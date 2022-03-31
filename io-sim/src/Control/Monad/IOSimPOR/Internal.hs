@@ -57,7 +57,7 @@ module Control.Monad.IOSimPOR.Internal
 import           Prelude hiding (read)
 
 import           Data.Dynamic
-import           Data.Foldable (traverse_)
+import           Data.Foldable (traverse_, foldlM)
 import qualified Data.List as List
 import qualified Data.List.Trace as Trace
 import           Data.Map.Strict (Map)
@@ -70,10 +70,9 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
 
-import           Control.Exception (NonTermination (..), assert, throw)
-import           Control.Monad (join)
-
-import           Control.Monad (when)
+import           Control.Exception
+                   (NonTermination (..), assert, throw, AsyncException (..))
+import           Control.Monad ( join, when )
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
@@ -161,9 +160,13 @@ labelledThreads threadMap =
 
 
 -- | Timers mutable variables.  First one supports 'newTimeout' api, the second
--- one 'registerDelay'.
+-- one 'registerDelay', the third one 'threadDelay'.
 --
-data TimerVars s = TimerVars !(TVar s TimeoutState) !(TVar s Bool)
+data TimerCompletionInfo s =
+       Timer !(TVar s TimeoutState)
+     | TimerRegisterDelay !(TVar s Bool)
+     | TimerThreadDelay !ThreadId
+     | TimerTimeout !ThreadId !TimeoutId !(STRef s IsLocked)
 
 type RunQueue = OrdPSQ (Down ThreadId) (Down ThreadId) ()
 
@@ -178,9 +181,10 @@ data SimState s a = SimState {
        finished         :: !(Map ThreadId (FinishedReason, VectorClock)),
        -- | current time
        curTime          :: !Time,
-       -- | ordered list of timers
-       timers           :: !(OrdPSQ TimeoutId Time (TimerVars s)),
-       -- | list of clocks
+       -- | ordered list of timers and timeouts
+       timers           :: !(OrdPSQ TimeoutId Time (TimerCompletionInfo s)),
+       -- | timeout locks in order to synchronize the timeout handler and the
+       -- main thread
        clocks           :: !(Map ClockId UTCTime),
        nextVid          :: !TVarId,     -- ^ next unused 'TVarId'
        nextTmid         :: !TimeoutId,  -- ^ next unused 'TimeoutId'
@@ -338,7 +342,53 @@ schedule thread@Thread{
         let thread' = thread { threadControl = ThreadControl (k x) ctl' }
         schedule thread' simstate
 
+      TimeoutFrame tmid isLockedRef k ctl' -> do
+        -- It could happen that the timeout action finished at the same time
+        -- as the timeout expired, this will be a race condition. That's why
+        -- we have the locks to solve this.
+        --
+        -- The lock starts 'NotLocked' and when the timeout fires the lock is
+        -- locked and asynchronously an assassin thread is coming to interrupt
+        -- this one. If the lock is locked when the timeout is fired then nothing
+        -- happens.
+        --
+        -- Knowing this, if we reached this point in the code and the lock is
+        -- 'Locked', then it means that this thread still hasn't received the
+        -- 'TimeoutException', so we need to kill the thread that is responsible
+        -- for doing that (the assassin one, we need to defend ourselves!)
+        -- and run our continuation successfully and peacefully. We will do that
+        -- by uninterruptibly-masking ourselves so we can not receive any
+        -- exception and kill the assassin thread behind its back.
+        -- If the lock is 'NotLocked' then it means we can just acquire it and
+        -- carry on with the success case.
+        locked <- readSTRef isLockedRef
+        case locked of
+          Locked etid -> do
+            let -- Kill the exception throwing thread and carry on the
+                -- continuation
+                thread' =
+                  thread { threadControl =
+                            ThreadControl (ThrowTo (toException ThreadKilled)
+                                                   etid
+                                                   (k (Just x)))
+                                          ctl'
+                         , threadMasking = MaskedUninterruptible
+                         }
+            schedule thread' simstate
+
+          NotLocked -> do
+            -- Acquire lock
+            writeSTRef isLockedRef (Locked tid)
+
+                -- Remove the timer from the queue
+            let timers' = PSQ.delete tmid timers
+                -- Run the continuation successfully
+                thread' = thread { threadControl = ThreadControl (k (Just x)) ctl' }
+
+            schedule thread' simstate { timers = timers'
+                                      }
     Throw thrower e -> case unwindControlStack e thread of
+      -- Found a CatchFrame
       Right thread0@Thread { threadMasking = maskst' } -> do
         -- We found a suitable exception handler, continue with that
         -- We record a step, in case there is no exception handler on replay.
@@ -452,18 +502,72 @@ schedule thread@Thread{
                            (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
-      tvar' <- execNewTVar (succ nextVid)
-                           (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
-                           False
-      modifySTRef (tvarVClock tvar') (leastUpperBoundVClock vClock)
       let expiry  = d `addTime` time
           t       = Timeout tvar nextTmid
-          timers' = PSQ.insert nextTmid expiry (TimerVars tvar tvar') timers
+          timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
           thread' = thread { threadControl = ThreadControl (k t) ctl }
-      !trace <- schedule thread' simstate { timers   = timers'
+      trace <- schedule thread' simstate { timers   = timers'
                                           , nextVid  = succ (succ nextVid)
                                           , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
+
+    -- This case is guarded by checks in 'timeout' itself.
+    StartTimeout d _ _ | d <= 0 ->
+      error "schedule: StartTimeout: Impossible happened"
+
+    StartTimeout d action' k -> do
+      isLockedRef <- newSTRef NotLocked
+      let expiry    = d `addTime` time
+          timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid isLockedRef) timers
+          thread'   = thread { threadControl =
+                                 ThreadControl action'
+                                               (TimeoutFrame nextTmid isLockedRef k ctl)
+                              }
+      trace <- deschedule Yield thread' simstate { timers   = timers'
+                                                  , nextTmid = succ nextTmid }
+      return (SimPORTrace time tid tstep tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
+
+    RegisterDelay d k | d < 0 -> do
+      tvar <- execNewTVar nextVid
+                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          True
+      modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
+      let !expiry  = d `addTime` time
+          !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
+      trace <- schedule thread' simstate { nextVid = succ nextVid }
+      return (SimPORTrace time tid tstep tlbl (EventRegisterDelayCreated nextTmid nextVid expiry) $
+              SimPORTrace time tid tstep tlbl (EventRegisterDelayFired nextTmid) $
+              trace)
+
+    RegisterDelay d k -> do
+      tvar <- execNewTVar nextVid
+                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          False
+      modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
+      let !expiry  = d `addTime` time
+          !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
+          !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
+      trace <- schedule thread' simstate { timers   = timers'
+                                         , nextVid  = succ nextVid
+                                         , nextTmid = succ nextTmid }
+      return (SimPORTrace time tid tstep tlbl
+                (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
+
+    ThreadDelay d k | d < 0 -> do
+      let expiry  = d `addTime` time
+          thread' = thread { threadControl = ThreadControl k ctl }
+      trace <- schedule thread' simstate
+      return (SimPORTrace time tid tstep tlbl (EventThreadDelay expiry) $
+              SimPORTrace time tid tstep tlbl EventThreadDelayFired $
+              trace)
+
+    ThreadDelay d k -> do
+      let expiry  = d `addTime` time
+          timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid) timers
+          thread' = thread { threadControl = ThreadControl k ctl }
+      trace <- deschedule Blocked thread' simstate { timers   = timers'
+                                                    , nextTmid = succ nextTmid }
+      return (SimPORTrace time tid tstep tlbl (EventThreadDelay expiry) trace)
 
     -- we do not follow `GHC.Event` behaviour here; updating a timer to the past
     -- effectively cancels it.
@@ -935,34 +1039,65 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         -- Reuse the STM functionality here to write all the timer TVars.
         -- Simplify to a special case that only reads and writes TVars.
         written <- execAtomically' (runSTM $ mapM_ timeoutAction fired)
-        (wakeup, wokeby) <- threadsUnblockedByWrites written
+        (wakeupSTM, wokeby) <- threadsUnblockedByWrites written
         mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
-        -- TODO: the vector clock below cannot be right, can it?
-        let (unblocked,
-             simstate') = unblockThreads bottomVClock wakeup simstate
-            -- all open races will be completed and reported at this time
-            simstate''  = simstate'{ races = noRaces }
+        let wakeupThreadDelay = [ tid | TimerThreadDelay tid <- fired ]
+            wakeup            = wakeupThreadDelay ++ wakeupSTM
+            -- TODO: the vector clock below cannot be right, can it?
+            (_, !simstate')   = unblockThreads bottomVClock wakeup simstate
+
+            -- For each 'timeout' action where the timeout has fired, start a
+            -- new thread to execute throwTo to interrupt the action.
+            !timeoutExpired = [ (tid, tmid, isLockedRef)
+                              | TimerTimeout tid tmid isLockedRef <- fired ]
+
+        -- Get the isLockedRef values
+        !timeoutExpired' <- traverse (\(tid, tmid, isLockedRef) -> do
+                                        locked <- readSTRef isLockedRef
+                                        return (tid, tmid, isLockedRef, locked)
+                                    )
+                                    timeoutExpired
+
+        -- all open races will be completed and reported at this time
+        !simstate'' <- forkTimeoutInterruptThreads timeoutExpired'
+                                                   simstate' { races = noRaces }
         !trace <- reschedule simstate'' { curTime = time'
                                         , timers  = timers' }
         let traceEntries =
-                     [ (time', ThreadId [-1], (-1), Just "timer", EventTimerFired tmid)
-                     | tmid <- tmids ]
-                  ++ [ (time', tid', (-1), tlbl', EventTxWakeup vids)
-                     | tid' <- unblocked
+                     [ ( time', ThreadId [-1], -1, Just "timer"
+                       , EventTimerFired tmid)
+                     | (tmid, Timer _) <- zip tmids fired ]
+                  ++ [ ( time', ThreadId [-1], -1, Just "register delay timer"
+                       , EventRegisterDelayFired tmid)
+                     | (tmid, TimerRegisterDelay _) <- zip tmids fired ]
+                  ++ [ (time', tid', -1, tlbl', EventTxWakeup vids)
+                     | tid' <- wakeupSTM
                      , let tlbl' = lookupThreadLabel tid' threads
                      , let Just vids = Set.toList <$> Map.lookup tid' wokeby ]
+                  ++ [ ( time', tid, -1, Just "thread delay timer"
+                       , EventThreadDelayFired)
+                     | tid <- wakeupThreadDelay ]
+                  ++ [ ( time', tid, -1, Just "timeout timer"
+                       , EventTimeoutFired tmid)
+                     | (tid, tmid, _, _) <- timeoutExpired' ]
+                  ++ [ ( time', tid, -1, Just "forked thread"
+                       , EventThreadForked tid)
+                     | (tid, _, _, _) <- timeoutExpired' ]
+
         return $
           traceFinalRacesFound simstate $
           traceMany traceEntries trace
   where
-    timeoutAction (TimerVars var bvar) = do
+    timeoutAction (Timer var) = do
       x <- readTVar var
       case x of
-        TimeoutPending   -> writeTVar var  TimeoutFired
-                         >> writeTVar bvar True
+        TimeoutPending   -> writeTVar var TimeoutFired
         TimeoutFired     -> error "MonadTimer(Sim): invariant violation"
         TimeoutCancelled -> return ()
+    timeoutAction (TimerRegisterDelay var) = writeTVar var True
+    timeoutAction (TimerThreadDelay _)     = return ()
+    timeoutAction (TimerTimeout _ _ _)     = return ()
 
 unblockThreads :: forall s a.
                   VectorClock
@@ -998,6 +1133,78 @@ unblockThreads vClock wakeup simstate@SimState {runqueue, threads} =
                                 threadVClock = vClock `leastUpperBoundVClock` threadVClock t })))
                    threads unblockedIds
 
+-- | This function receives a list of TimerTimeout values that represent threads
+-- for which the timeout expired and kills the running thread if needed.
+--
+-- This function is responsible for the second part of the race condition issue
+-- and relates to the 'schedule's 'TimeoutFrame' locking explanation (here is
+-- where the assassin threads are launched. So, as explained previously, at this
+-- point in code, the timeout expired so we need to interrupt the running
+-- thread. If the running thread finished at the same time the timeout expired
+-- we have a race condition. To deal with this race condition what we do is
+-- look at the lock value. If it is 'Locked' this means that the running thread
+-- already finished (or won the race) so we can safely do nothing. Otherwise, if
+-- the lock value is 'NotLocked' we need to acquire the lock and launch an
+-- assassin thread that is going to interrupt the running one. Note that we
+-- should run this interrupting thread in an unmasked state since it might
+-- receive a 'ThreadKilled' exception.
+--
+forkTimeoutInterruptThreads :: [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
+                            -> SimState s a
+                            -> ST s (SimState s a)
+forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
+  foldlM (\st@SimState{ runqueue = runqueue,
+                        threads  = threads'
+                      }
+           (t, isLockedRef)
+          -> do
+            let tid'      = threadId t
+                threads'' = Map.insert tid' t threads'
+                runqueue' = insertThread t runqueue
+            writeSTRef isLockedRef (Locked tid')
+
+            return st { runqueue = runqueue',
+                        threads  = threads''
+                      })
+          simState
+          throwToThread
+
+  where
+    -- can only throw exception if the thread exists and if the mutually
+    -- exclusive lock exists and is still 'NotLocked'
+    toThrow = [ (tid, tmid, ref, t)
+              | (tid, tmid, ref, locked) <- timeoutExpired
+              , Just t <- [Map.lookup tid threads]
+              , NotLocked <- [locked]
+              ]
+    -- we launch a thread responsible for throwing an AsyncCancelled exception
+    -- to the thread which timeout expired
+    throwToThread =
+      [ let nextId   = threadNextTId t
+            tid'     = childThreadId tid nextId
+         in ( Thread { threadId      = tid',
+                       threadControl =
+                        ThreadControl
+                          (ThrowTo (toException (TimeoutException tmid))
+                                    tid
+                                    (Return ()))
+                          ForkFrame,
+                       threadBlocked = False,
+                       threadDone    = False,
+                       threadMasking = Unmasked,
+                       threadThrowTo = [],
+                       threadClockId = threadClockId t,
+                       threadLabel   = Just "timeout-forked-thread",
+                       threadNextTId = 1,
+                       threadStep    = 0,
+                       threadVClock  = insertVClock tid' 0
+                                     $ threadVClock t,
+                       threadEffect  = mempty,
+                       threadRacy    = threadRacy t
+                     }
+            , ref)
+      | (tid, tmid, ref, t) <- toThrow
+      ]
 
 -- | Iterate through the control stack to find an enclosing exception handler
 -- of the right type, or unwind all the way to the top level for the thread.
@@ -1014,7 +1221,8 @@ unwindControlStack e thread =
       ThreadControl _ ctl -> unwind (threadMasking thread) ctl
   where
     unwind :: forall s' c. MaskingState
-           -> ControlStack s' c a -> Either Bool (Thread s' a)
+           -> ControlStack s' c a
+           -> Either Bool (Thread s' a)
     unwind _  MainFrame                 = Left True
     unwind _  ForkFrame                 = Left False
     unwind _ (MaskFrame _k maskst' ctl) = unwind maskst' ctl
@@ -1026,12 +1234,28 @@ unwindControlStack e thread =
 
         -- Ok! We will be able to continue the thread with the handler
         -- followed by the continuation after the catch
-        Just e' -> Right thread {
-                      -- As per async exception rules, the handler is run masked
+        Just e' -> Right ( thread {
+                      -- As per async exception rules, the handler is run
+                      -- masked
                      threadControl = ThreadControl (handler e')
                                                    (MaskFrame k maskst ctl),
                      threadMasking = atLeastInterruptibleMask maskst
                    }
+                )
+
+    -- Either Timeout fired or the action threw an exception.
+    -- - If Timeout fired, then it was possibly during this thread's execution
+    --   so we need to run the continuation with a Nothing value.
+    -- - If the timeout action threw an exception we need to keep unwinding the
+    --   control stack looking for a handler to this exception.
+    unwind maskst (TimeoutFrame tmid isLockedRef k ctl) =
+      case fromException e of
+        -- Exception came from timeout expiring
+        Just (TimeoutException tmid') ->
+          assert (tmid == tmid')
+          Right thread { threadControl = ThreadControl (k Nothing) ctl }
+        -- Exception came from a different exception
+        _ -> unwind maskst ctl
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState
     atLeastInterruptibleMask Unmasked = MaskedInterruptible
