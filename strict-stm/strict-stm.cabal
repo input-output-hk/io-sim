@@ -35,7 +35,7 @@ library
 
   exposed-modules:     Control.Monad.Class.MonadSTM.Strict
   default-language:    Haskell2010
-  build-depends:       base  >=4.9 && <4.15,
+  build-depends:       base  >=4.9 && <4.17,
                        stm   >=2.5 && <2.6,
                        io-classes
   ghc-options:         -Wall
