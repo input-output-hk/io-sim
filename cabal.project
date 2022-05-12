@@ -1,0 +1,18 @@
+index-state: 2022-02-18T00:00:00Z
+
+packages: ./io-sim
+          ./io-classes
+          ./strict-stm
+
+package io-sim
+  tests: True
+  -- NOTE: to enable benchmarks, one needs to disable tests for --
+  -- `typed-protocols-examples`.  This won't be a problem, once `io-sim` lands
+  -- in its own repository.
+  benchmarks: False
+
+package io-classes
+  flags: +asserts
+
+package strict-stm
+  flags: +asserts
