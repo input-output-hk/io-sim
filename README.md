@@ -9,31 +9,31 @@
 * concurrency: both low level `forkIO` as well as `async` style
 * strict STM
 * access to lazy ST
-* schedule discovery (see [IOSimPOR](./how-to-use-IOSimPOR.md)
+* schedule discovery (see [IOSimPOR](./how-to-use-IOSimPOR.md))
 * eventlog
 * dynamic tracing
 * tracing committed changes to `TVar`, `TMVar`s, ...
 * labeling of threads, `TVar`'s, ...
 
 `io-classes` provide a common interface, which allow to write code which can be
-run in both real `IO` and `IOSim`.  It is a drop-in replacement for `IO`.
+run in both real `IO` and `IOSim`. It is a drop-in replacement for `IO`.
 
 One of the principles of `io-classes` was to stay as close to `IO` as possible,
 thus most of the `IO` instances are directly referring to `base`, `async` api.
 However we made some differences, which are reported below.
 
 `io-classes` supports a novel hierarchy for error handling monads as well more
-familiar `exception` style.   The new hierarchy provides `bracket` and
+familiar `exception` style. The new hierarchy provides `bracket` and
 `finally` functions in the `MonadThrow` class, while `catch` style operators
-are provided by a super-class `MonadCatch`.  Both `bracket` and `finally` are
+are provided by a super-class `MonadCatch`. Both `bracket` and `finally` are
 the most common interface used to write code with robust exception handling,
 exposing them through the more basic `MonadThrow` class informs the reader
-/ reviewer than no tricky error handling is done in that section of the code
+/ reviewer that no tricky error handling is done in that section of the code
 base.
 
 `IOSim` exposes a detailed trace, which can be enhanced by labelling threads,
 or mutable variables, tracing `Dynamic` values (which can be recovered from the
-trace) or simple `String` based tracing.  It has been used to develop & test
+trace) or simple `String` based tracing. It has been used to develop & test
 a complex concurrent system ([ouroboros-network][ouroboros-network]), in
 particular
 
@@ -67,9 +67,9 @@ type Async :: (Type -> Type) -> Type -> Type
 
 The first type of kind `Type -> Type` describe the monad which could be
 instantiated to `IO`, `IOSim` or some other monad stack build with monad
-transformers.  The same applies to many other types, e.g. `TVar`, `TMVar`.
+transformers. The same applies to many other types, e.g. `TVar`, `TMVar`.
 
- The types although similar to the original
+The types although similar to the original
 are not the same as the ones that come from `base`, `async`, or
 `excpetions` packages:
 
