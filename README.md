@@ -9,7 +9,7 @@
 * concurrency: both low level `forkIO` as well as `async` style
 * strict STM
 * access to lazy ST
-* schedule discovery (see [IOSimPOR](./how-to-use-IOSimPOR.md)
+* schedule discovery (see [IOSimPOR](./how-to-use-IOSimPOR.md))
 * eventlog
 * dynamic tracing
 * tracing committed changes to `TVar`, `TMVar`s, ...
@@ -23,12 +23,12 @@ thus most of the `IO` instances are directly referring to `base`, `async` api.
 However we made some differences, which are reported below.
 
 `io-classes` supports a novel hierarchy for error handling monads as well more
-familiar `exception` style.   The new hierarchy provides `bracket` and
+familiar `exception` style.  The new hierarchy provides `bracket` and
 `finally` functions in the `MonadThrow` class, while `catch` style operators
 are provided by a super-class `MonadCatch`.  Both `bracket` and `finally` are
 the most common interface used to write code with robust exception handling,
 exposing them through the more basic `MonadThrow` class informs the reader
-/ reviewer than no tricky error handling is done in that section of the code
+/ reviewer that no tricky error handling is done in that section of the code
 base.
 
 `IOSim` exposes a detailed trace, which can be enhanced by labelling threads,
@@ -69,7 +69,7 @@ The first type of kind `Type -> Type` describe the monad which could be
 instantiated to `IO`, `IOSim` or some other monad stack build with monad
 transformers.  The same applies to many other types, e.g. `TVar`, `TMVar`.
 
- The types although similar to the original
+The types although similar to the original
 are not the same as the ones that come from `base`, `async`, or
 `excpetions` packages:
 
