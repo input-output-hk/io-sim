@@ -7,9 +7,7 @@ runCommand "check-stylish" {
 } ''
   unpackPhase
   cd $sourceRoot
-  fd . './io-sim' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
-  fd . './io-classes' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
-  fd . './strict-stm' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
+  bash ./scripts/check-stylish.sh
   diff -ru $src .
 
   EXIT_CODE=$?
