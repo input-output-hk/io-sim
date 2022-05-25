@@ -54,7 +54,7 @@ library
                        FlexibleContexts
                        ScopedTypeVariables
                        RankNTypes
-  build-depends:       base  >=4.9 && <4.15,
+  build-depends:       base  >=4.9 && <4.17,
                        async >=2.1,
                        bytestring,
                        mtl   >=2.2 && <2.3,

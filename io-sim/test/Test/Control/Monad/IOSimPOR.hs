@@ -4,6 +4,8 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module Test.Control.Monad.IOSimPOR where
 
 import           Control.Monad
