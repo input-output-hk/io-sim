@@ -848,7 +848,7 @@ instance MonadSTM m => MonadSTM (ContT r m) where
 
     type TVar (ContT r m) = TVar m
     newTVar        = WrappedSTM .  newTVar
-    readTVar       =            readTVar
+    readTVar       = WrappedSTM .  readTVar
     writeTVar      = WrappedSTM .: writeTVar
     retry          = WrappedSTM    retry
     orElse         = WrappedSTM .: on orElse runWrappedSTM
@@ -899,7 +899,7 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
 
     type TVar (ReaderT r m) = TVar m
     newTVar        = WrappedSTM .  newTVar
-    readTVar       =            readTVar
+    readTVar       = WrappedSTM .  readTVar
     writeTVar      = WrappedSTM .: writeTVar
     retry          = WrappedSTM    retry
     orElse         = WrappedSTM .: on orElse runWrappedSTM
@@ -950,7 +950,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
 
     type TVar (WriterT w m) = TVar m
     newTVar        = WrappedSTM .  newTVar
-    readTVar       =            readTVar
+    readTVar       = WrappedSTM .  readTVar
     writeTVar      = WrappedSTM .: writeTVar
     retry          = WrappedSTM    retry
     orElse         = WrappedSTM .: on orElse runWrappedSTM
@@ -1001,7 +1001,7 @@ instance MonadSTM m => MonadSTM (StateT s m) where
 
     type TVar (StateT s m) = TVar m
     newTVar        = WrappedSTM .  newTVar
-    readTVar       =            readTVar
+    readTVar       = WrappedSTM .  readTVar
     writeTVar      = WrappedSTM .: writeTVar
     retry          = WrappedSTM    retry
     orElse         = WrappedSTM .: on orElse runWrappedSTM
@@ -1052,7 +1052,7 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
 
     type TVar (ExceptT e m) = TVar m
     newTVar        = WrappedSTM .  newTVar
-    readTVar       =            readTVar
+    readTVar       = WrappedSTM .  readTVar
     writeTVar      = WrappedSTM .: writeTVar
     retry          = WrappedSTM    retry
     orElse         = WrappedSTM .: on orElse runWrappedSTM
@@ -1103,7 +1103,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
 
     type TVar (RWST r w s m) = TVar m
     newTVar        = WrappedSTM .  newTVar
-    readTVar       =            readTVar
+    readTVar       = WrappedSTM .  readTVar
     writeTVar      = WrappedSTM .: writeTVar
     retry          = WrappedSTM    retry
     orElse         = WrappedSTM .: on orElse runWrappedSTM
