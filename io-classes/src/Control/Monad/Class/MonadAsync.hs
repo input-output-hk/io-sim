@@ -347,7 +347,7 @@ instance Exception ExceptionInLinkedThread where
   fromException = E.asyncExceptionFromException
   toException = E.asyncExceptionToException
 
--- | Generalizion of 'link' that links an async to an arbitrary thread.
+-- | Generalization of 'link' that links an async to an arbitrary thread.
 linkTo :: (MonadAsync m, MonadFork m, MonadMask m)
        => ThreadId m -> Async m a -> m ()
 linkTo tid = linkToOnly tid (not . isCancel)

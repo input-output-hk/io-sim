@@ -18,11 +18,6 @@ source-repository head
   location: https://github.com/input-output-hk/ouroboros-network
   subdir:   io-classes
 
-flag checktvarinvariant
-  Description: Enable runtime invariant checks on StrictT(M)Var
-  Manual: True
-  Default: False
-
 flag asserts
   description: Enable assertions
   manual:      False
