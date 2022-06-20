@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs              #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 -- | Internal types shared between `IOSim` and `IOSimPOR`.
 --
