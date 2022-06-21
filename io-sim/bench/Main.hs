@@ -3,7 +3,7 @@
 
 module Main (main) where
 
-import           Control.Monad (replicateM, forever)
+import           Control.Monad (forever, replicateM)
 import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSTM

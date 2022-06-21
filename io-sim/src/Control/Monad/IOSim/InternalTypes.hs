@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE GADTs #-}
 
 -- | Internal types shared between `IOSim` and `IOSimPOR`.
 --
@@ -47,12 +47,12 @@ data ControlStack s b a where
 instance Show (ControlStack s b a) where
   show = show . dash
     where dash :: ControlStack s' b' a' -> ControlStackDash
-          dash MainFrame          = MainFrame'
-          dash ForkFrame          = ForkFrame'
-          dash (MaskFrame _ m s)  = MaskFrame' m (dash s)
-          dash (CatchFrame _ _ s) = CatchFrame' (dash s)
+          dash MainFrame                   = MainFrame'
+          dash ForkFrame                   = ForkFrame'
+          dash (MaskFrame _ m s)           = MaskFrame' m (dash s)
+          dash (CatchFrame _ _ s)          = CatchFrame' (dash s)
           dash (TimeoutFrame tid tmid _ s) = TimeoutFrame' tid tmid (dash s)
-          dash (ThreadDelayFrame tmid s) = ThreadDelayFrame' tmid (dash s)
+          dash (ThreadDelayFrame tmid s)   = ThreadDelayFrame' tmid (dash s)
 
 data ControlStackDash =
     MainFrame'

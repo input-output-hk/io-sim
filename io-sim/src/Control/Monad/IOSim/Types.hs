@@ -1,14 +1,14 @@
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTSyntax                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE PatternSynonyms            #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DeriveGeneric             #-}
+{-# LANGUAGE DerivingVia               #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTSyntax                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE NamedFieldPuns            #-}
+{-# LANGUAGE PatternSynonyms           #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields          #-}
@@ -520,8 +520,8 @@ instance MonadTimer (IOSim s) where
                          | NegativeTimeout !TimeoutId
                          -- ^ a negative timeout
 
-  readTimeout (Timeout var _key) = MonadSTM.readTVar var
-  readTimeout (NegativeTimeout _key)   = pure TimeoutCancelled
+  readTimeout (Timeout var _key)     = MonadSTM.readTVar var
+  readTimeout (NegativeTimeout _key) = pure TimeoutCancelled
 
   newTimeout      d = IOSim $ oneShot $ \k -> NewTimeout      d k
   updateTimeout t d = IOSim $ oneShot $ \k -> UpdateTimeout t d (k ())
