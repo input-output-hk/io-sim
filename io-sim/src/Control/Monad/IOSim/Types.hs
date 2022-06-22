@@ -71,6 +71,7 @@ import qualified Control.Monad.Class.MonadAsync as MonadAsync
 import           Control.Monad.Class.MonadEventlog
 import           Control.Monad.Class.MonadFork hiding (ThreadId)
 import qualified Control.Monad.Class.MonadFork as MonadFork
+import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
@@ -447,6 +448,17 @@ instance MonadTraceSTM (IOSim s) where
   traceTVar _ tvar f = STM $ \k -> TraceTVar tvar f (k ())
   traceTQueue  = traceTQueueDefault
   traceTBQueue = traceTBQueueDefault
+
+
+instance MonadMVar (IOSim s) where
+  type MVar (IOSim s) = MVarDefault (IOSim s)
+  newEmptyMVar = newEmptyMVarDefault
+  newMVar      = newMVarDefault
+  takeMVar     = takeMVarDefault
+  putMVar      = putMVarDefault
+  tryTakeMVar  = tryTakeMVarDefault
+  tryPutMVar   = tryPutMVarDefault
+  isEmptyMVar  = isEmptyMVarDefault
 
 data Async s a = Async !ThreadId (STM s (Either SomeException a))
 
