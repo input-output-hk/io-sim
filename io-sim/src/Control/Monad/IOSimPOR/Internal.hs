@@ -1212,6 +1212,18 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
         -- TODO: step
         return $ SimPORTrace time tid (-1) tlbl (EventLog x) trace
 
+      CatchStm action' handler k ->
+        {-# SCC "execAtomically.go.CatchStm" #-} do
+        undefined
+
+      GetMaskStateStm x ->
+        {-# SCC "execAtomically.go.GetMaskStateStm" #-} do
+        undefined
+
+      SetMaskStateStm x m k ->
+        {-# SCC "execAtomically.go.SetMaskStateStm" #-} do
+        undefined
+
       where
         localInvariant =
             Map.keysSet written

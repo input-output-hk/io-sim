@@ -22,7 +22,7 @@ newtype TQueueDefault m a = TQueue (TVar m ([a], [a]))
 labelTQueueDefault
   :: MonadLabelledSTM m
   => TQueueDefault m a -> String -> STM m ()
-labelTQueueDefault (TQueue queue) label =  labelTVar queue label
+labelTQueueDefault (TQueue queue) =  labelTVar queue
 
 traceTQueueDefault
   :: MonadTraceSTM m

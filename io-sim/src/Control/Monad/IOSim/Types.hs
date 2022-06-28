@@ -175,6 +175,7 @@ runSTM (STM k) = k ReturnStm
 data StmA s a where
   ReturnStm    :: a -> StmA s a
   ThrowStm     :: SomeException -> StmA s a
+  CatchStm     :: Exception e => StmA s a -> (e -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
   NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
@@ -189,6 +190,9 @@ data StmA s a where
                   TVar s a
                -> (Maybe a -> a -> ST s TraceValue)
                -> StmA s b -> StmA s b
+
+  SetMaskStateStm :: MaskingState -> STM s a -> (a -> StmA s b) -> StmA s b
+  GetMaskStateStm :: (MaskingState -> StmA s b) -> StmA s b
 
 -- Exported type
 type STMSim = STM
@@ -312,6 +316,38 @@ instance MonadThrow (STM s) where
 
 instance Exceptions.MonadThrow (STM s) where
   throwM = MonadThrow.throwIO
+
+instance MonadCatch (STM s) where
+    catch action handler =
+        STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler) k
+
+
+getMaskingStateStmImpl :: STM s MaskingState
+unblockStm, blockStm, blockUninterruptibleStm :: STM s a -> STM s a
+
+getMaskingStateStmImpl    = STM GetMaskStateStm
+unblockStm              a = STM (SetMaskStateStm Unmasked a)
+blockStm                a = STM (SetMaskStateStm MaskedInterruptible a)
+blockUninterruptibleStm a = STM (SetMaskStateStm MaskedUninterruptible a)
+
+
+instance MonadMask (STM s) where
+    mask action = do
+      b <- getMaskingStateStmImpl
+      case b of
+        Unmasked              -> blockStm $ action unblockStm
+        MaskedInterruptible   -> action blockStm
+        MaskedUninterruptible -> action blockUninterruptibleStm
+
+    uninterruptibleMask action = do
+      b <- getMaskingStateStmImpl
+      case b of
+        Unmasked              -> blockUninterruptibleStm $ action unblockStm
+        MaskedInterruptible   -> blockUninterruptibleStm $ action blockStm
+        MaskedUninterruptible -> action blockUninterruptibleStm
+
+instance Exceptions.MonadCatch (STM s) where
+    catch = MonadThrow.catch
 
 instance MonadCatch (IOSim s) where
   catch action handler =
