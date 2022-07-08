@@ -77,9 +77,10 @@ test-suite test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Main.hs
-  other-modules:       Test.IOSim
-                       Test.STM
-                       Test.Control.Monad.IOSimPOR
+  other-modules:       Test.STM
+                       Test.Control.Monad.Common
+                       Test.Control.Monad.IOSim.Test
+                       Test.Control.Monad.IOSimPOR.Test
   default-language:    Haskell2010
   build-depends:       base,
                        array,

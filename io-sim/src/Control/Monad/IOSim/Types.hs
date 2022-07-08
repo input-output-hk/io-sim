@@ -1,16 +1,14 @@
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTSyntax                 #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE PatternSynonyms            #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DeriveGeneric             #-}
+{-# LANGUAGE DerivingVia               #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTSyntax                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE NamedFieldPuns            #-}
+{-# LANGUAGE PatternSynonyms           #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields          #-}
@@ -141,9 +139,15 @@ data SimA s a where
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
 
-  NewTimeout   :: DiffTime -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
-  UpdateTimeout:: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
-  CancelTimeout:: Timeout (IOSim s) -> SimA s b -> SimA s b
+  StartTimeout :: DiffTime -> IOSim s a -> (Maybe a -> SimA s b) -> SimA s b
+
+  NewRegisterDelay :: DiffTime -> (TVar s Bool -> SimA s b) -> SimA s b
+
+  NewThreadDelay :: DiffTime -> SimA s b -> SimA s b
+
+  NewTimeout    :: DiffTime -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
+  UpdateTimeout :: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
+  CancelTimeout :: Timeout (IOSim s) -> SimA s b -> SimA s b
 
   Throw        :: SomeException -> SimA s a
   Catch        :: Exception e =>
@@ -506,44 +510,29 @@ unshareClock :: IOSim s ()
 unshareClock = IOSim $ oneShot $ \k -> UnshareClock (k ())
 
 instance MonadDelay (IOSim s) where
-  -- Use default in terms of MonadTimer
+  -- Use optimized IOSim primitive
+  threadDelay d = IOSim $ \k -> NewThreadDelay d (k ())
 
 instance MonadTimer (IOSim s) where
-  data Timeout (IOSim s) = Timeout !(TVar s TimeoutState) !(TVar s Bool) !TimeoutId
-                         -- ^ a timeout; we keep both 'TVar's to support
-                         -- `newTimer` and 'registerTimeout'.
+  data Timeout (IOSim s) = Timeout !(TVar s TimeoutState) !TimeoutId
+                         -- ^ a timeout; for 'registerDelay' IOSim has
+                         -- its own constructor primitive
                          | NegativeTimeout !TimeoutId
                          -- ^ a negative timeout
 
-  readTimeout (Timeout var _bvar _key) = MonadSTM.readTVar var
-  readTimeout (NegativeTimeout _key)   = pure TimeoutCancelled
+  readTimeout (Timeout var _key)     = MonadSTM.readTVar var
+  readTimeout (NegativeTimeout _key) = pure TimeoutCancelled
 
   newTimeout      d = IOSim $ oneShot $ \k -> NewTimeout      d k
   updateTimeout t d = IOSim $ oneShot $ \k -> UpdateTimeout t d (k ())
   cancelTimeout t   = IOSim $ oneShot $ \k -> CancelTimeout t   (k ())
 
   timeout d action
-    | d <  0    = Just <$> action
-    | d == 0    = return Nothing
-    | otherwise = do
-        pid <- myThreadId
-        t@(Timeout _ _ tid) <- newTimeout d
-        handleJust
-          (\(TimeoutException tid') -> if tid' == tid
-                                         then Just ()
-                                         else Nothing)
-          (\_ -> return Nothing) $
-          bracket
-            (forkIO $ do
-                labelThisThread "<<timeout>>"
-                fired <- MonadSTM.atomically $ awaitTimeout t
-                when fired $ throwTo pid (TimeoutException tid))
-            (\pid' -> do
-                  cancelTimeout t
-                  throwTo pid' AsyncCancelled)
-            (\_ -> Just <$> action)
+    | d <  0 = Just <$> action
+    | d == 0 = return Nothing
+    | otherwise = IOSim $ \k -> StartTimeout d action k
 
-  registerDelay d = IOSim $ oneShot $ \k -> NewTimeout d (\(Timeout _var bvar _) -> k bvar)
+  registerDelay d = IOSim $ \k -> NewRegisterDelay d k
 
 newtype TimeoutException = TimeoutException TimeoutId deriving Eq
 
@@ -770,10 +759,19 @@ data SimEventType
                        (Maybe Effect)    -- effect performed (only for `IOSimPOR`)
   | EventTxWakeup      [Labelled TVarId] -- changed vars causing retry
 
-  | EventTimerCreated   TimeoutId TVarId Time
-  | EventTimerUpdated   TimeoutId        Time
-  | EventTimerCancelled TimeoutId
-  | EventTimerExpired   TimeoutId
+  | EventThreadDelay        Time
+  | EventThreadDelayExpired
+
+  | EventTimeoutCreated        TimeoutId ThreadId Time
+  | EventTimeoutCreatedExpired TimeoutId
+
+  | EventRegisterDelayCreated TimeoutId TVarId Time
+  | EventRegisterDelayExpired TimeoutId
+
+  | EventTimerCreated         TimeoutId TVarId Time
+  | EventTimerUpdated         TimeoutId        Time
+  | EventTimerCancelled       TimeoutId
+  | EventTimerExpired         TimeoutId
 
   -- the following events are inserted to mark the difference between
   -- a failed trace and a similar passing trace of the same action
