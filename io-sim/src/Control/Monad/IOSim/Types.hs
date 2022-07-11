@@ -175,6 +175,7 @@ runSTM (STM k) = k ReturnStm
 data StmA s a where
   ReturnStm    :: a -> StmA s a
   ThrowStm     :: SomeException -> StmA s a
+  CatchStm     :: Exception e => StmA s a -> (e -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
   NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
@@ -312,6 +313,17 @@ instance MonadThrow (STM s) where
 
 instance Exceptions.MonadThrow (STM s) where
   throwM = MonadThrow.throwIO
+
+instance MonadCatch (STM s) where 
+
+  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler)  k
+
+  -- Default implmentation uses mask. For STM, mask is not necessary.
+  generalBracket = generalBracketSTM 
+
+instance Exceptions.MonadCatch (STM s) where 
+
+  catch = MonadThrow.catch
 
 instance MonadCatch (IOSim s) where
   catch action handler =
@@ -853,6 +865,15 @@ data StmStack s b a where
                    -> StmStack s b c
                    -> StmStack s a c
 
+  -- | Executing in the context of the /action/ part of the 'catch'
+  CatchStmFrame    :: Exception e              
+                   => (e -> StmA s a)         -- exception handler
+                   -> (a -> StmA s b)         -- subsequent continuation
+                   -> Map TVarId (SomeTVar s) -- saved written vars set
+                   -> [SomeTVar s]            -- saved written vars set
+                   -> [SomeTVar s]            -- created vars list
+                   -> StmStack s b c 
+                   -> StmStack s a c         
 ---
 --- Schedules
 ---

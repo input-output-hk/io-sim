@@ -910,11 +910,24 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           -- Continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
+        CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          undefined
+
       ThrowStm e ->
         {-# SCC "execAtomically.go.ThrowStm" #-} do
-        -- Revert all the TVar writes
-        !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-        k0 $ StmTxAborted [] (toException e)
+        case (fromException e, ctl) of 
+          (Just e', CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl') | isException exc -> do
+            -- Use handler to rescue the exception
+            go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (handler e')
+          (_, _) -> do
+            -- Revert all the TVar writes
+            !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+            k0 $ StmTxAborted [] (toException e)
+
+      CatchStm act handler k -> 
+        {-# SCC "execAtomically.go.CatchStm" #-} do
+          let ctl' = CatchStmFrame handler k written writtenSeq createdSeq ctl
+          go ctl' read Map.empty [] [] nextVid act
 
       Retry ->
         {-# SCC "execAtomically.go.Retry" #-}
@@ -940,6 +953,10 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           -- Skip the continuation and propagate the retry into the outer frame
           -- using the written set for the outer frame
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchStmFrame handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchStmFrame" #-} do
+            undefined 
 
       OrElse a b k ->
         {-# SCC "execAtomically.go.OrElse" #-} do
