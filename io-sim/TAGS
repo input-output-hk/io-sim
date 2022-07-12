@@ -1,0 +1,1044 @@
+
+./src/Control/Monad/IOSimPOR/Timeout.hs,381
+module Control.Monad.IOSimPOR.TimeoutControl.Monad.IOSimPOR.Timeout0,1
+newtype Timeout Timeout28,29
+instance Show Show Timeout31,32
+    show show32,33
+instance Exception Exception Timeout34,35
+  toException toException35,36
+  fromException fromException36,37
+timeout timeout38,39
+waitFor waitFor52,53
+getGCTime getGCTime61,62
+unsafeTimeout unsafeTimeout65,66
+
+./src/Control/Monad/IOSimPOR/Types.hs,702
+module Control.Monad.IOSimPOR.Types Control.Monad.IOSimPOR.Types0,1
+data Effect Effect15,16
+data Effect = Effect Effect15,16
+    effectReads effectReads16,17
+    effectWrites effectWrites17,18
+    effectForks effectForks18,19
+    effectThrows effectThrows19,20
+    effectWakeup effectWakeup20,21
+instance Semigroup Semigroup Effect24,25
+  Effect Effect25,26
+instance Monoid Monoid Effect28,29
+  mempty mempty29,30
+readEffects readEffects34,35
+writeEffects writeEffects40,41
+forkEffect forkEffect43,44
+throwToEffect throwToEffect46,47
+wakeupEffects wakeupEffects49,50
+someTvarId someTvarId52,53
+onlyReadEffect onlyReadEffect55,56
+racingEffects racingEffects58,59
+
+./src/Control/Monad/IOSimPOR/QuickCheckUtils.hs,994
+module Control.Monad.IOSimPOR.QuickCheckUtils Control.Monad.IOSimPOR.QuickCheckUtils2,3
+conjoinPar conjoinPar13,14
+conjoinNoCatch conjoinNoCatch29,30
+conjoinSpeculate conjoinSpeculate32,33
+(|(|&&|)75,76
+p p76,77
+(.(.&&|)83,84
+p p84,85
+class TestableNoCatch TestableNoCatch93,94
+  propertyNoCatch propertyNoCatch94,95
+instance TestableNoCatch TestableNoCatch Discard96,97
+  propertyNoCatch propertyNoCatch97,98
+instance TestableNoCatch TestableNoCatch Bool99,100
+  propertyNoCatch propertyNoCatch100,101
+instance TestableNoCatch TestableNoCatch Result102,103
+  propertyNoCatch propertyNoCatch103,104
+instance TestableNoCatch TestableNoCatch Prop105,106
+  propertyNoCatch propertyNoCatch106,107
+instance TestableNoCatch TestableNoCatch prop => TestableNoCatch (Gen prop)108,109
+  propertyNoCatch propertyNoCatch109,110
+instance TestableNoCatch TestableNoCatch Property111,112
+  propertyNoCatch propertyNoCatch112,113
+againNoCatch againNoCatch114,115
+
+./src/Control/Monad/IOSimPOR/Internal.hs,4347
+module Control.Monad.IOSimPOR.InternalControl.Monad.IOSimPOR.Internal24,25
+data Thread Thread95,96
+data Thread s a = Thread Thread95,96
+    threadId threadId96,97
+    threadControl threadControl97,98
+    threadBlocked threadBlocked98,99
+    threadDone threadDone99,100
+    threadMasking threadMasking100,101
+    threadThrowTo threadThrowTo102,103
+    threadClockId threadClockId103,104
+    threadLabel threadLabel104,105
+    threadNextTId threadNextTId105,106
+    threadStep threadStep106,107
+    threadVClock threadVClock107,108
+    threadEffect threadEffect108,109
+    threadRacy threadRacy109,110
+threadStepId threadStepId113,114
+isRacyThreadId isRacyThreadId116,117
+isNotRacyThreadId isNotRacyThreadId120,121
+bottomVClock bottomVClock125,126
+insertVClock insertVClock128,129
+leastUpperBoundVClock leastUpperBoundVClock131,132
+happensBeforeStep happensBeforeStep138,139
+labelledTVarId labelledTVarId146,147
+labelledThreads labelledThreads149,150
+data TimerVars TimerVars162,163
+data TimerVars s = TimerVars TimerVars162,163
+type RunQueue RunQueue164,165
+data SimState SimState168,169
+data SimState s a = SimState SimState168,169
+       runqueue runqueue169,170
+       threads threads172,173
+       curTime curTime174,175
+       timers timers176,177
+       clocks clocks178,179
+       nextVid nextVid179,180
+       nextTmid nextTmid180,181
+       races races183,184
+       control control185,186
+       control0 control0186,187
+       perStepTimeLimit perStepTimeLimit189,190
+initialState initialState193,194
+invariant invariant211,212
+timeSinceEpoch timeSinceEpoch232,233
+insertThread insertThread238,239
+schedule schedule244,245
+threadInterruptible threadInterruptible707,708
+deschedule deschedule716,717
+reschedule reschedule823,824
+unblockThreads unblockThreads905,906
+unwindControlStack unwindControlStack946,947
+removeMinimums removeMinimums979,980
+traceMany traceMany993,994
+lookupThreadLabel lookupThreadLabel999,1000
+runSimTraceST runSimTraceST1008,1009
+controlSimTraceST controlSimTraceST1011,1012
+execAtomically execAtomically1045,1046
+execAtomically execAtomically1053,1054
+execAtomically' execAtomically'1223,1224
+execNewTVar execNewTVar1248,1249
+execReadTVar execReadTVar1260,1261
+execWriteTVar execWriteTVar1264,1265
+saveTVar saveTVar1268,1269
+revertTVar revertTVar1275,1276
+commitTVar commitTVar1283,1284
+readTVarUndos readTVarUndos1290,1291
+traceTVarST traceTVarST1295,1296
+leastUpperBoundTVarVClocks leastUpperBoundTVarVClocks1312,1313
+readTVarBlockedThreads readTVarBlockedThreads1321,1322
+blockThreadOnTVar blockThreadOnTVar1324,1325
+unblockAllThreadsFromTVar unblockAllThreadsFromTVar1332,1333
+threadsUnblockedByWrites threadsUnblockedByWrites1342,1343
+ordNub ordNub1359,1360
+data Step Step1371,1372
+data Step = Step Step1371,1372
+    stepThreadId stepThreadId1372,1373
+    stepStep stepStep1373,1374
+    stepEffect stepEffect1374,1375
+    stepVClock stepVClock1375,1376
+racingSteps racingSteps1380,1381
+currentStep currentStep1393,1394
+stepThread stepThread1405,1406
+data StepInfo StepInfo1415,1416
+data StepInfo = StepInfo StepInfo1415,1416
+    stepInfoStep stepInfoStep1416,1417
+    stepInfoControl stepInfoControl1418,1419
+    stepInfoConcurrent stepInfoConcurrent1420,1421
+    stepInfoNonDep stepInfoNonDep1423,1424
+    stepInfoRaces stepInfoRaces1425,1426
+data Races Races1433,1434
+data Races = Races Races1433,1434
+                     activeRaces activeRaces1434,1435
+                     completeRaces completeRaces1436,1437
+noRaces noRaces1440,1441
+updateRacesInSimState updateRacesInSimState1443,1444
+updateRaces updateRaces1464,1465
+threadTerminatesRaces threadTerminatesRaces1533,1534
+normalizeRaces normalizeRaces1539,1540
+quiescentRaces quiescentRaces1552,1553
+traceRaces traceRaces1560,1561
+controlTargets controlTargets1570,1571
+followControl followControl1576,1577
+controlFollows controlFollows1583,1584
+advanceControl advanceControl1590,1591
+stepStepId stepStepId1616,1617
+stepInfoToScheduleMods stepInfoToScheduleMods1619,1620
+traceFinalRacesFound traceFinalRacesFound1643,1644
+extendScheduleControl' extendScheduleControl'1655,1656
+extendScheduleControl extendScheduleControl1685,1686
+
+./src/Control/Monad/IOSim.hs,1400
+module Control.Monad.IOSimControl.Monad.IOSim6,7
+selectTraceEvents selectTraceEvents110,111
+selectTraceEvents' selectTraceEvents'126,127
+selectTraceRaces selectTraceRaces132,133
+detachTraceRaces detachTraceRaces155,156
+selectTraceEventsDynamic selectTraceEventsDynamic173,174
+selectTraceEventsDynamic' selectTraceEventsDynamic'183,184
+selectTraceEventsSay selectTraceEventsSay194,195
+selectTraceEventsSay' selectTraceEventsSay'204,205
+printTraceEventsSay printTraceEventsSay215,216
+traceSelectTraceEvents traceSelectTraceEvents225,226
+traceSelectTraceEventsDynamic traceSelectTraceEventsDynamic242,243
+traceSelectTraceEventsSay traceSelectTraceEventsSay253,254
+data Failure Failure262,263
+       FailureException FailureException264,265
+     | FailureDeadlock FailureDeadlock267,268
+     | FailureSloppyShutdown FailureSloppyShutdown272,273
+instance Exception Exception Failure275,276
+    displayException displayException276,277
+runSim runSim290,291
+runSimOrThrow runSimOrThrow296,297
+runSimStrictShutdown runSimStrictShutdown306,307
+traceResult traceResult309,310
+traceEvents traceEvents322,323
+ppEvents ppEvents330,331
+runSimTrace runSimTrace355,356
+controlSimTrace controlSimTrace358,359
+exploreSimTrace exploreSimTrace373,374
+replaySimTrace replaySimTrace444,445
+raceReversals raceReversals455,456
+compareTraces compareTraces470,471
+
+./src/Control/Monad/IOSim/CommonTypes.hs,1339
+module Control.Monad.IOSim.CommonTypes Control.Monad.IOSim.CommonTypes7,8
+data ThreadId ThreadId16,17
+data ThreadId = RacyThreadId RacyThreadId16,17
+              | ThreadId ThreadId17,18
+childThreadId childThreadId20,21
+setRacyThread setRacyThread24,25
+newtype TVarId TVarId29,30
+newtype TimeoutId TimeoutId30,31
+newtype ClockId ClockId31,32
+newtype VectorClock VectorClock32,33
+newtype VectorClock = VectorClock { getVectorClock getVectorClock32,33
+unTimeoutId unTimeoutId35,36
+type ThreadLabel ThreadLabel38,39
+type TVarLabel TVarLabel39,40
+data TVar TVar41,42
+data TVar s a = TVar TVar41,42
+       tvarId tvarId45,46
+       tvarLabel tvarLabel48,49
+       tvarCurrent tvarCurrent52,53
+       tvarUndo tvarUndo57,58
+       tvarBlocked tvarBlocked65,66
+       tvarVClock tvarVClock69,70
+       tvarTrace tvarTrace73,74
+instance Eq Eq (TVar s a)76,77
+    TVar TVar77,78
+data SomeTVar SomeTVar79,80
+  SomeTVar SomeTVar80,81
+data Deschedule Deschedule82,83
+data Deschedule = Yield Yield82,83
+data Deschedule = Yield | Interruptable Interruptable82,83
+data Deschedule = Yield | Interruptable | Blocked Blocked82,83
+data Deschedule = Yield | Interruptable | Blocked | Terminated Terminated82,83
+data Deschedule = Yield | Interruptable | Blocked | Terminated | SleepSleep82,83
+
+./src/Control/Monad/IOSim/Types.hs,12976
+module Control.Monad.IOSim.TypesControl.Monad.IOSim.Types17,18
+newtype IOSim IOSim116,117
+newtype IOSim s a = IOSim { unIOSim unIOSim116,117
+type SimM SimM118,119
+runIOSim runIOSim121,122
+traceM traceM124,125
+traceSTM traceSTM127,128
+data SimA SimA130,131
+  Return Return131,132
+  Say Say133,134
+  Output Output134,135
+  LiftST LiftST136,137
+  GetMonoTime GetMonoTime138,139
+  GetWallTime GetWallTime139,140
+  SetWallTime SetWallTime140,141
+  UnshareClock UnshareClock141,142
+  NewTimeout NewTimeout143,144
+  UpdateTimeout:UpdateTimeout144,145
+  CancelTimeout:CancelTimeout145,146
+  Throw Throw147,148
+  Catch Catch148,149
+  Evaluate Evaluate150,151
+  Fork Fork152,153
+  GetThreadId GetThreadId153,154
+  LabelThread LabelThread154,155
+  Atomically Atomically156,157
+  ThrowTo ThrowTo158,159
+  SetMaskState SetMaskState159,160
+  GetMaskState GetMaskState160,161
+  YieldSim YieldSim162,163
+  ExploreRaces ExploreRaces164,165
+  Fix Fix166,167
+newtype STM STM169,170
+newtype STM s a = STM { unSTM unSTM169,170
+runSTM runSTM171,172
+data StmA StmA174,175
+  ReturnStm ReturnStm175,176
+  ThrowStm ThrowStm176,177
+  CatchStm CatchStm177,178
+  NewTVar NewTVar179,180
+  LabelTVar LabelTVar180,181
+  ReadTVar ReadTVar181,182
+  WriteTVar WriteTVar182,183
+  Retry Retry183,184
+  OrElse OrElse184,185
+  SayStm SayStm186,187
+  OutputStm OutputStm187,188
+  TraceTVar TraceTVar188,189
+type STMSim STMSim194,195
+type SimSTM SimSTM196,197
+instance Functor Functor (IOSim s)203,204
+    fmap fmap205,206
+instance Applicative Applicative (IOSim s)207,208
+    pure pure209,210
+    (<(<*>)212,213
+    (*(*>)216,217
+instance Monad Monad (IOSim s)218,219
+    return return219,220
+    (>(>>=)222,223
+    (>(>>)225,226
+    fail fail228,229
+instance Semigroup Semigroup a => Semigroup (IOSim s a)231,232
+    (<(<>)232,233
+instance Monoid Monoid a => Monoid (IOSim s a)234,235
+    mempty mempty235,236
+    mappend mappend238,239
+instance Fail.MonadFail Fail-MonadFail (IOSim s)241,242
+  fail fail242,243
+instance MonadFix MonadFix (IOSim s)244,245
+    mfix mfix245,246
+instance Functor Functor (STM s)248,249
+    fmap fmap250,251
+instance Applicative Applicative (STM s)252,253
+    pure pure254,255
+    (<(<*>)257,258
+    (*(*>)261,262
+instance Monad Monad (STM s)263,264
+    return return264,265
+    (>(>>=)267,268
+    (>(>>)270,271
+    fail fail273,274
+instance Fail.MonadFail Fail-MonadFail (STM s)276,277
+  fail fail277,278
+instance Alternative Alternative (STM s)279,280
+    empty empty280,281
+    (<(<|>)281,282
+instance MonadPlus MonadPlus (STM s)283,284
+instance MonadSay MonadSay (IOSim s)285,286
+  say say286,287
+instance MonadThrow MonadThrow (IOSim s)288,289
+  throwIO throwIO289,290
+instance MonadEvaluate MonadEvaluate (IOSim s)291,292
+  evaluate evaluate292,293
+instance Exceptions.MonadThrow Exceptions-MonadThrow (IOSim s)294,295
+  throwM throwM295,296
+instance MonadThrow MonadThrow (STM s)297,298
+  throwIO throwIO298,299
+  bracket bracket302,303
+  finally finally308,309
+instance Exceptions.MonadThrow Exceptions-MonadThrow (STM s)313,314
+  throwM throwM314,315
+instance MonadCatch MonadCatch (STM s)316,317
+    catch catch317,318
+instance Exceptions.MonadCatch Exceptions-MonadCatch (STM s)320,321
+    catch catch321,322
+instance MonadCatch MonadCatch (IOSim s)323,324
+  catch catch324,325
+instance Exceptions.MonadCatch Exceptions-MonadCatch (IOSim s)327,328
+  catch catch328,329
+instance MonadMask MonadMask (IOSim s)330,331
+  mask mask331,332
+  uninterruptibleMask uninterruptibleMask338,339
+instance MonadMaskingState MonadMaskingState (IOSim s)345,346
+  getMaskingState getMaskingState346,347
+instance Exceptions.MonadMask Exceptions-MonadMask (IOSim s)348,349
+  mask mask349,350
+  uninterruptibleMask uninterruptibleMask350,351
+  generalBracket generalBracket352,353
+getMaskingStateImpl getMaskingStateImpl362,363
+unblock, block, blockUninterruptible blockUninterruptible363,364
+unblock, block,block363,364
+unblock,unblock363,364
+getMaskingStateImpl getMaskingStateImpl365,366
+unblock unblock366,367
+block block367,368
+blockUninterruptible blockUninterruptible368,369
+instance MonadThread MonadThread (IOSim s)370,371
+  type ThreadId ThreadId371,372
+  myThreadId myThreadId372,373
+  labelThread labelThread373,374
+instance MonadFork MonadFork (IOSim s)375,376
+  forkIO forkIO376,377
+  forkIOWithUnmask forkIOWithUnmask377,378
+  throwTo throwTo378,379
+  yield yield379,380
+instance MonadTest MonadTest (IOSim s)381,382
+  exploreRaces exploreRaces382,383
+instance MonadSay MonadSay (STMSim s)384,385
+  say say385,386
+instance MonadLabelledSTM MonadLabelledSTM (IOSim s)388,389
+  labelTVar labelTVar389,390
+  labelTMVar labelTMVar390,391
+  labelTQueue labelTQueue391,392
+  labelTBQueue labelTBQueue392,393
+instance MonadSTM MonadSTM (IOSim s)394,395
+  type STM STM395,396
+  type TVar TVar396,397
+  type TMVar TMVar397,398
+  type TQueue TQueue398,399
+  type TBQueue TBQueue399,400
+  atomically atomically401,402
+  newTVar newTVar403,404
+  readTVar readTVar404,405
+  writeTVar writeTVar405,406
+  retry retry406,407
+  orElse orElse407,408
+  newTMVar newTMVar409,410
+  newEmptyTMVar newEmptyTMVar410,411
+  takeTMVar takeTMVar411,412
+  tryTakeTMVar tryTakeTMVar412,413
+  putTMVar putTMVar413,414
+  tryPutTMVar tryPutTMVar414,415
+  readTMVar readTMVar415,416
+  tryReadTMVar tryReadTMVar416,417
+  swapTMVar swapTMVar417,418
+  isEmptyTMVar isEmptyTMVar418,419
+  newTQueue newTQueue420,421
+  readTQueue readTQueue421,422
+  tryReadTQueue tryReadTQueue422,423
+  peekTQueue peekTQueue423,424
+  tryPeekTQueue tryPeekTQueue424,425
+  writeTQueue writeTQueue425,426
+  isEmptyTQueue isEmptyTQueue426,427
+  newTBQueue newTBQueue428,429
+  readTBQueue readTBQueue429,430
+  tryReadTBQueue tryReadTBQueue430,431
+  peekTBQueue peekTBQueue431,432
+  tryPeekTBQueue tryPeekTBQueue432,433
+  flushTBQueue flushTBQueue433,434
+  writeTBQueue writeTBQueue434,435
+  lengthTBQueue lengthTBQueue435,436
+  isEmptyTBQueue isEmptyTBQueue436,437
+  isFullTBQueue isFullTBQueue437,438
+  newTMVarIO newTMVarIO439,440
+  newEmptyTMVarIO newEmptyTMVarIO440,441
+instance MonadInspectSTM MonadInspectSTM (IOSim s)442,443
+  type InspectMonad InspectMonad443,444
+  inspectTVar inspectTVar444,445
+  inspectTMVar inspectTMVar445,446
+instance MonadTraceSTM MonadTraceSTM (IOSim s)453,454
+  traceTVar traceTVar454,455
+  traceTQueue traceTQueue455,456
+  traceTBQueue traceTBQueue456,457
+data Async Async458,459
+data Async s a = Async Async458,459
+instance Eq Eq (Async s a)460,461
+    Async Async461,462
+instance Ord Ord (Async s a)463,464
+    compare compare464,465
+instance Functor Functor (Async s)466,467
+  fmap fmap467,468
+instance MonadAsync MonadAsync (IOSim s)469,470
+  type Async Async470,471
+  async async472,473
+  asyncThreadId asyncThreadId480,481
+  waitCatchSTM waitCatchSTM482,483
+  pollSTM pollSTM483,484
+  cancel cancel485,486
+  cancelWith cancelWith486,487
+  asyncWithUnmask asyncWithUnmask488,489
+instance MonadST MonadST (IOSim s)490,491
+  withLiftST withLiftST491,492
+liftST liftST493,494
+instance MonadMonotonicTime MonadMonotonicTime (IOSim s)496,497
+  getMonotonicTime getMonotonicTime497,498
+instance MonadTime MonadTime (IOSim s)499,500
+  getCurrentTime getCurrentTime500,501
+setCurrentTime setCurrentTime504,505
+unshareClock unshareClock512,513
+instance MonadDelay MonadDelay (IOSim s)515,516
+instance MonadTimer MonadTimer (IOSim s)518,519
+  data Timeout Timeout519,520
+  data Timeout (IOSim s) = Timeout Timeout519,520
+                         | NegativeTimeout NegativeTimeout522,523
+  readTimeout readTimeout525,526
+  newTimeout newTimeout528,529
+  updateTimeout updateTimeout529,530
+  cancelTimeout cancelTimeout530,531
+  timeout timeout532,533
+  registerDelay registerDelay553,554
+newtype TimeoutException TimeoutException555,556
+instance Show Show TimeoutException557,558
+    show show558,559
+instance Exception Exception TimeoutException560,561
+  toException toException561,562
+  fromException fromException562,563
+newtype EventlogEvent EventlogEvent566,567
+newtype EventlogMarker EventlogMarker570,571
+instance MonadEventlog MonadEventlog (IOSim s)572,573
+  traceEventIO traceEventIO573,574
+  traceMarkerIO traceMarkerIO574,575
+data SimEventSimEvent589,590
+  = SimEvent SimEvent590,591
+      seTime seTime591,592
+      seThreadId seThreadId592,593
+      seThreadLabel seThreadLabel593,594
+      seType seType594,595
+  | SimPOREvent SimPOREvent596,597
+      seTime seTime597,598
+      seThreadId seThreadId598,599
+      seStep seStep599,600
+      seThreadLabel seThreadLabel600,601
+      seType seType601,602
+  | SimRacesFound SimRacesFound603,604
+ppSimEvent ppSimEvent608,609
+data SimResult SimResult638,639
+    = MainReturn MainReturn639,640
+    | MainException MainException640,641
+    | Deadlock Deadlock641,642
+    | LoopLoop642,643
+type SimTrace SimTrace646,647
+ppTrace ppTrace650,651
+ppTrace_ ppTrace_678,679
+ppDebug ppDebug706,707
+pattern Trace Trace711,712
+pattern Trace time time713,714
+pattern SimTrace SimTrace719,720
+pattern SimTrace time time721,722
+pattern SimPORTrace SimPORTrace725,726
+pattern SimPORTrace time time727,728
+pattern TraceRacesFound TraceRacesFound731,732
+pattern TraceRacesFound controls controls733,734
+pattern TraceMainReturn TraceMainReturn737,738
+pattern TraceMainReturn time time739,740
+pattern TraceMainException TraceMainException741,742
+pattern TraceMainException time time743,744
+pattern TraceDeadlock TraceDeadlock745,746
+pattern TraceDeadlock time time747,748
+pattern TraceLoop TraceLoop749,750
+data SimEventTypeSimEventType756,757
+  = EventSimStart EventSimStart757,758
+  | EventSay EventSay758,759
+  | EventLog EventLog759,760
+  | EventMask EventMask760,761
+  | EventThrow EventThrow762,763
+  | EventThrowTo EventThrowTo763,764
+  | EventThrowToBlocked EventThrowToBlocked764,765
+  | EventThrowToWakeup EventThrowToWakeup765,766
+  | EventThrowToUnmasked EventThrowToUnmasked766,767
+  | EventThreadForked EventThreadForked768,769
+  | EventThreadFinished EventThreadFinished769,770
+  | EventThreadUnhandled EventThreadUnhandled770,771
+  | EventTxCommitted EventTxCommitted772,773
+  | EventTxAborted EventTxAborted775,776
+  | EventTxBlocked EventTxBlocked776,777
+  | EventTxWakeup EventTxWakeup778,779
+  | EventTimerCreated EventTimerCreated780,781
+  | EventTimerUpdated EventTimerUpdated781,782
+  | EventTimerCancelled EventTimerCancelled782,783
+  | EventTimerExpired EventTimerExpired783,784
+  | EventThreadSleep EventThreadSleep787,788
+  | EventThreadWake EventThreadWake789,790
+  | EventDeschedule EventDeschedule790,791
+  | EventFollowControl EventFollowControl791,792
+  | EventAwaitControl EventAwaitControl792,793
+  | EventPerformAction EventPerformAction793,794
+  | EventReschedule EventReschedule794,795
+  | EventUnblocked EventUnblocked795,796
+type TraceEvent TraceEvent798,799
+data Labelled Labelled801,802
+data Labelled a = Labelled Labelled801,802
+    l_labelled l_labelled802,803
+    l_label l_label803,804
+data StmTxResult StmTxResult812,813
+       StmTxCommitted StmTxCommitted825,826
+     | StmTxBlocked StmTxBlocked835,836
+     | StmTxAborted StmTxAborted840,841
+data StmStack StmStack842,843
+  AtomicallyFrame AtomicallyFrame844,845
+  OrElseLeftFrame OrElseLeftFrame847,848
+  OrElseRightFrame OrElseRightFrame856,857
+data ScheduleControl ScheduleControl867,868
+data ScheduleControl = ControlDefaultControlDefault867,868
+                     | ControlAwait ControlAwait869,870
+                     | ControlFollow ControlFollow875,876
+data ScheduleMod ScheduleMod881,882
+data ScheduleMod = ScheduleMod{ScheduleMod{881,882
+    scheduleModTarget scheduleModTarget883,884
+    scheduleModControl scheduleModControl887,888
+    scheduleModInsertion scheduleModInsertion890,891
+type StepId StepId894,895
+instance Show Show ScheduleMod896,897
+  showsPrec showsPrec897,898
+data ExplorationOptions ExplorationOptions910,911
+data ExplorationOptions = ExplorationOptions{ExplorationOptions{910,911
+    explorationScheduleBound explorationScheduleBound911,912
+    explorationBranching explorationBranching912,913
+    explorationStepTimelimit explorationStepTimelimit913,914
+    explorationReplay explorationReplay914,915
+stdExplorationOptions stdExplorationOptions918,919
+type ExplorationSpec ExplorationSpec926,927
+withScheduleBound withScheduleBound928,929
+withBranching withBranching931,932
+withStepTimelimit withStepTimelimit934,935
+withReplay withReplay937,938
+
+./src/Control/Monad/IOSim/STM.hs,1245
+module Control.Monad.IOSim.STM Control.Monad.IOSim.STM7,8
+newtype TQueueDefault TQueueDefault19,20
+newtype TQueueDefault m a = TQueue TQueue19,20
+labelTQueueDefault labelTQueueDefault24,25
+traceTQueueDefault traceTQueueDefault32,33
+newTQueueDefault newTQueueDefault38,39
+writeTQueueDefault writeTQueueDefault41,42
+readTQueueDefault readTQueueDefault46,47
+tryReadTQueueDefault tryReadTQueueDefault49,50
+isEmptyTQueueDefault isEmptyTQueueDefault63,64
+peekTQueueDefault peekTQueueDefault72,73
+tryPeekTQueueDefault tryPeekTQueueDefault79,80
+data TBQueueDefault TBQueueDefault90,91
+data TBQueueDefault m a = TBQueueTBQueue90,91
+labelTBQueueDefault labelTBQueueDefault97,98
+traceTBQueueDefault traceTBQueueDefault105,106
+newTBQueueDefault newTBQueueDefault111,112
+readTBQueueDefault readTBQueueDefault117,118
+tryReadTBQueueDefault tryReadTBQueueDefault120,121
+peekTBQueueDefault peekTBQueueDefault140,141
+tryPeekTBQueueDefault tryPeekTBQueueDefault143,144
+writeTBQueueDefault writeTBQueueDefault150,151
+isEmptyTBQueueDefault isEmptyTBQueueDefault162,163
+isFullTBQueueDefault isFullTBQueueDefault169,170
+lengthTBQueueDefault lengthTBQueueDefault179,180
+flushTBQueueDefault flushTBQueueDefault184,185
+
+./src/Control/Monad/IOSim/InternalTypes.hs,621
+module Control.Monad.IOSim.InternalTypesControl.Monad.IOSim.InternalTypes5,6
+data ThreadControl ThreadControl18,19
+  ThreadControl ThreadControl19,20
+instance Show Show (ThreadControl s a)23,24
+  show show24,25
+data ControlStack ControlStack26,27
+  MainFrame MainFrame27,28
+  ForkFrame ForkFrame28,29
+  MaskFrame MaskFrame29,30
+  CatchFrame CatchFrame33,34
+instance Show Show (ControlStack s b a)39,40
+  show show40,41
+data ControlStackDash ControlStackDash47,48
+    MainFrame'MainFrame'48,49
+  | ForkFrame'ForkFrame'49,50
+  | MaskFrame' MaskFrame'50,51
+  | CatchFrame' CatchFrame'51,52
+
+./src/Control/Monad/IOSim/Internal.hs,2038
+module Control.Monad.IOSim.InternalControl.Monad.IOSim.Internal22,23
+data Thread Thread94,95
+data Thread s a = Thread Thread94,95
+    threadId threadId95,96
+    threadControl threadControl96,97
+    threadBlocked threadBlocked97,98
+    threadMasking threadMasking98,99
+    threadThrowTo threadThrowTo100,101
+    threadClockId threadClockId101,102
+    threadLabel threadLabel102,103
+    threadNextTId threadNextTId103,104
+labelledTVarId labelledTVarId106,107
+labelledThreads labelledThreads109,110
+data TimerVars TimerVars122,123
+data TimerVars s = TimerVars TimerVars122,123
+data SimState SimState127,128
+data SimState s a = SimState SimState127,128
+       runqueue runqueue128,129
+       threads threads131,132
+       curTime curTime133,134
+       timers timers135,136
+       clocks clocks137,138
+       nextVid nextVid138,139
+       nextTmid nextTmid139,140
+initialState initialState142,143
+invariant invariant156,157
+timeSinceEpoch timeSinceEpoch175,176
+schedule schedule181,182
+threadInterruptible threadInterruptible582,583
+deschedule deschedule591,592
+reschedule reschedule675,676
+unblockThreads unblockThreads724,725
+unwindControlStack unwindControlStack752,753
+removeMinimums removeMinimums785,786
+traceMany traceMany799,800
+lookupThreadLabel lookupThreadLabel805,806
+runSimTraceST runSimTraceST814,815
+execAtomically execAtomically834,835
+execAtomically execAtomically842,843
+execAtomically' execAtomically'1005,1006
+execNewTVar execNewTVar1030,1031
+execReadTVar execReadTVar1042,1043
+execWriteTVar execWriteTVar1046,1047
+saveTVar saveTVar1050,1051
+revertTVar revertTVar1058,1059
+commitTVar commitTVar1067,1068
+readTVarUndos readTVarUndos1075,1076
+traceTVarST traceTVarST1080,1081
+readTVarBlockedThreads readTVarBlockedThreads1102,1103
+blockThreadOnTVar blockThreadOnTVar1105,1106
+unblockAllThreadsFromTVar unblockAllThreadsFromTVar1114,1115
+threadsUnblockedByWrites threadsUnblockedByWrites1125,1126
+ordNub ordNub1142,1143
+
+./src/Data/List/Trace.hs,1572
+module Data.List.TraceData.List.Trace2,3
+data Trace Trace30,31
+    = Cons Cons31,32
+    | Nil Nil32,33
+head head35,36
+tail tail39,40
+filter filter43,44
+length length50,51
+toList toList54,55
+fromList fromList57,58
+ppTrace ppTrace62,63
+instance Bifunctor Bifunctor Trace66,67
+    bimap bimap67,68
+instance Bifoldable Bifoldable Trace70,71
+    bifoldMap bifoldMap71,72
+    bifoldr bifoldr74,75
+    bifoldl bifoldl80,81
+instance Bitraversable Bitraversable Trace86,87
+    bitraverse bitraverse87,88
+instance Semigroup Semigroup a => Semigroup (Trace a b)90,91
+    Cons Cons91,92
+    o@Nil o@Nil92,93
+    Nil Nil93,94
+instance Monoid Monoid a => Monoid (Trace a b)95,96
+    mempty mempty96,97
+instance Monoid Monoid a => Applicative (Trace a)98,99
+    pure pure99,100
+    Cons Cons100,101
+    Nil Nil101,102
+instance Monoid Monoid a => Monad (Trace a)103,104
+    return return104,105
+    o o106,107
+instance Monoid Monoid a => MonadFail (Trace a)108,109
+    fail fail109,110
+instance Monoid Monoid a => Alternative (Trace a)111,112
+    empty empty112,113
+    (<(<|>)113,114
+instance Monoid Monoid a => MonadPlus (Trace a)115,116
+    mzero mzero116,117
+    mplus mplus117,118
+instance Monoid Monoid a => MonadFix (Trace a)119,120
+    mfix mfix120,121
+instance Eq Eq a => Eq1 (Trace a)124,125
+    liftEq liftEq125,126
+instance Ord Ord a => Ord1 (Trace a)130,131
+    liftCompare liftCompare131,132
+instance Show Show a => Show1 (Trace a)136,137
+    liftShowsPrec liftShowsPrec137,138
+
+./bench/Main.hs,312
+module Main Main3,4
+prop_channel prop_channel32,33
+prop_threadDelay prop_threadDelay57,58
+prop_registerDelay prop_registerDelay60,61
+prop_timeout_fail prop_timeout_fail63,64
+prop_timeout_succeed prop_timeout_succeed66,67
+prop_threads prop_threads74,75
+prop_async prop_async83,84
+main main91,92
+
+./test/Main.hs,55
+module Main Main0,1
+main main6,7
+tests tests9,10
+
+./test/Test/Control/Monad/IOSimPOR.hs,1477
+module Test.Control.Monad.IOSimPOR Test.Control.Monad.IOSimPOR8,9
+data Step Step30,31
+    WhenSet WhenSet31,32
+  | ThrowTo ThrowTo32,33
+  | Delay Delay33,34
+  | Timeout Timeout34,35
+data TimeoutStep TimeoutStep37,38
+    NewTimeout NewTimeout38,39
+  | UpdateTimeout UpdateTimeout39,40
+  | CancelTimeoutCancelTimeout40,41
+  | AwaitTimeoutAwaitTimeout41,42
+instance Arbitrary Arbitrary Step44,45
+  arbitrary arbitrary45,46
+  shrink shrink54,55
+instance Arbitrary Arbitrary TimeoutStep60,61
+  arbitrary arbitrary61,62
+  shrink shrink68,69
+newtype Task Task71,72
+instance Arbitrary Arbitrary Task74,75
+  arbitrary arbitrary75,76
+  shrink shrink78,79
+normalize normalize82,83
+compressSteps compressSteps90,91
+newtype Tasks Tasks96,97
+instance Arbitrary Arbitrary Tasks99,100
+  arbitrary arbitrary100,101
+  shrink shrink101,102
+fixThrowTos fixThrowTos108,109
+shrinkDelays shrinkDelays111,112
+removeTask removeTask126,127
+advanceThrowTo advanceThrowTo134,135
+mapThrowTos mapThrowTos144,145
+sortTasks sortTasks150,151
+interpret interpret155,156
+runTasks runTasks179,180
+maxTaskValue maxTaskValue191,192
+propSimulates propSimulates196,197
+propExploration propExploration202,203
+propPermutations propPermutations217,218
+doit doit226,227
+ordered ordered234,235
+noExceptions noExceptions237,238
+splitTrace splitTrace243,244
+traceCounter traceCounter249,250
+traceNoDuplicates traceNoDuplicates259,260
+
+./test/Test/IOSim.hs,4560
+module Test.IOSimTest.IOSim5,6
+tests tests42,43
+prop_stm_graph_io prop_stm_graph_io153,154
+prop_stm_graph_sim prop_stm_graph_sim158,159
+prop_stm_graph prop_stm_graph167,168
+newtype TestThreadGraph TestThreadGraph198,199
+instance Arbitrary Arbitrary TestThreadGraph201,202
+  arbitrary arbitrary202,203
+arbitraryAcyclicGraph arbitraryAcyclicGraph209,210
+newtype TestMicro TestMicro235,236
+instance Arbitrary Arbitrary TestMicro241,242
+  arbitrary arbitrary242,243
+  shrink shrink259,260
+test_timers test_timers261,262
+prop_timers_ST prop_timers_ST309,310
+prop_timers_IO prop_timers_IO314,315
+test_fork_order test_fork_order325,326
+prop_fork_order_ST prop_fork_order_ST350,351
+prop_fork_order_IO prop_fork_order_IO353,354
+test_threadId_order test_threadId_order357,358
+prop_threadId_order_order_Sim prop_threadId_order_order_Sim380,381
+prop_wakeup_order_ST prop_wakeup_order_ST384,385
+test_wakeup_order test_wakeup_order394,395
+prop_mfix_purity prop_mfix_purity422,423
+prop_mfix_purity_2 prop_mfix_purity_2432,433
+prop_mfix_left_shrinking prop_mfix_left_shrinking469,470
+prop_mfix_lazy prop_mfix_lazy491,492
+prop_mfix_recdata prop_mfix_recdata540,541
+type Probe Probe573,574
+withProbe withProbe575,576
+probeOutput probeOutput581,582
+unit_catch_0 unit_catch_0595,596
+unit_catch_1 unit_catch_1609,610
+unit_catch_2 unit_catch_2619,620
+unit_catch_3 unit_catch_3632,633
+unit_catch_4 unit_catch_4644,645
+unit_catch_5 unit_catch_5657,658
+unit_catch_6 unit_catch_6670,671
+unit_evaluate_0 unit_evaluate_0685,686
+unit_fork_1 unit_fork_1693,694
+unit_fork_2 unit_fork_2706,707
+unit_async_1 unit_async_1738,739
+unit_async_2 unit_async_2751,752
+unit_async_3 unit_async_3762,763
+unit_async_4 unit_async_4773,774
+unit_async_5 unit_async_5784,785
+unit_async_6 unit_async_6799,800
+unit_async_7 unit_async_7819,820
+unit_async_8 unit_async_8839,840
+unit_async_9 unit_async_9859,860
+unit_async_10 unit_async_10875,876
+unit_async_11 unit_async_11903,904
+unit_async_12 unit_async_12935,936
+unit_async_13 unit_async_13956,957
+unit_async_14 unit_async_14965,966
+unit_async_15 unit_async_15986,987
+unit_async_16 unit_async_161006,1007
+prop_stm_referenceIO prop_stm_referenceIO1033,1034
+prop_stm_referenceSim prop_stm_referenceSim1040,1041
+prop_stm_referenceM prop_stm_referenceM1051,1052
+prop_timeout_no_deadlockM prop_timeout_no_deadlockM1062,1063
+prop_timeout_no_deadlock_Sim prop_timeout_no_deadlock_Sim1084,1085
+prop_timeout_no_deadlock_IO prop_timeout_no_deadlock_IO1087,1088
+setMaskingState_ setMaskingState_1095,1096
+setMaskingState setMaskingState1100,1101
+maxMS maxMS1106,1107
+forall_masking_states forall_masking_states1114,1115
+prop_set_masking_state prop_set_masking_state1125,1126
+unit_set_masking_state_IO unit_set_masking_state_IO1133,1134
+unit_set_masking_state_ST unit_set_masking_state_ST1137,1138
+prop_unmask prop_unmask1144,1145
+unit_unmask_IO unit_unmask_IO1154,1155
+unit_unmask_ST unit_unmask_ST1157,1158
+prop_fork_masking_state prop_fork_masking_state1163,1164
+unit_fork_masking_state_IO unit_fork_masking_state_IO1174,1175
+unit_fork_masking_state_ST unit_fork_masking_state_ST1178,1179
+prop_fork_unmask prop_fork_unmask1188,1189
+unit_fork_unmask_IO unit_fork_unmask_IO1204,1205
+unit_fork_unmask_ST unit_fork_unmask_ST1207,1208
+prop_catch_throwIO_masking_state prop_catch_throwIO_masking_state1214,1215
+unit_catch_throwIO_masking_state_IO unit_catch_throwIO_masking_state_IO1223,1224
+unit_catch_throwIO_masking_state_ST unit_catch_throwIO_masking_state_ST1227,1228
+prop_catch_throwTo_masking_state prop_catch_throwTo_masking_state1234,1235
+unit_catch_throwTo_masking_state_IO unit_catch_throwTo_masking_state_IO1247,1248
+unit_catch_throwTo_masking_state_ST unit_catch_throwTo_masking_state_ST1251,1252
+prop_catch_throwTo_masking_state_async prop_catch_throwTo_masking_state_async1259,1260
+unit_catch_throwTo_masking_state_async_IO unit_catch_throwTo_masking_state_async_IO1285,1286
+unit_catch_throwTo_masking_state_async_ST unit_catch_throwTo_masking_state_async_ST1289,1290
+prop_catch_throwTo_masking_state_async_mayblock prop_catch_throwTo_masking_state_async_mayblock1298,1299
+unit_catch_throwTo_masking_state_async_mayblock_IO unit_catch_throwTo_masking_state_async_mayblock_IO1329,1330
+unit_catch_throwTo_masking_state_async_mayblock_ST unit_catch_throwTo_masking_state_async_mayblock_ST1333,1334
+runSimTraceSay runSimTraceSay1341,1342
+selectTraceSay selectTraceSay1344,1345
+
+./test/Test/STM.hs,4426
+module Test.STM Test.STM22,23
+data Type Type41,42
+    TyUnit TyUnit42,43
+    TyInt TyInt43,44
+    TyVar TyVar44,45
+    TyUnit TyUnit42,43
+    TyInt TyInt43,44
+    TyVar TyVar44,45
+data TyRep TyRep49,50
+data TyRep (t t49,50
+    TyRepUnit TyRepUnit50,51
+    TyRepInt TyRepInt51,52
+    TyRepVar TyRepVar52,53
+data TyRep (t t49,50
+data Term Term65,66
+data Term (t t65,66
+    Return Return67,68
+    Throw Throw68,69
+    Retry Retry69,70
+    ReadTVar ReadTVar71,72
+    WriteTVar WriteTVar72,73
+    NewTVar NewTVar73,74
+    Bind Bind76,77
+    OrElse OrElse77,78
+data Term (t t65,66
+data Expr Expr84,85
+data Expr (t t84,85
+    ExprUnit ExprUnit86,87
+    ExprInt ExprInt87,88
+    ExprName ExprName88,89
+data Expr (t t84,85
+data Value Value95,96
+data Value (t t95,96
+    ValUnit ValUnit97,98
+    ValInt ValInt98,99
+    ValVar ValVar99,100
+data Value (t t95,96
+data Name Name114,115
+data Name (t :: Type) = Name Name114,115
+newtype NameId NameId117,118
+data Var Var125,126
+data Var (t :: Type) = Var Var125,126
+newtype VarId VarId128,129
+eqTyRep eqTyRep137,138
+nameTyRep nameTyRep145,146
+varTyRep varTyRep148,149
+tyRepExpr tyRepExpr151,152
+tyRepValue tyRepValue156,157
+data SomeName SomeName166,167
+     SomeName SomeName167,168
+data SomeValue SomeValue169,170
+     SomeValue SomeValue170,171
+newtype Env Env178,179
+lookupEnv lookupEnv183,184
+extendEnv extendEnv190,191
+data SomeVar SomeVar199,200
+     SomeVar SomeVar200,201
+newtype Heap Heap204,205
+type Allocs Allocs208,209
+readVar readVar211,212
+writeVar writeVar218,219
+extendHeap extendHeap227,228
+data TxResult TxResult249,250
+       TxComitted TxComitted250,251
+     | TxBlockedTxBlocked251,252
+     | TxAborted TxAborted252,253
+data ImmValue ImmValue261,262
+    ImmValUnit ImmValUnit263,264
+    ImmValInt ImmValInt264,265
+    ImmValVar ImmValVar265,266
+    ImmValUnit ImmValUnit263,264
+instance Exception Exception ImmValue271,272
+evalExpr evalExpr279,280
+data NfTerm NfTerm286,287
+data NfTerm (t t286,287
+    NfReturn NfReturn288,289
+    NfThrow NfThrow289,290
+    NfRetry NfRetry290,291
+data NfTerm (t t286,287
+evalTerm evalTerm300,301
+evalAtomically evalAtomically361,362
+snapshotValue snapshotValue388,389
+data ExecValue ExecValue398,399
+data ExecValue m (t t398,399
+    ExecValUnit ExecValUnit400,401
+    ExecValInt ExecValInt401,402
+    ExecValVar ExecValVar402,403
+instance Show Show (ExecValue m t)405,406
+  show show406,407
+data SomeExecValue SomeExecValue411,412
+     SomeExecValue SomeExecValue412,413
+newtype ExecEnv ExecEnv417,418
+tyRepExecValue tyRepExecValue420,421
+lookupExecEnv lookupExecEnv425,426
+extendExecEnv extendExecEnv432,433
+execTerm execTerm439,440
+execExpr execExpr482,483
+snapshotExecValue snapshotExecValue487,488
+execAtomically execAtomically493,494
+instance Arbitrary Arbitrary SomeTerm513,514
+  arbitrary arbitrary514,515
+  shrink shrink516,517
+data SomeTerm SomeTerm519,520
+     SomeTerm SomeTerm520,521
+data SomeExpr SomeExpr522,523
+     SomeExpr SomeExpr523,524
+data GenEnv GenEnv532,533
+data GenEnv = GenEnv GenEnv532,533
+       envNames envNames534,535
+       envNextName envNextName537,538
+data TyTrie TyTrie540,541
+     TyTrieEmptyTyTrieEmpty541,542
+   | TyTrieNode TyTrieNode542,543
+       trieUnit trieUnit543,544
+       trieInt trieInt544,545
+       trieVar trieVar545,546
+lookupTyTrie lookupTyTrie549,550
+insertTyTrie insertTyTrie555,556
+emptyGenEnv emptyGenEnv568,569
+lookupNames lookupNames571,572
+freshName freshName577,578
+pickName pickName587,588
+data SomeVarName SomeVarName591,592
+     SomeVarName SomeVarName592,593
+lookupVarNames lookupVarNames595,596
+deep deep607,608
+genSomeTerm genSomeTerm614,615
+genTerm genTerm630,631
+genSomeExpr genSomeExpr677,678
+genExpr genExpr686,687
+elements' elements'701,702
+oneof' oneof'704,705
+frequency' frequency'707,708
+shrinkTerm shrinkTerm710,711
+shrinkExpr shrinkExpr730,731
+freeNamesTerm freeNamesTerm737,738
+freeNamesExpr freeNamesExpr748,749
+nameId nameId753,754
+prop_genSomeTerm prop_genSomeTerm756,757
+termSize termSize767,768
+termDepth termDepth777,778
+showTerm showTerm787,788
+showExpr showExpr808,809
+showName showName813,814
+showNameTyped showNameTyped816,817
+showTyRep showTyRep821,822

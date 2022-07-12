@@ -911,15 +911,16 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
         CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
-          undefined
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid undefined
 
       ThrowStm e ->
         {-# SCC "execAtomically.go.ThrowStm" #-} do
-        case (fromException e, ctl) of 
-          (Just e', CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl') | isException exc -> do
+        case ctl of 
+          CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl'  -> do
             -- Use handler to rescue the exception
-            go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (handler e')
-          (_, _) -> do
+            -- go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (handler e')
+            undefined
+          _ -> do
             -- Revert all the TVar writes
             !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
             k0 $ StmTxAborted [] (toException e)
