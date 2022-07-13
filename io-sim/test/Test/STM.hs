@@ -34,6 +34,8 @@ import           Control.Monad.Class.MonadSTM as STM
 import           Control.Monad.Class.MonadThrow
 
 import           Test.QuickCheck
+import Test.Tasty (testGroup, TestTree)
+import Test.Tasty.QuickCheck (testProperty)
 
 
 -- | The type level structure of types in our STM 'Term's. This is kept simple,
@@ -318,7 +320,7 @@ evalTerm !env !heap !allocs term = case term of
         -- Rule XSTM1
         --                M; heap, {} => return P; heap', allocs'
         -- --------------------------------------------------------
-        -- S[catch M N]; heap, allocs => S[N P]; heap, allocs
+        -- S[catch M N]; heap, allocs => S[return P]; heap, allocs
         NfReturn v -> (NfReturn v, heap', allocs `mappend` allocs')
 
         -- Rule XSTM2
@@ -860,3 +862,10 @@ showTyRep _  TyRepUnit   = showString "()"
 showTyRep _  TyRepInt    = showString "Int"
 showTyRep p (TyRepVar t) = showParen (p > 10) $
                              showString "TVar " . showTyRep 11 t
+
+tests :: TestTree
+tests = 
+  testGroup "Test STM"
+  [
+    testProperty "Term generation" prop_genSomeTerm
+  ]

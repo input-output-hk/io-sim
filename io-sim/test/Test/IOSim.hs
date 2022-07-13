@@ -33,7 +33,7 @@ import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
 import           Control.Monad.IOSim
 
-import           Test.STM
+import           Test.STM hiding (tests)
 
 import           Test.QuickCheck
 import           Test.Tasty

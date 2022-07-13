@@ -14,6 +14,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields          #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Control.Monad.IOSim.Types
   ( IOSim (..)
@@ -175,7 +176,8 @@ runSTM (STM k) = k ReturnStm
 data StmA s a where
   ReturnStm    :: a -> StmA s a
   ThrowStm     :: SomeException -> StmA s a
-  CatchStm     :: Exception e => StmA s a -> (e -> StmA s a) -> (a -> StmA s b) -> StmA s b
+  -- Catch with continuation
+  CatchStm     :: StmA s a -> (SomeException -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
   NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
@@ -225,9 +227,9 @@ instance Monad (IOSim s) where
     {-# INLINE (>>) #-}
     (>>) = (*>)
 
-#if !(MIN_VERSION_base(4,13,0))
-    fail = Fail.fail
-#endif
+
+
+
 
 instance Semigroup a => Semigroup (IOSim s a) where
     (<>) = liftA2 (<>)
@@ -235,9 +237,9 @@ instance Semigroup a => Semigroup (IOSim s a) where
 instance Monoid a => Monoid (IOSim s a) where
     mempty = pure mempty
 
-#if !(MIN_VERSION_base(4,11,0))
-    mappend = liftA2 mappend
-#endif
+
+
+
 
 instance Fail.MonadFail (IOSim s) where
   fail msg = IOSim $ oneShot $ \_ -> Throw (toException (IO.Error.userError msg))
@@ -270,9 +272,9 @@ instance Monad (STM s) where
     {-# INLINE (>>) #-}
     (>>) = (*>)
 
-#if !(MIN_VERSION_base(4,13,0))
-    fail = Fail.fail
-#endif
+
+
+
 
 instance Fail.MonadFail (STM s) where
   fail msg = STM $ oneShot $ \_ -> ThrowStm (toException (ErrorCall msg))
@@ -314,14 +316,20 @@ instance MonadThrow (STM s) where
 instance Exceptions.MonadThrow (STM s) where
   throwM = MonadThrow.throwIO
 
-instance MonadCatch (STM s) where 
+instance MonadCatch (STM s) where
 
-  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler)  k
+  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler') k
+    where
+      handler' :: SomeException -> STM s a
+      handler' exc = 
+        if
+          | Just exc' <- fromException exc -> handler exc'
+          | otherwise                      -> throwIO exc
 
   -- Default implmentation uses mask. For STM, mask is not necessary.
-  generalBracket = generalBracketSTM 
+  generalBracket = generalBracketSTM
 
-instance Exceptions.MonadCatch (STM s) where 
+instance Exceptions.MonadCatch (STM s) where
 
   catch = MonadThrow.catch
 
@@ -866,14 +874,13 @@ data StmStack s b a where
                    -> StmStack s a c
 
   -- | Executing in the context of the /action/ part of the 'catch'
-  CatchStmFrame    :: Exception e              
-                   => (e -> StmA s a)         -- exception handler
+  CatchStmFrame    :: (SomeException -> StmA s a)         -- exception handler
                    -> (a -> StmA s b)         -- subsequent continuation
                    -> Map TVarId (SomeTVar s) -- saved written vars set
-                   -> [SomeTVar s]            -- saved written vars set
-                   -> [SomeTVar s]            -- created vars list
-                   -> StmStack s b c 
-                   -> StmStack s a c         
+                   -> [SomeTVar s]            -- saved written vars list
+                   -> [SomeTVar s]            -- created vars list (allocations)
+                   -> StmStack s b c
+                   -> StmStack s a c
 ---
 --- Schedules
 ---
