@@ -882,6 +882,14 @@ data StmStack s b a where
                    -> [SomeTVar s]            -- created vars list (allocations)
                    -> StmStack s b c
                    -> StmStack s a c
+
+  -- | A continuation frame
+  CatchHandlerStmFrame :: (b -> StmA s c)         -- subsequent continuation
+                       -> Map TVarId (SomeTVar s) -- saved written vars set
+                       -> [SomeTVar s]            -- saved written vars list
+                       -> [SomeTVar s]            -- created vars list (allocations)
+                       -> !(StmStack s c a)
+                       -> StmStack s b a
 ---
 --- Schedules
 ---

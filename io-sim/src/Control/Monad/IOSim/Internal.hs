@@ -72,11 +72,8 @@ import qualified Deque.Strict as Deque
 
 import           GHC.Exts (fromList)
 
-import           Control.Exception (NonTermination (..),
-                     SomeException (SomeException), assert, throw)
-import           Control.Monad (join)
-
-import           Control.Monad (when)
+import           Control.Exception (NonTermination (..), assert, throw)
+import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
@@ -830,6 +827,33 @@ runSimTraceST mainAction = schedule mainThread initialState
         threadNextTId = 1
       }
 
+
+data StmControl s a where
+  StmControl :: StmA s b -> !(StmStack s b a) -> StmControl s a
+
+
+-- Unwind the STM control stack till the matching exception
+unwindControlStmStack :: forall s a.
+                         SomeException
+                      -> StmControl s a
+                      -> Either Bool (StmControl s a)
+unwindControlStmStack e (StmControl _ frame) = unwindFrame frame
+
+  where
+    unwindFrame :: forall s' b. StmStack s' b a -> Either Bool (StmControl s' a)
+    unwindFrame AtomicallyFrame                     = Left True
+    unwindFrame (OrElseLeftFrame _ _ _ _ _ ctl)     = unwindFrame ctl
+    unwindFrame (OrElseRightFrame _ _ _ _ ctl)      = unwindFrame ctl
+    unwindFrame (CatchHandlerStmFrame _ _ _ _ ctl)  = unwindFrame ctl
+    unwindFrame (CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl) =
+      case fromException e of
+        -- Continue to unwind till we find a handler which can handle this exception.
+        Nothing -> unwindFrame ctl
+        Just e' ->
+          let action' = handler e'
+              ctl'    = CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl
+          in Right $ StmControl action' ctl'
+
 --
 -- Executing STM Transactions
 --
@@ -845,24 +869,6 @@ execAtomically :: forall s a c.
 execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
     go AtomicallyFrame Map.empty Map.empty [] [] nextVid0 action0
   where
-    catchStackFrameOrAbort :: forall b.
-                              StmStack s b a
-                           -> Map TVarId (SomeTVar s)
-                           -> SomeException
-                           -> TVarId
-                           -> ST s (SimTrace c)
-                           -> ST s (SimTrace c)
-    catchStackFrameOrAbort ctl read exc nextVid abort =
-      case ctl of
-        AtomicallyFrame                 -> abort
-        OrElseLeftFrame _ _ _ _ _ ctl'  -> catchStackFrameOrAbort ctl' read exc nextVid abort
-        OrElseRightFrame _ _ _ _ ctl'   -> catchStackFrameOrAbort ctl' read exc nextVid abort
-        CatchStmFrame handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-          case fromException exc of
-            Nothing -> catchStackFrameOrAbort ctl' read exc nextVid abort
-            Just e' -> go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (handler e')
-
-
     go :: forall b.
           StmStack s b a
        -> Map TVarId (SomeTVar s)  -- set of vars read
@@ -931,6 +937,20 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
         CatchStmFrame _handler k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          -- Successful main catch action
+          -- Merge allocations with outer sequence
+          let written'    = Map.union written writtenOuter
+              writtenSeq' = filter (\(SomeTVar tvar) ->
+                                      tvarId tvar `Map.notMember` writtenOuter)
+                                    writtenSeq
+                         ++ writtenOuterSeq
+              createdSeq' = createdSeq ++ createdOuterSeq
+          go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
+
+        CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          -- Successful completion of catch handler
+          !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar)
+                          (Map.intersection written writtenOuter)
           -- Merge allocations with outer sequence
           let written'    = Map.union written writtenOuter
               writtenSeq' = filter (\(SomeTVar tvar) ->
@@ -942,11 +962,16 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
 
       ThrowStm e ->
         {-# SCC "execAtomically.go.ThrowStm" #-}
+        -- Abort if no matching exception is found
         let abort = do
                       -- Revert all the TVar writes
                       !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
                       k0 $ StmTxAborted [] (toException e)
-        in catchStackFrameOrAbort ctl read (toException e) nextVid abort
+
+        -- Unwind to the nearest matching exception
+        in case unwindControlStmStack e (StmControl action ctl) of
+          Left _                          -> abort
+          Right (StmControl action' ctl') -> go ctl' read written writtenSeq createdSeq nextVid action'
 
       CatchStm act handler k ->
         {-# SCC "execAtomically.go.CatchStm" #-} do
@@ -984,6 +1009,14 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           -- Revert all the TVar writes within this catch action branch
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchHandlerStmFrame _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchStmFrame" #-} do
+          -- This is XSTM3 test case from the STM paper.
+          -- Revert all the TVar writes within this catch action branch
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
 
       OrElse a b k ->
         {-# SCC "execAtomically.go.OrElse" #-} do
