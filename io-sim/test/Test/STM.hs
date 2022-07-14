@@ -320,13 +320,13 @@ evalTerm !env !heap !allocs term = case term of
         -- Rule XSTM1
         --                M; heap, {} => return P; heap', allocs'
         -- --------------------------------------------------------
-        -- S[catch M N]; heap, allocs => S[return P]; heap, allocs
+        -- S[catch M N]; heap, allocs => S[return P]; heap', allocs'
         NfReturn v -> (NfReturn v, heap', allocs `mappend` allocs')
 
         -- Rule XSTM2
         --                M; heap, {} => throw P; heap', allocs'
         -- --------------------------------------------------------
-        -- S[catch M N]; heap, allocs => S[N P]; heap, allocs
+        -- S[catch M N]; heap, allocs => S[N P]; heap U allocs', allocs U allocs'
         NfThrow _ -> evalTerm env (heap `mappend` allocs') (allocs `mappend` allocs') t2
 
         -- Rule XSTM3
@@ -686,7 +686,7 @@ genTerm env tyrep =
                   Nothing)
         ]
 
-    binTerm = frequency [ (2, bindTerm), (1, orElseTerm)]
+    binTerm = frequency [ (2, bindTerm), (1, orElseTerm), (1, catchTerm)]
 
     bindTerm =
       sized $ \sz -> do
@@ -703,6 +703,11 @@ genTerm env tyrep =
       sized $ \sz -> resize (sz `div` 2) $
         OrElse <$> genTerm env tyrep
                <*> genTerm env tyrep
+
+    catchTerm = 
+      sized $ \sz -> resize (sz `div` 2) $
+        Catch <$> genTerm env tyrep 
+              <*> genTerm env tyrep
 
 genSomeExpr :: GenEnv -> Gen SomeExpr
 genSomeExpr env =

@@ -19,8 +19,8 @@
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
 -- and 'reschedule'.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE PolyKinds                  #-}
 
 module Control.Monad.IOSim.Internal
   ( IOSim (..)
@@ -72,7 +72,8 @@ import qualified Deque.Strict as Deque
 
 import           GHC.Exts (fromList)
 
-import           Control.Exception (NonTermination (..), assert, throw, SomeException (SomeException))
+import           Control.Exception (NonTermination (..),
+                     SomeException (SomeException), assert, throw)
 import           Control.Monad (join)
 
 import           Control.Monad (when)
@@ -829,8 +830,6 @@ runSimTraceST mainAction = schedule mainThread initialState
         threadNextTId = 1
       }
 
-
-
 --
 -- Executing STM Transactions
 --
@@ -849,17 +848,19 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
     catchStackFrameOrAbort :: forall b.
                               StmStack s b a
                            -> Map TVarId (SomeTVar s)
-                           -> SomeException 
+                           -> SomeException
                            -> TVarId
                            -> ST s (SimTrace c)
                            -> ST s (SimTrace c)
     catchStackFrameOrAbort ctl read exc nextVid abort =
-      case ctl of 
+      case ctl of
         AtomicallyFrame                 -> abort
-        OrElseLeftFrame _ _ _ _ _ ctl'  ->  catchStackFrameOrAbort ctl' read exc nextVid abort
-        OrElseRightFrame _ _ _ _ ctl'   -> catchStackFrameOrAbort ctl' read exc nextVid abort 
+        OrElseLeftFrame _ _ _ _ _ ctl'  -> catchStackFrameOrAbort ctl' read exc nextVid abort
+        OrElseRightFrame _ _ _ _ ctl'   -> catchStackFrameOrAbort ctl' read exc nextVid abort
         CatchStmFrame handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (handler exc)
+          case fromException exc of
+            Nothing -> catchStackFrameOrAbort ctl' read exc nextVid abort
+            Just e' -> go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (handler e')
 
 
     go :: forall b.
@@ -940,14 +941,14 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
       ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} 
+        {-# SCC "execAtomically.go.ThrowStm" #-}
         let abort = do
                       -- Revert all the TVar writes
                       !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
                       k0 $ StmTxAborted [] (toException e)
-        in catchStackFrameOrAbort ctl read (toException e) nextVid abort 
+        in catchStackFrameOrAbort ctl read (toException e) nextVid abort
 
-      CatchStm act handler k -> 
+      CatchStm act handler k ->
         {-# SCC "execAtomically.go.CatchStm" #-} do
           let ctl' = CatchStmFrame handler k written writtenSeq createdSeq ctl
           go ctl' read Map.empty [] [] nextVid act
@@ -979,7 +980,7 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
 
         CatchStmFrame _handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
           {-# SCC "execAtomically.go.catchStmFrame" #-} do
-          -- This is XSTM3 test case from the STM paper. 
+          -- This is XSTM3 test case from the STM paper.
           -- Revert all the TVar writes within this catch action branch
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry

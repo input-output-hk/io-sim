@@ -177,7 +177,7 @@ data StmA s a where
   ReturnStm    :: a -> StmA s a
   ThrowStm     :: SomeException -> StmA s a
   -- Catch with continuation
-  CatchStm     :: StmA s a -> (SomeException -> StmA s a) -> (a -> StmA s b) -> StmA s b
+  CatchStm     :: Exception e => StmA s a -> (e -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
   NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
@@ -318,16 +318,16 @@ instance Exceptions.MonadThrow (STM s) where
 
 instance MonadCatch (STM s) where
 
-  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler') k
-    where
-      handler' :: SomeException -> STM s a
-      handler' exc = 
-        if
-          | Just exc' <- fromException exc -> handler exc'
-          | otherwise                      -> throwIO exc
+  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler) k
 
   -- Default implmentation uses mask. For STM, mask is not necessary.
-  generalBracket = generalBracketSTM
+  generalBracket acquire release use = do
+    resource <- acquire
+    b <- use resource `catch` \e -> do
+      _ <- release resource (ExitCaseException e)
+      throwIO e
+    c <- release resource (ExitCaseSuccess b)
+    return (b, c)
 
 instance Exceptions.MonadCatch (STM s) where
 
@@ -874,7 +874,8 @@ data StmStack s b a where
                    -> StmStack s a c
 
   -- | Executing in the context of the /action/ part of the 'catch'
-  CatchStmFrame    :: (SomeException -> StmA s a)         -- exception handler
+  CatchStmFrame    :: Exception e 
+                   => (e -> StmA s a)         -- exception handler
                    -> (a -> StmA s b)         -- subsequent continuation
                    -> Map TVarId (SomeTVar s) -- saved written vars set
                    -> [SomeTVar s]            -- saved written vars list

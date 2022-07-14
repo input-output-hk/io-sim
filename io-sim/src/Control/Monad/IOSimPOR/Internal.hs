@@ -1121,11 +1121,27 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
           -- Continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
+        CatchStmFrame _handler k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          let written'    = Map.union written writtenOuter
+              writtenSeq' = filter (\(SomeTVar tvar) ->
+                                      tvarId tvar `Map.notMember` writtenOuter)
+                                    writtenSeq
+                         ++ writtenOuterSeq
+              createdSeq' = createdSeq ++ createdOuterSeq
+          go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
+
+
       ThrowStm e ->
         {-# SCC "execAtomically.go.ThrowStm" #-} do
         -- Revert all the TVar writes
+        -- TODO: Add unwind support
         !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
         k0 $ StmTxAborted (Map.elems read) (toException e)
+
+      CatchStm act handler k ->
+         {-# SCC "execAtomically.go.ThrowStm" #-} do
+         let ctl' = CatchStmFrame handler k written writtenSeq createdSeq ctl
+         go ctl' read Map.empty [] [] nextVid act
 
       Retry ->
         {-# SCC "execAtomically.go.Retry" #-}
@@ -1151,6 +1167,14 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
           -- Skip the continuation and propagate the retry into the outer frame
           -- using the written set for the outer frame
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchStmFrame _handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchStmFrame" #-} do
+          -- This is XSTM3 test case from the STM paper.
+          -- Revert all the TVar writes within this catch action branch
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
 
       OrElse a b k ->
         {-# SCC "execAtomically.go.OrElse" #-} do

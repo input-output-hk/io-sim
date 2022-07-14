@@ -18,7 +18,6 @@ module Control.Monad.Class.MonadThrow
   , ExitCase (..)
   , Handler (..)
   , catches
-  , generalBracketSTM
     -- * Deprecated interfaces
   , throwM
   ) where
@@ -243,19 +242,16 @@ instance MonadThrow STM where
   throwIO = STM.throwSTM
 
 
-generalBracketSTM :: MonadCatch m => m a -> (a -> ExitCase b -> m c) -> (a -> m b) -> m (b, c)
-generalBracketSTM acquire release use = do
+instance MonadCatch STM where
+  catch  = STM.catchSTM
+
+  generalBracket acquire release use = do
     resource <- acquire
     b <- use resource `catch` \e -> do
       _ <- release resource (ExitCaseException e)
       throwIO e
     c <- release resource (ExitCaseSuccess b)
     return (b, c)
-
-instance MonadCatch STM where
-  catch  = STM.catchSTM
-
-  generalBracket = generalBracketSTM
 
 
 --
