@@ -832,7 +832,7 @@ data StmControl s a where
   StmControl :: StmA s b -> !(StmStack s b a) -> StmControl s a
 
 
--- Unwind the STM control stack till the matching exception
+-- Unwind the STM control stack till the matching exception is found
 unwindControlStmStack :: forall s a.
                          SomeException
                       -> StmControl s a
