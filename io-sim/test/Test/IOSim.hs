@@ -134,8 +134,8 @@ tests =
     , testProperty "16" unit_async_16
     ]
   , testGroup "STM reference semantics"
-    [ testProperty "Reference vs IO"    prop_stm_referenceIO
-    , testProperty "Reference vs Sim"   prop_stm_referenceSim
+    [ testProperty "Reference vs IO"    (withMaxSuccess 10000 prop_stm_referenceIO)
+    , testProperty "Reference vs Sim"   (withMaxSuccess 10000 prop_stm_referenceSim)
     ]
   , testGroup "MonadFix instance"
     [ testProperty "purity"     prop_mfix_purity
