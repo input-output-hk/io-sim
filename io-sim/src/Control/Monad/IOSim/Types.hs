@@ -14,7 +14,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields          #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf                 #-}
 
 module Control.Monad.IOSim.Types
   ( IOSim (..)
@@ -874,7 +874,7 @@ data StmStack s b a where
                    -> StmStack s a c
 
   -- | Executing in the context of the /action/ part of the 'catch'
-  CatchStmFrame    :: Exception e 
+  CatchStmFrame    :: Exception e
                    => (e -> StmA s a)         -- exception handler
                    -> (a -> StmA s b)         -- subsequent continuation
                    -> Map TVarId (SomeTVar s) -- saved written vars set

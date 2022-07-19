@@ -11,7 +11,7 @@ main = defaultMain tests
 tests :: TestTree
 tests =
   testGroup "IO Sim"
-  [ 
+  [
     Test.IOSim.tests
   , Test.STM.tests
   ]

@@ -34,8 +34,8 @@ import           Control.Monad.Class.MonadSTM as STM
 import           Control.Monad.Class.MonadThrow
 
 import           Test.QuickCheck
-import Test.Tasty (testGroup, TestTree)
-import Test.Tasty.QuickCheck (testProperty)
+import           Test.Tasty (TestTree, testGroup)
+import           Test.Tasty.QuickCheck (testProperty)
 
 
 -- | The type level structure of types in our STM 'Term's. This is kept simple,
@@ -704,9 +704,9 @@ genTerm env tyrep =
         OrElse <$> genTerm env tyrep
                <*> genTerm env tyrep
 
-    catchTerm = 
+    catchTerm =
       sized $ \sz -> resize (sz `div` 2) $
-        Catch <$> genTerm env tyrep 
+        Catch <$> genTerm env tyrep
               <*> genTerm env tyrep
 
 genSomeExpr :: GenEnv -> Gen SomeExpr
@@ -869,7 +869,7 @@ showTyRep p (TyRepVar t) = showParen (p > 10) $
                              showString "TVar " . showTyRep 11 t
 
 tests :: TestTree
-tests = 
+tests =
   testGroup "Test STM"
   [
     testProperty "Term generation" prop_genSomeTerm
