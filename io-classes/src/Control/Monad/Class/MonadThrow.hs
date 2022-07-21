@@ -241,6 +241,7 @@ instance MonadEvaluate IO where
 instance MonadThrow STM where
   throwIO = STM.throwSTM
 
+
 instance MonadCatch STM where
   catch  = STM.catchSTM
 

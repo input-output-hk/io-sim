@@ -33,7 +33,7 @@ import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
 import           Control.Monad.IOSim
 
-import           Test.STM
+import           Test.STM hiding (tests)
 
 import           Test.QuickCheck
 import           Test.Tasty
@@ -134,8 +134,8 @@ tests =
     , testProperty "16" unit_async_16
     ]
   , testGroup "STM reference semantics"
-    [ testProperty "Reference vs IO"    prop_stm_referenceIO
-    , testProperty "Reference vs Sim"   prop_stm_referenceSim
+    [ testProperty "Reference vs IO"    (withMaxSuccess 10000 prop_stm_referenceIO)
+    , testProperty "Reference vs Sim"   (withMaxSuccess 10000 prop_stm_referenceSim)
     ]
   , testGroup "MonadFix instance"
     [ testProperty "purity"     prop_mfix_purity
@@ -1049,7 +1049,7 @@ prop_stm_referenceSim t =
 -- | Compare the behaviour of the STM reference operational semantics with
 -- the behaviour of any 'MonadSTM' STM implementation.
 --
-prop_stm_referenceM :: (MonadSTM m, MonadThrow (STM m), MonadCatch m)
+prop_stm_referenceM :: (MonadSTM m, MonadThrow (STM m), MonadCatch m, LazySTM.MonadSTM m, MonadCatch (LazySTM.STM m))
                     => SomeTerm -> m Property
 prop_stm_referenceM (SomeTerm _tyrep t) = do
     let (r1, _heap) = evalAtomically t

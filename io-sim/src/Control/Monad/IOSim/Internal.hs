@@ -19,6 +19,8 @@
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
 -- and 'reschedule'.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE PolyKinds                  #-}
 
 module Control.Monad.IOSim.Internal
   ( IOSim (..)
@@ -71,9 +73,7 @@ import qualified Deque.Strict as Deque
 import           GHC.Exts (fromList)
 
 import           Control.Exception (NonTermination (..), assert, throw)
-import           Control.Monad (join)
-
-import           Control.Monad (when)
+import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
@@ -828,6 +828,35 @@ runSimTraceST mainAction = schedule mainThread initialState
       }
 
 
+data StmControl s a where
+  StmControl :: StmA s b -> !(StmStack s b a) -> StmControl s a
+
+
+-- Unwind the STM control stack till the matching exception is found
+unwindControlStmStack :: forall s a.
+                         SomeException
+                      -> StmControl s a
+                      -> Either Bool
+                           ( StmControl s a
+                           , [Map TVarId (SomeTVar s)]
+                           )
+unwindControlStmStack e (StmControl _ frame) = unwindFrame [] frame
+
+  where
+    unwindFrame :: forall s' b. [Map TVarId (SomeTVar s')] -> StmStack s' b a -> Either Bool (StmControl s' a, [Map TVarId (SomeTVar s')])
+    unwindFrame _  AtomicallyFrame                          = Left True
+    unwindFrame ws (OrElseLeftFrame _ _ w _ _ ctl)          = unwindFrame (w:ws) ctl
+    unwindFrame ws (OrElseRightFrame _ w _ _ ctl)           = unwindFrame (w:ws) ctl
+    unwindFrame ws (CatchHandlerStmFrame _ _w _ _ ctl)      = unwindFrame ws     ctl  -- Should not happen
+    unwindFrame ws (CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl) =
+      case fromException e of
+        -- Continue to unwind till we find a handler which can handle this exception.
+        Nothing -> unwindFrame (writtenOuter:ws) ctl
+        Just e' ->
+          let action' = handler e'
+              ctl'    = CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl
+          in Right $ (StmControl action' ctl', reverse ws)
+
 --
 -- Executing STM Transactions
 --
@@ -910,11 +939,47 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           -- Continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
-      ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} do
+        CatchStmFrame _handler k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          -- Successful main catch action
+          -- Merge allocations with outer sequence
+          !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar)
+                          (Map.intersection written writtenOuter)
+          -- Merge the written set of the inner with the outer
+          let written'    = Map.union written writtenOuter
+              writtenSeq' = filter (\(SomeTVar tvar) ->
+                                      tvarId tvar `Map.notMember` writtenOuter)
+                                    writtenSeq
+                         ++ writtenOuterSeq
+          -- Skip the orElse right hand and continue with the k continuation
+          go ctl' read written' writtenSeq' createdOuterSeq nextVid (k x)
+
+        CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          -- Undo all written tvars
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (k x)
+
+      ThrowStm e -> {-# SCC "execAtomically.go.ThrowStm" #-} do
+        revertThem written
+        case unwindControlStmStack e (StmControl action ctl) of
+
+          -- Unwind to the nearest matching exception
+          Right (StmControl action' ctl', ws) -> do
+              mapM_ revertThem ws
+              go ctl' read written writtenSeq createdSeq nextVid action'
+
+          -- Abort if no matching exception is found
+          Left{}                              ->
+              k0 $ StmTxAborted [] (toException e)
+
         -- Revert all the TVar writes
-        !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-        k0 $ StmTxAborted [] (toException e)
+        where
+          revertThem x =
+              traverse_ (\(SomeTVar tvar) -> revertTVar tvar) x
+
+      CatchStm act handler k ->
+        {-# SCC "execAtomically.go.CatchStm" #-} do
+          let ctl' = CatchStmFrame handler k written writtenSeq createdSeq ctl
+          go ctl' read Map.empty [] [] nextVid act
 
       Retry ->
         {-# SCC "execAtomically.go.Retry" #-}
@@ -939,6 +1004,19 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           -- Skip the continuation and propagate the retry into the outer frame
           -- using the written set for the outer frame
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchStmFrame _handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchStmFrame" #-} do
+          -- This is XSTM3 test case from the STM paper.
+          -- Revert all the TVar writes within this catch action branch
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchHandlerStmFrame _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchHandlerStmFrame" #-} do
+          -- Undo all written tvars
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
       OrElse a b k ->

@@ -1039,6 +1039,32 @@ controlSimTraceST limit control mainAction =
       }
 
 
+data StmControl s a where
+  StmControl :: StmA s b -> !(StmStack s b a) -> StmControl s a
+
+
+-- Unwind the STM control stack till the matching exception is found
+unwindControlStmStack :: forall s a.
+                         SomeException
+                      -> StmControl s a
+                      -> Either Bool (StmControl s a)
+unwindControlStmStack e (StmControl _ frame) = unwindFrame frame
+
+  where
+    unwindFrame :: forall s' b. StmStack s' b a -> Either Bool (StmControl s' a)
+    unwindFrame AtomicallyFrame                       = Left True
+    unwindFrame (OrElseLeftFrame _ _ _ _ _ ctl)       = unwindFrame ctl
+    unwindFrame (OrElseRightFrame _ _ _ _ ctl)        = unwindFrame ctl
+    unwindFrame (CatchHandlerStmFrame _ _ _ _ ctl)    = unwindFrame ctl
+    unwindFrame (CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl) =
+      case fromException e of
+        -- Continue to unwind till we find a handler which can handle this exception.
+        Nothing -> unwindFrame ctl
+        Just e' ->
+          let action' = handler e'
+              ctl'    = CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl
+          in Right $ StmControl action' ctl'
+
 --
 -- Executing STM Transactions
 --
@@ -1121,11 +1147,44 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
           -- Continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
+        CatchStmFrame _handler k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          let written'    = Map.union written writtenOuter
+              writtenSeq' = filter (\(SomeTVar tvar) ->
+                                      tvarId tvar `Map.notMember` writtenOuter)
+                                    writtenSeq
+                         ++ writtenOuterSeq
+              createdSeq' = createdSeq ++ createdOuterSeq
+          go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
+
+        CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar)
+                          (Map.intersection written writtenOuter)
+          let written'    = Map.union written writtenOuter
+              writtenSeq' = filter (\(SomeTVar tvar) ->
+                                      tvarId tvar `Map.notMember` writtenOuter)
+                                    writtenSeq
+                         ++ writtenOuterSeq
+              createdSeq' = createdSeq ++ createdOuterSeq
+          go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
+
+
+
       ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} do
-        -- Revert all the TVar writes
-        !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-        k0 $ StmTxAborted (Map.elems read) (toException e)
+        {-# SCC "execAtomically.go.ThrowStm" #-}
+
+        let abort = do
+              -- Revert all the TVar writes
+              !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+              k0 $ StmTxAborted (Map.elems read) (toException e)
+
+        in case unwindControlStmStack e (StmControl action ctl) of
+          Left _ -> abort
+          Right (StmControl action' ctl') -> go ctl' read written writtenSeq createdSeq nextVid action'
+
+      CatchStm act handler k ->
+         {-# SCC "execAtomically.go.ThrowStm" #-} do
+         let ctl' = CatchStmFrame handler k written writtenSeq createdSeq ctl
+         go ctl' read Map.empty [] [] nextVid act
 
       Retry ->
         {-# SCC "execAtomically.go.Retry" #-}
@@ -1151,6 +1210,19 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
           -- Skip the continuation and propagate the retry into the outer frame
           -- using the written set for the outer frame
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchStmFrame _handler _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchStmFrame" #-} do
+          -- Revert all the TVar writes within this catch action branch
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
+        CatchHandlerStmFrame _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+          {-# SCC "execAtomically.go.catchHandlerStmFrame" #-} do
+          -- Revert all the TVar writes within this catch action branch
+          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+
 
       OrElse a b k ->
         {-# SCC "execAtomically.go.OrElse" #-} do
