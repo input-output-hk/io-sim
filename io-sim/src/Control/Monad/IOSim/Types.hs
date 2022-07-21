@@ -890,7 +890,6 @@ data StmStack s b a where
 
   -- | A continuation frame
   CatchHandlerStmFrame :: (b -> StmA s c)           -- subsequent continuation
-                       -> [Map TVarId (SomeTVar s)] -- All written vars between `throw` and `catch`
                        -> Map TVarId (SomeTVar s)   -- saved written vars set
                        -> [SomeTVar s]              -- saved written vars list
                        -> [SomeTVar s]              -- created vars list (allocations)

@@ -73,7 +73,7 @@ import qualified Deque.Strict as Deque
 import           GHC.Exts (fromList)
 
 import           Control.Exception (NonTermination (..), assert, throw)
-import           Control.Monad (join, when, forM_)
+import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
@@ -836,23 +836,26 @@ data StmControl s a where
 unwindControlStmStack :: forall s a.
                          SomeException
                       -> StmControl s a
-                      -> Either Bool (StmControl s a)
+                      -> Either Bool
+                           ( StmControl s a
+                           , [Map TVarId (SomeTVar s)]
+                           )
 unwindControlStmStack e (StmControl _ frame) = unwindFrame [] frame
 
   where
-    unwindFrame :: forall s' b. [Map TVarId (SomeTVar s')] -> StmStack s' b a -> Either Bool (StmControl s' a)
+    unwindFrame :: forall s' b. [Map TVarId (SomeTVar s')] -> StmStack s' b a -> Either Bool (StmControl s' a, [Map TVarId (SomeTVar s')])
     unwindFrame _  AtomicallyFrame                          = Left True
     unwindFrame ws (OrElseLeftFrame _ _ w _ _ ctl)          = unwindFrame (w:ws) ctl
     unwindFrame ws (OrElseRightFrame _ w _ _ ctl)           = unwindFrame (w:ws) ctl
-    unwindFrame ws (CatchHandlerStmFrame _ _ws' _w _ _ ctl) = unwindFrame ws     ctl  -- Should not happen
+    unwindFrame ws (CatchHandlerStmFrame _ _w _ _ ctl)      = unwindFrame ws     ctl  -- Should not happen
     unwindFrame ws (CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl) =
       case fromException e of
         -- Continue to unwind till we find a handler which can handle this exception.
         Nothing -> unwindFrame (writtenOuter:ws) ctl
         Just e' ->
           let action' = handler e'
-              ctl'    = CatchHandlerStmFrame k (reverse ws) writtenOuter writtenOuterSeq createdOuterSeq ctl
-          in Right $ StmControl action' ctl'
+              ctl'    = CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl
+          in Right $ (StmControl action' ctl', reverse ws)
 
 --
 -- Executing STM Transactions
@@ -950,25 +953,28 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           -- Skip the orElse right hand and continue with the k continuation
           go ctl' read written' writtenSeq' createdOuterSeq nextVid (k x)
 
-        CatchHandlerStmFrame k ws writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+        CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
           -- Undo all written tvars
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-          -- And all the ones till the catch frame
-          forM_ ws $ traverse_ (\(SomeTVar tvar) -> revertTVar tvar) 
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (k x)
 
-      ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-}
-        -- Abort if no matching exception is found
-        let abort = do
-                      -- Revert all the TVar writes
-                      !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-                      k0 $ StmTxAborted [] (toException e)
+      ThrowStm e -> {-# SCC "execAtomically.go.ThrowStm" #-} do
+        revertThem written
+        case unwindControlStmStack e (StmControl action ctl) of
 
-        -- Unwind to the nearest matching exception
-        in case unwindControlStmStack e (StmControl action ctl) of
-          Right (StmControl action' ctl') -> go ctl' read written writtenSeq createdSeq nextVid action'
-          _                               -> abort
+          -- Unwind to the nearest matching exception
+          Right (StmControl action' ctl', ws) -> do
+              mapM_ revertThem ws
+              go ctl' read written writtenSeq createdSeq nextVid action'
+
+          -- Abort if no matching exception is found
+          Left{}                              ->
+              k0 $ StmTxAborted [] (toException e)
+
+        -- Revert all the TVar writes
+        where
+          revertThem x =
+              traverse_ (\(SomeTVar tvar) -> revertTVar tvar) x
 
       CatchStm act handler k ->
         {-# SCC "execAtomically.go.CatchStm" #-} do
@@ -1007,12 +1013,10 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
-        CatchHandlerStmFrame _k ws writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+        CatchHandlerStmFrame _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
           {-# SCC "execAtomically.go.catchHandlerStmFrame" #-} do
           -- Undo all written tvars
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-          -- And all the ones till the catch frame
-          forM_ ws $ traverse_ (\(SomeTVar tvar) -> revertTVar tvar) 
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
       OrElse a b k ->

@@ -1055,14 +1055,14 @@ unwindControlStmStack e (StmControl _ frame) = unwindFrame frame
     unwindFrame AtomicallyFrame                       = Left True
     unwindFrame (OrElseLeftFrame _ _ _ _ _ ctl)       = unwindFrame ctl
     unwindFrame (OrElseRightFrame _ _ _ _ ctl)        = unwindFrame ctl
-    unwindFrame (CatchHandlerStmFrame _ _ _ _ _ ctl)  = unwindFrame ctl
+    unwindFrame (CatchHandlerStmFrame _ _ _ _ ctl)    = unwindFrame ctl
     unwindFrame (CatchStmFrame handler k writtenOuter writtenOuterSeq createdOuterSeq ctl) =
       case fromException e of
         -- Continue to unwind till we find a handler which can handle this exception.
         Nothing -> unwindFrame ctl
         Just e' ->
           let action' = handler e'
-              ctl'    = CatchHandlerStmFrame k [] writtenOuter writtenOuterSeq createdOuterSeq ctl
+              ctl'    = CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl
           in Right $ StmControl action' ctl'
 
 --
@@ -1156,7 +1156,7 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
               createdSeq' = createdSeq ++ createdOuterSeq
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
-        CatchHandlerStmFrame k [] writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+        CatchHandlerStmFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
           !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar)
                           (Map.intersection written writtenOuter)
           let written'    = Map.union written writtenOuter
@@ -1217,7 +1217,7 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
-        CatchHandlerStmFrame _k [] writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+        CatchHandlerStmFrame _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
           {-# SCC "execAtomically.go.catchHandlerStmFrame" #-} do
           -- Revert all the TVar writes within this catch action branch
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
