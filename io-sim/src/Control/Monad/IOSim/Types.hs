@@ -14,7 +14,6 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields          #-}
-{-# LANGUAGE MultiWayIf                 #-}
 
 module Control.Monad.IOSim.Types
   ( IOSim (..)
@@ -227,7 +226,9 @@ instance Monad (IOSim s) where
     {-# INLINE (>>) #-}
     (>>) = (*>)
 
-
+#if !(MIN_VERSION_base(4,13,0))
+    fail = Fail.fail
+#endif
 
 
 
@@ -237,7 +238,9 @@ instance Semigroup a => Semigroup (IOSim s a) where
 instance Monoid a => Monoid (IOSim s a) where
     mempty = pure mempty
 
-
+#if !(MIN_VERSION_base(4,11,0))
+    mappend = liftA2 mappend
+#endif
 
 
 
@@ -272,7 +275,9 @@ instance Monad (STM s) where
     {-# INLINE (>>) #-}
     (>>) = (*>)
 
-
+#if !(MIN_VERSION_base(4,13,0))
+    fail = Fail.fail
+#endif
 
 
 
@@ -884,10 +889,11 @@ data StmStack s b a where
                    -> StmStack s a c
 
   -- | A continuation frame
-  CatchHandlerStmFrame :: (b -> StmA s c)         -- subsequent continuation
-                       -> Map TVarId (SomeTVar s) -- saved written vars set
-                       -> [SomeTVar s]            -- saved written vars list
-                       -> [SomeTVar s]            -- created vars list (allocations)
+  CatchHandlerStmFrame :: (b -> StmA s c)           -- subsequent continuation
+                       -> [Map TVarId (SomeTVar s)] -- All written vars between `throw` and `catch`
+                       -> Map TVarId (SomeTVar s)   -- saved written vars set
+                       -> [SomeTVar s]              -- saved written vars list
+                       -> [SomeTVar s]              -- created vars list (allocations)
                        -> !(StmStack s c a)
                        -> StmStack s b a
 ---
