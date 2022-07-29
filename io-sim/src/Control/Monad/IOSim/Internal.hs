@@ -119,10 +119,13 @@ labelledThreads threadMap =
       [] threadMap
 
 
--- | Timers mutable variables.  First one supports 'newTimeout' api, the second
--- one 'registerDelay'.
+-- | Timers mutable variables. Supports 'newTimeout' api, the second
+-- one 'registerDelay', the third one 'threadDelay'.
 --
-data TimerVars s = TimerVars !(TVar s TimeoutState) !(TVar s Bool)
+data TimerCompletionInfo s =
+       Timer !(TVar s TimeoutState)
+     | TimerRegisterDelay !(TVar s Bool)
+     | TimerThreadDelay !ThreadId
 
 -- | Internal state.
 --
@@ -136,7 +139,7 @@ data SimState s a = SimState {
        -- | current time
        curTime  :: !Time,
        -- | ordered list of timers
-       timers   :: !(OrdPSQ TimeoutId Time (TimerVars s)),
+       timers   :: !(OrdPSQ TimeoutId Time (TimerCompletionInfo s)),
        -- | list of clocks
        clocks   :: !(Map ClockId UTCTime),
        nextVid  :: !TVarId,     -- ^ next unused 'TVarId'
@@ -346,30 +349,72 @@ schedule !thread@Thread{
     NewTimeout d k ->
       {-# SCC "schedule.NewTimeout.2" #-} do
       !tvar  <- execNewTVar nextVid
-                            (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
-                            TimeoutPending
-      !tvar' <- execNewTVar (succ nextVid)
-                            (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
-                            False
+                           (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
+                           TimeoutPending
       let !expiry  = d `addTime` time
-          !t       = Timeout tvar tvar' nextTmid
-          !timers' = PSQ.insert nextTmid expiry (TimerVars tvar tvar') timers
+          !t       = Timeout tvar nextTmid
+          !timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
           !thread' = thread { threadControl = ThreadControl (k t) ctl }
-      !trace <- schedule thread' simstate { timers   = timers'
-                                          , nextVid  = succ (succ nextVid)
-                                          , nextTmid = succ nextTmid }
+      trace <- schedule thread' simstate { timers   = timers'
+                                         , nextVid  = succ nextVid
+                                         , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
+
+    RegisterDelay d k | d < 0 ->
+      {-# SCC "schedule.NewRegisterDelay" #-} do
+      !tvar <- execNewTVar nextVid
+                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          True
+      let !expiry  = d `addTime` time
+          !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
+      trace <- schedule thread' simstate { nextVid = succ nextVid }
+      return (SimTrace time tid tlbl (EventRegisterDelayCreated nextTmid nextVid expiry) $
+              SimTrace time tid tlbl (EventRegisterDelayFired nextTmid) $
+              trace)
+
+    RegisterDelay d k ->
+      {-# SCC "schedule.NewRegisterDelay" #-} do
+      !tvar <- execNewTVar nextVid
+                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          False
+      let !expiry  = d `addTime` time
+          !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
+          !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
+      trace <- schedule thread' simstate { timers   = timers'
+                                         , nextVid  = succ nextVid
+                                         , nextTmid = succ nextTmid }
+      return (SimTrace time tid tlbl
+                (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
+
+    ThreadDelay d k | d < 0 ->
+      {-# SCC "schedule.NewThreadDelay" #-} do
+      let !expiry  = d `addTime` time
+          !thread' = thread { threadControl = ThreadControl k ctl }
+      trace <- schedule thread' simstate
+      return (SimTrace time tid tlbl (EventThreadDelay expiry) $
+              SimTrace time tid tlbl EventThreadDelayFired $
+              trace)
+
+    ThreadDelay d k ->
+      {-# SCC "schedule.NewThreadDelay" #-} do
+      let !expiry  = d `addTime` time
+          !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid) timers
+          !thread' = thread { threadControl = ThreadControl k ctl }
+      !trace <- deschedule Blocked thread' simstate { timers   = timers'
+                                                    , nextTmid = succ nextTmid }
+      return (SimTrace time tid tlbl (EventThreadDelay expiry) trace)
+
 
     -- we do not follow `GHC.Event` behaviour here; updating a timer to the past
     -- effectively cancels it.
-    UpdateTimeout (Timeout _tvar _tvar' tmid) d k | d < 0 ->
+    UpdateTimeout (Timeout _tvar tmid) d k | d < 0 ->
       {-# SCC "schedule.UpdateTimeout" #-} do
       let !timers' = PSQ.delete tmid timers
           !thread' = thread { threadControl = ThreadControl k ctl }
       trace <- schedule thread' simstate { timers = timers' }
       return (SimTrace time tid tlbl (EventTimerCancelled tmid) trace)
 
-    UpdateTimeout (Timeout _tvar _tvar' tmid) d k ->
+    UpdateTimeout (Timeout _tvar tmid) d k ->
       {-# SCC "schedule.UpdateTimeout" #-} do
           -- updating an expired timeout is a noop, so it is safe
           -- to race using a timeout with updating or cancelling it
@@ -387,12 +432,12 @@ schedule !thread@Thread{
       let thread' = thread { threadControl = ThreadControl k ctl }
       schedule thread' simstate
 
-    CancelTimeout (Timeout tvar _tvar' tmid) k ->
+    CancelTimeout (Timeout tvar tmid) k ->
       {-# SCC "schedule.CancelTimeout" #-} do
       let !timers' = PSQ.delete tmid timers
           !thread' = thread { threadControl = ThreadControl k ctl }
       !written <- execAtomically' (runSTM $ writeTVar tvar TimeoutCancelled)
-      (!wakeup, wokeby) <- threadsUnblockedByWrites written
+      (wakeup, wokeby) <- threadsUnblockedByWrites written
       mapM_ (\(SomeTVar var) -> unblockAllThreadsFromTVar var) written
       let (unblocked,
            simstate') = unblockThreads wakeup simstate
@@ -525,7 +570,7 @@ schedule !thread@Thread{
                                                (runIOSim action')
                                                (MaskFrame k maskst ctl)
                            , threadMasking = maskst' }
-      !trace <-
+      trace <-
         case maskst' of
           -- If we're now unmasked then check for any pending async exceptions
           Unmasked -> SimTrace time tid tlbl (EventDeschedule Interruptable)
@@ -723,30 +768,43 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
 
         -- Reuse the STM functionality here to write all the timer TVars.
         -- Simplify to a special case that only reads and writes TVars.
-        !written <- execAtomically' (runSTM $ mapM_ timeoutAction fired)
-        (wakeup, wokeby) <- threadsUnblockedByWrites written
+        !written <- execAtomically' (runSTM $ mapM_ timeoutSTMAction fired)
+        (wakeupSTM, wokeby) <- threadsUnblockedByWrites written
         !_ <- mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
-        let (unblocked,
-             simstate') = unblockThreads wakeup simstate
+            -- Check all fired threadDelays
+        let wakeupThreadDelay = [ tid | TimerThreadDelay tid <- fired ]
+            wakeup            = wakeupThreadDelay ++ wakeupSTM
+            (_, !simstate')   = unblockThreads wakeup simstate
+
         !trace <- reschedule simstate' { curTime = time'
                                        , timers  = timers' }
         return $
-          traceMany ([ (time', ThreadId [-1], Just "timer", EventTimerExpired tmid)
-                     | tmid <- tmids ]
+          traceMany ([ ( time', ThreadId [-1], Just "timer"
+                       , EventTimerFired tmid)
+                     | (tmid, Timer _) <- zip tmids fired ]
+                  ++ [ ( time', ThreadId [-1], Just "register delay timer"
+                       , EventRegisterDelayFired tmid)
+                     | (tmid, TimerRegisterDelay _) <- zip tmids fired ]
                   ++ [ (time', tid', tlbl', EventTxWakeup vids)
-                     | tid' <- unblocked
+                     | tid' <- wakeupSTM
                      , let tlbl' = lookupThreadLabel tid' threads
-                     , let Just vids = Set.toList <$> Map.lookup tid' wokeby ])
+                     , let Just vids = Set.toList <$> Map.lookup tid' wokeby ]
+                  ++ [ ( time', tid, Just "thread delay timer"
+                       , EventThreadDelayFired)
+                     | tid <- wakeupThreadDelay ])
                     trace
   where
-    timeoutAction (TimerVars var bvar) = do
+    timeoutSTMAction (Timer var) = do
       x <- readTVar var
       case x of
-        TimeoutPending   -> writeTVar var  TimeoutFired
-                         >> writeTVar bvar True
+        TimeoutPending   -> writeTVar var TimeoutFired
         TimeoutFired     -> error "MonadTimer(Sim): invariant violation"
         TimeoutCancelled -> return ()
+    timeoutSTMAction (TimerRegisterDelay var) = writeTVar var True
+    -- Note that 'threadDelay' is not handled via STM style wakeup, but rather
+    -- it's handled directly above with 'wakeupThreadDelay' and 'unblockThreads'
+    timeoutSTMAction (TimerThreadDelay _)     = return ()
 
 unblockThreads :: [ThreadId] -> SimState s a -> ([ThreadId], SimState s a)
 unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
