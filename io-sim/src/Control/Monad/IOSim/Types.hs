@@ -150,9 +150,13 @@ data SimA s a where
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
 
-  NewTimeout   :: DiffTime -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
-  UpdateTimeout:: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
-  CancelTimeout:: Timeout (IOSim s) -> SimA s b -> SimA s b
+  RegisterDelay :: DiffTime -> (TVar s Bool -> SimA s b) -> SimA s b
+
+  ThreadDelay :: DiffTime -> SimA s b -> SimA s b
+
+  NewTimeout    :: DiffTime -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
+  UpdateTimeout :: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
+  CancelTimeout :: Timeout (IOSim s) -> SimA s b -> SimA s b
 
   Throw        :: Thrower -> SomeException -> SimA s a
   Catch        :: Exception e =>
@@ -542,17 +546,17 @@ unshareClock :: IOSim s ()
 unshareClock = IOSim $ oneShot $ \k -> UnshareClock (k ())
 
 instance MonadDelay (IOSim s) where
-  -- Use default in terms of MonadTimer
+  -- Use optimized IOSim primitive
+  threadDelay d = IOSim $ oneShot $ \k -> ThreadDelay d (k ())
 
 instance MonadTimer (IOSim s) where
-  data Timeout (IOSim s) = Timeout !(TVar s TimeoutState) !(TVar s Bool) !TimeoutId
-                         -- ^ a timeout; we keep both 'TVar's to support
-                         -- `newTimer` and 'registerTimeout'.
+  data Timeout (IOSim s) = Timeout !(TVar s TimeoutState) !TimeoutId
+                         -- ^ a timeout
                          | NegativeTimeout !TimeoutId
                          -- ^ a negative timeout
 
-  readTimeout (Timeout var _bvar _key) = MonadSTM.readTVar var
-  readTimeout (NegativeTimeout _key)   = pure TimeoutCancelled
+  readTimeout (Timeout var _key)     = MonadSTM.readTVar var
+  readTimeout (NegativeTimeout _key) = pure TimeoutCancelled
 
   newTimeout      d = IOSim $ oneShot $ \k -> NewTimeout      d k
   updateTimeout t d = IOSim $ oneShot $ \k -> UpdateTimeout t d (k ())
@@ -563,7 +567,7 @@ instance MonadTimer (IOSim s) where
     | d == 0    = return Nothing
     | otherwise = do
         pid <- myThreadId
-        t@(Timeout _ _ tid) <- newTimeout d
+        t@(Timeout _ tid) <- newTimeout d
         handleJust
           (\(TimeoutException tid') -> if tid' == tid
                                          then Just ()
@@ -579,7 +583,7 @@ instance MonadTimer (IOSim s) where
                   throwTo pid' AsyncCancelled)
             (\_ -> Just <$> action)
 
-  registerDelay d = IOSim $ oneShot $ \k -> NewTimeout d (\(Timeout _var bvar _) -> k bvar)
+  registerDelay d = IOSim $ oneShot $ \k -> RegisterDelay d k
 
 newtype TimeoutException = TimeoutException TimeoutId deriving Eq
 
@@ -806,10 +810,16 @@ data SimEventType
                        (Maybe Effect)    -- effect performed (only for `IOSimPOR`)
   | EventTxWakeup      [Labelled TVarId] -- changed vars causing retry
 
-  | EventTimerCreated   TimeoutId TVarId Time
-  | EventTimerUpdated   TimeoutId        Time
-  | EventTimerCancelled TimeoutId
-  | EventTimerExpired   TimeoutId
+  | EventThreadDelay        Time
+  | EventThreadDelayFired
+
+  | EventRegisterDelayCreated TimeoutId TVarId Time
+  | EventRegisterDelayFired TimeoutId
+
+  | EventTimerCreated         TimeoutId TVarId Time
+  | EventTimerUpdated         TimeoutId        Time
+  | EventTimerCancelled       TimeoutId
+  | EventTimerFired           TimeoutId
 
   -- the following events are inserted to mark the difference between
   -- a failed trace and a similar passing trace of the same action
