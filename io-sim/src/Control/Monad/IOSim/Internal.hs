@@ -54,7 +54,9 @@ module Control.Monad.IOSim.Internal
 import           Prelude hiding (read)
 
 import           Data.Dynamic
-import           Data.Foldable (toList, traverse_)
+import           Data.Foldable (toList, traverse_, foldlM)
+import           Deque.Strict (Deque)
+import qualified Deque.Strict as Deque
 import qualified Data.List as List
 import qualified Data.List.Trace as Trace
 import           Data.Map.Strict (Map)
@@ -65,16 +67,13 @@ import qualified Data.OrdPSQ as PSQ
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
-import           Deque.Strict (Deque)
-import qualified Deque.Strict as Deque
 
 import           GHC.Exts (fromList)
 import           GHC.Conc (ThreadStatus(..), BlockReason(..))
 
-import           Control.Exception (NonTermination (..), assert, throw)
-import           Control.Monad (join)
-
-import           Control.Monad (when)
+import           Control.Exception
+                   (NonTermination (..), assert, throw, AsyncException (..))
+import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
@@ -126,6 +125,7 @@ data TimerCompletionInfo s =
        Timer !(TVar s TimeoutState)
      | TimerRegisterDelay !(TVar s Bool)
      | TimerThreadDelay !ThreadId
+     | TimerTimeout !ThreadId !TimeoutId !(STRef s IsLocked)
 
 -- | Internal state.
 --
@@ -138,7 +138,7 @@ data SimState s a = SimState {
        finished :: !(Map ThreadId FinishedReason),
        -- | current time
        curTime  :: !Time,
-       -- | ordered list of timers
+       -- | ordered list of timers and timeouts
        timers   :: !(OrdPSQ TimeoutId Time (TimerCompletionInfo s)),
        -- | list of clocks
        clocks   :: !(Map ClockId UTCTime),
@@ -235,8 +235,53 @@ schedule !thread@Thread{
         let thread' = thread { threadControl = ThreadControl (k x) ctl' }
         schedule thread' simstate
 
+      TimeoutFrame tmid isLockedRef k ctl' -> do
+        -- There is a possible race between timeout action and the timeout expiration.
+        -- We use a lock to solve the race.
+        --
+        -- The lock starts 'NotLocked' and when the timeout fires the lock is
+        -- locked and asynchronously an assassin thread is coming to interrupt
+        -- it. If the lock is locked when the timeout is fired then nothing
+        -- happens.
+        --
+        -- Knowing this, if we reached this point in the code and the lock is
+        -- 'Locked', then it means that this thread still hasn't received the
+        -- 'TimeoutException', so we need to kill the thread that is responsible
+        -- for doing that (the assassin thread, we need to defend ourselves!)
+        -- and run our continuation successfully and peacefully. We will do that
+        -- by uninterruptibly-masking ourselves so we can not receive any
+        -- exception and kill the assassin thread behind its back.
+        -- If the lock is 'NotLocked' then it means we can just acquire it and
+        -- carry on with the success case.
+        locked <- readSTRef isLockedRef
+        case locked of
+          Locked etid -> do
+            let -- Kill the assassin throwing thread and carry on the
+                -- continuation
+                thread' =
+                  thread { threadControl =
+                            ThreadControl (ThrowTo (toException ThreadKilled)
+                                                   etid
+                                                   (k (Just x)))
+                                          ctl'
+                         , threadMasking = MaskedUninterruptible
+                         }
+            schedule thread' simstate
+
+          NotLocked -> do
+            -- Acquire lock
+            writeSTRef isLockedRef (Locked tid)
+
+                -- Remove the timer from the queue
+            let timers' = PSQ.delete tmid timers
+                -- Run the continuation
+                thread' = thread { threadControl = ThreadControl (k (Just x)) ctl' }
+
+            schedule thread' simstate { timers = timers'
+                                      }
     Throw thrower e -> {-# SCC "schedule.Throw" #-}
                case unwindControlStack e thread of
+      -- Found a CatchFrame
       Right thread'@Thread { threadMasking = maskst' } -> do
         -- We found a suitable exception handler, continue with that
         trace <- schedule thread' simstate
@@ -360,6 +405,23 @@ schedule !thread@Thread{
                                          , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
 
+    -- This case is guarded by checks in 'timeout' itself.
+    StartTimeout d _ _ | d <= 0 ->
+      error "schedule: StartTimeout: Impossible happened"
+
+    StartTimeout d action' k ->
+      {-# SCC "schedule.StartTimeout" #-} do
+      isLockedRef <- newSTRef NotLocked
+      let !expiry    = d `addTime` time
+          !timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid isLockedRef) timers
+          !thread'   = thread { threadControl =
+                                 ThreadControl action'
+                                               (TimeoutFrame nextTmid isLockedRef k ctl)
+                              }
+      !trace <- deschedule Yield thread' simstate { timers   = timers'
+                                                  , nextTmid = succ nextTmid }
+      return (SimTrace time tid tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
+
     RegisterDelay d k | d < 0 ->
       {-# SCC "schedule.NewRegisterDelay" #-} do
       !tvar <- execNewTVar nextVid
@@ -403,7 +465,6 @@ schedule !thread@Thread{
       !trace <- deschedule Blocked thread' simstate { timers   = timers'
                                                     , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventThreadDelay expiry) trace)
-
 
     -- we do not follow `GHC.Event` behaviour here; updating a timer to the past
     -- effectively cancels it.
@@ -777,8 +838,23 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
             wakeup            = wakeupThreadDelay ++ wakeupSTM
             (_, !simstate')   = unblockThreads wakeup simstate
 
-        !trace <- reschedule simstate' { curTime = time'
-                                       , timers  = timers' }
+            -- For each 'timeout' action where the timeout has fired, start a
+            -- new thread to execute throwTo to interrupt the action.
+            !timeoutExpired = [ (tid, tmid, isLockedRef)
+                              | TimerTimeout tid tmid isLockedRef <- fired ]
+
+        -- Get the isLockedRef values
+        !timeoutExpired' <- traverse (\(tid, tmid, isLockedRef) -> do
+                                        locked <- readSTRef isLockedRef
+                                        return (tid, tmid, isLockedRef, locked)
+                                     )
+                                     timeoutExpired
+
+        !simstate'' <- forkTimeoutInterruptThreads timeoutExpired' simstate'
+
+        !trace <- reschedule simstate'' { curTime = time'
+                                        , timers  = timers' }
+
         return $
           traceMany ([ ( time', ThreadId [-1], Just "timer"
                        , EventTimerFired tmid)
@@ -792,7 +868,13 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
                      , let Just vids = Set.toList <$> Map.lookup tid' wokeby ]
                   ++ [ ( time', tid, Just "thread delay timer"
                        , EventThreadDelayFired)
-                     | tid <- wakeupThreadDelay ])
+                     | tid <- wakeupThreadDelay ]
+                  ++ [ ( time', tid, Just "timeout timer"
+                       , EventTimeoutFired tmid)
+                     | (tid, tmid, _, _) <- timeoutExpired' ]
+                  ++ [ ( time', tid, Just "thread forked"
+                       , EventThreadForked tid)
+                     | (tid, _, _, _) <- timeoutExpired' ])
                     trace
   where
     timeoutSTMAction (Timer var) = do
@@ -804,7 +886,8 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
     timeoutSTMAction (TimerRegisterDelay var) = writeTVar var True
     -- Note that 'threadDelay' is not handled via STM style wakeup, but rather
     -- it's handled directly above with 'wakeupThreadDelay' and 'unblockThreads'
-    timeoutSTMAction (TimerThreadDelay _)     = return ()
+    timeoutSTMAction TimerThreadDelay{}       = return ()
+    timeoutSTMAction TimerTimeout{}           = return ()
 
 unblockThreads :: [ThreadId] -> SimState s a -> ([ThreadId], SimState s a)
 unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
@@ -825,7 +908,76 @@ unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
     -- and in which case we mark them as now running
     !threads'  = List.foldl'
                    (flip (Map.adjust (\t -> t { threadBlocked = False })))
-                  threads unblocked
+                   threads
+                   unblocked
+
+-- | This function receives a list of TimerTimeout values that represent threads
+-- for which the timeout expired and kills the running thread if needed.
+--
+-- This function is responsible for the second part of the race condition issue
+-- and relates to the 'schedule's 'TimeoutFrame' locking explanation (here is
+-- where the assassin threads are launched. So, as explained previously, at this
+-- point in code, the timeout expired so we need to interrupt the running
+-- thread. If the running thread finished at the same time the timeout expired
+-- we have a race condition. To deal with this race condition what we do is
+-- look at the lock value. If it is 'Locked' this means that the running thread
+-- already finished (or won the race) so we can safely do nothing. Otherwise, if
+-- the lock value is 'NotLocked' we need to acquire the lock and launch an
+-- assassin thread that is going to interrupt the running one. Note that we
+-- should run this interrupting thread in an unmasked state since it might
+-- receive a 'ThreadKilled' exception.
+--
+forkTimeoutInterruptThreads :: [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
+                            -> SimState s a
+                            -> ST s (SimState s a)
+forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
+  foldlM (\st@SimState{ runqueue = runqueue,
+                        threads  = threads'
+                      }
+           (t, isLockedRef)
+          -> do
+            let tid'      = threadId t
+                threads'' = Map.insert tid' t threads'
+                runqueue' = Deque.snoc tid' runqueue
+
+            writeSTRef isLockedRef (Locked tid')
+
+            return st { runqueue = runqueue',
+                        threads  = threads''
+                      })
+          simState
+          throwToThread
+
+  where
+    -- can only throw exception if the thread exists and if the mutually
+    -- exclusive lock exists and is still 'NotLocked'
+    toThrow = [ (tid, tmid, ref, t)
+              | (tid, tmid, ref, locked) <- timeoutExpired
+              , Just t <- [Map.lookup tid threads]
+              , NotLocked <- [locked]
+              ]
+    -- we launch a thread responsible for throwing an AsyncCancelled exception
+    -- to the thread which timeout expired
+    throwToThread =
+      [ let nextId   = threadNextTId t
+            tid'     = childThreadId tid nextId
+         in ( Thread { threadId      = tid',
+                       threadControl =
+                         ThreadControl
+                          (ThrowTo (toException (TimeoutException tmid))
+                                   tid
+                                   (Return ()))
+                          ForkFrame,
+                       threadBlocked = False,
+                       threadMasking = Unmasked,
+                       threadThrowTo = [],
+                       threadClockId = threadClockId t,
+                       threadLabel   = Just "timeout-forked-thread",
+                       threadNextTId = 1
+                     }
+            , ref )
+      | (tid, tmid, ref, t) <- toThrow
+      ]
 
 
 -- | Iterate through the control stack to find an enclosing exception handler
@@ -843,7 +995,8 @@ unwindControlStack e thread =
       ThreadControl _ ctl -> unwind (threadMasking thread) ctl
   where
     unwind :: forall s' c. MaskingState
-           -> ControlStack s' c a -> Either Bool (Thread s' a)
+           -> ControlStack s' c a
+           -> Either Bool (Thread s' a)
     unwind _  MainFrame                 = Left True
     unwind _  ForkFrame                 = Left False
     unwind _ (MaskFrame _k maskst' ctl) = unwind maskst' ctl
@@ -855,12 +1008,28 @@ unwindControlStack e thread =
 
         -- Ok! We will be able to continue the thread with the handler
         -- followed by the continuation after the catch
-        Just e' -> Right thread {
-                      -- As per async exception rules, the handler is run masked
+        Just e' -> Right ( thread {
+                      -- As per async exception rules, the handler is run
+                      -- masked
                      threadControl = ThreadControl (handler e')
                                                    (MaskFrame k maskst ctl),
                      threadMasking = atLeastInterruptibleMask maskst
                    }
+                )
+
+    -- Either Timeout fired or the action threw an exception.
+    -- - If Timeout fired, then it was possibly during this thread's execution
+    --   so we need to run the continuation with a Nothing value.
+    -- - If the timeout action threw an exception we need to keep unwinding the
+    --   control stack looking for a handler to this exception.
+    unwind maskst (TimeoutFrame tmid _ k ctl) =
+      case fromException e of
+        -- Exception came from timeout expiring
+        Just (TimeoutException tmid') ->
+          assert (tmid == tmid')
+          Right thread { threadControl = ThreadControl (k Nothing) ctl }
+        -- Exception came from a different exception
+        _ -> unwind maskst ctl
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState
     atLeastInterruptibleMask Unmasked = MaskedInterruptible
