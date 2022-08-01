@@ -7,8 +7,6 @@
 {-# LANGUAGE QuantifiedConstraints  #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 -- MonadAsync's ReaderT instance is undecidable.
 {-# LANGUAGE UndecidableInstances   #-}
