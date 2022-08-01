@@ -1,16 +1,11 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTSyntax                 #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -161,22 +156,22 @@ initialState =
   where
     epoch1970 = UTCTime (fromGregorian 1970 1 1) 0
 
-invariant :: Maybe (Thread s a) -> SimState s a -> Bool
+invariant :: Maybe (Thread s a) -> SimState s a -> x -> x
 
 invariant (Just running) simstate@SimState{runqueue,threads,clocks} =
-    not (threadBlocked running)
- && threadId running `Map.notMember` threads
- && threadId running `List.notElem` toList runqueue
- && threadClockId running `Map.member` clocks
- && invariant Nothing simstate
+   assert (not (threadBlocked running))
+ . assert (threadId running `Map.notMember` threads)
+ . assert (threadId running `List.notElem` runqueue)
+ . assert (threadClockId running `Map.member` clocks)
+ . invariant Nothing simstate
 
 invariant Nothing SimState{runqueue,threads,clocks} =
-    all (`Map.member` threads) runqueue
- && and [ threadBlocked t == (threadId t `notElem` runqueue)
-        | t <- Map.elems threads ]
- && toList runqueue == List.nub (toList runqueue)
- && and [ threadClockId t `Map.member` clocks
-        | t <- Map.elems threads ]
+   assert (all (`Map.member` threads) runqueue)
+ . assert (and [ threadBlocked t == (threadId t `notElem` runqueue)
+               | t <- Map.elems threads ])
+ . assert (toList runqueue == List.nub (toList runqueue))
+ . assert (and [ threadClockId t `Map.member` clocks
+               | t <- Map.elems threads ])
 
 -- | Interpret the simulation monotonic time as a 'NominalDiffTime' since
 -- the start.
@@ -202,7 +197,7 @@ schedule !thread@Thread{
            nextVid, nextTmid,
            curTime  = time
          } =
-  assert (invariant (Just thread) simstate) $
+  invariant (Just thread) simstate $
   case action of
 
     Return x -> {-# SCC "schedule.Return" #-}
@@ -423,7 +418,7 @@ schedule !thread@Thread{
       return (SimTrace time tid tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
 
     RegisterDelay d k | d < 0 ->
-      {-# SCC "schedule.NewRegisterDelay" #-} do
+      {-# SCC "schedule.NewRegisterDelay.1" #-} do
       !tvar <- execNewTVar nextVid
                           (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           True
@@ -435,7 +430,7 @@ schedule !thread@Thread{
               trace)
 
     RegisterDelay d k ->
-      {-# SCC "schedule.NewRegisterDelay" #-} do
+      {-# SCC "schedule.NewRegisterDelay.2" #-} do
       !tvar <- execNewTVar nextVid
                           (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
@@ -809,7 +804,7 @@ reschedule :: SimState s a -> ST s (SimTrace a)
 reschedule !simstate@SimState{ runqueue, threads }
   | Just (!tid, runqueue') <- Deque.uncons runqueue =
     {-# SCC "reschedule.Just" #-}
-    assert (invariant Nothing simstate) $
+    invariant Nothing simstate $
 
     let thread = threads Map.! tid in
     schedule thread simstate { runqueue = runqueue'
@@ -819,7 +814,7 @@ reschedule !simstate@SimState{ runqueue, threads }
 -- timer event, or stop.
 reschedule !simstate@SimState{ threads, timers, curTime = time } =
     {-# SCC "reschedule.Nothing" #-}
-    assert (invariant Nothing simstate) $
+    invariant Nothing simstate $
 
     -- important to get all events that expire at this time
     case removeMinimums timers of

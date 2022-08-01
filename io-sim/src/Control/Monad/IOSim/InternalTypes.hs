@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs               #-}
-{-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
