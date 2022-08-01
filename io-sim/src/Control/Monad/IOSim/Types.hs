@@ -150,6 +150,8 @@ data SimA s a where
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
 
+  StartTimeout :: DiffTime -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
+
   RegisterDelay :: DiffTime -> (TVar s Bool -> SimA s b) -> SimA s b
 
   ThreadDelay :: DiffTime -> SimA s b -> SimA s b
@@ -563,25 +565,9 @@ instance MonadTimer (IOSim s) where
   cancelTimeout t   = IOSim $ oneShot $ \k -> CancelTimeout t   (k ())
 
   timeout d action
-    | d <  0    = Just <$> action
-    | d == 0    = return Nothing
-    | otherwise = do
-        pid <- myThreadId
-        t@(Timeout _ tid) <- newTimeout d
-        handleJust
-          (\(TimeoutException tid') -> if tid' == tid
-                                         then Just ()
-                                         else Nothing)
-          (\_ -> return Nothing) $
-          bracket
-            (forkIO $ do
-                labelThisThread "<<timeout>>"
-                fired <- MonadSTM.atomically $ awaitTimeout t
-                when fired $ throwTo pid (TimeoutException tid))
-            (\pid' -> do
-                  cancelTimeout t
-                  throwTo pid' AsyncCancelled)
-            (\_ -> Just <$> action)
+    | d <  0 = Just <$> action
+    | d == 0 = return Nothing
+    | otherwise = IOSim $ oneShot $ \k -> StartTimeout d (runIOSim action) k
 
   registerDelay d = IOSim $ oneShot $ \k -> RegisterDelay d k
 
@@ -812,6 +798,9 @@ data SimEventType
 
   | EventThreadDelay        Time
   | EventThreadDelayFired
+
+  | EventTimeoutCreated        TimeoutId ThreadId Time
+  | EventTimeoutFired          TimeoutId
 
   | EventRegisterDelayCreated TimeoutId TVarId Time
   | EventRegisterDelayFired TimeoutId
