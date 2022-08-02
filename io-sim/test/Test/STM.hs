@@ -67,7 +67,7 @@ data Term (t :: Type) where
 
     Return    :: Expr t -> Term t
     Throw     :: Expr a -> Term t
-    Catch     :: Term t -> Expr a -> Term t -> Term t
+    Catch     :: Term t -> Term t -> Term t
     Retry     :: Term t
 
     ReadTVar  :: Name (TyVar t) -> Term t
@@ -310,6 +310,30 @@ evalTerm !env !heap !allocs term = case term of
       where
         e'  = evalExpr env e
 
+    -- Exception semantics are detailed in "Appendix A Exception semantics" p 12-13 of
+    -- <https://research.microsoft.com/en-us/um/people/simonpj/papers/stm/stm.pdf>
+    Catch t1 t2 ->
+      let (nf1, heap', allocs') = evalTerm env heap mempty t1 in case nf1 of
+
+        -- Rule XSTM1
+        --                M; heap, {} => return P; heap', allocs'
+        -- --------------------------------------------------------
+        -- S[catch M N]; heap, allocs => S[return P]; heap', allocs'
+        NfReturn v -> (NfReturn v, heap', allocs `mappend` allocs')
+
+        -- Rule XSTM2
+        --                M; heap, {} => throw P; heap', allocs'
+        -- --------------------------------------------------------
+        -- S[catch M N]; heap, allocs => S[N P]; heap U allocs', allocs U allocs'
+        NfThrow _ -> evalTerm env (heap `mappend` allocs') (allocs `mappend` allocs') t2
+
+        -- Rule XSTM3
+        --                M; heap, {} => retry; heap', allocs'
+        -- --------------------------------------------------------
+        -- S[catch M N]; heap, allocs => S[retry]; heap, allocs
+        NfRetry -> (NfRetry, heap, allocs)
+
+
     Retry    -> (NfRetry,                   heap, allocs)
 
     -- Rule READ
@@ -438,7 +462,7 @@ extendExecEnv (Name name _tyrep) v (ExecEnv env) =
 
 -- | Execute an STM 'Term' in the 'STM' monad.
 --
-execTerm :: (MonadSTM m, MonadThrow (STM m))
+execTerm :: (MonadSTM m, MonadThrow (STM m), MonadCatch (STM m))
          => ExecEnv m
          -> Term t
          -> STM m (ExecValue m t)
@@ -451,6 +475,8 @@ execTerm env t =
       Throw e -> do
         let e' = execExpr env e
         throwSTM =<< snapshotExecValue e'
+
+      Catch t1 t2 -> execTerm env t1 `catch` \(_ :: ImmValue) -> execTerm env t2
 
       Retry -> retry
 
@@ -492,7 +518,7 @@ snapshotExecValue (ExecValInt x)   = return (ImmValInt x)
 snapshotExecValue (ExecValVar v _) = fmap ImmValVar
                                           (snapshotExecValue =<< readTVar v)
 
-execAtomically :: forall m t. (MonadSTM m, MonadThrow (STM m), MonadCatch m)
+execAtomically :: forall m t. (MonadSTM m, MonadThrow (STM m), MonadCatch m, MonadCatch (STM m))
                => Term t -> m TxResult
 execAtomically t =
     toTxResult <$> try (atomically action')
@@ -658,7 +684,7 @@ genTerm env tyrep =
                   Nothing)
         ]
 
-    binTerm = frequency [ (2, bindTerm), (1, orElseTerm)]
+    binTerm = frequency [ (2, bindTerm), (1, orElseTerm), (1, catchTerm)]
 
     bindTerm =
       sized $ \sz -> do
@@ -675,6 +701,11 @@ genTerm env tyrep =
       sized $ \sz -> resize (sz `div` 2) $
         OrElse <$> genTerm env tyrep
                <*> genTerm env tyrep
+
+    catchTerm =
+      sized $ \sz -> resize (sz `div` 2) $
+        Catch <$> genTerm env tyrep
+              <*> genTerm env tyrep
 
 genSomeExpr :: GenEnv -> Gen SomeExpr
 genSomeExpr env =
@@ -714,6 +745,9 @@ shrinkTerm t =
     case t of
       Return e      -> [Return e' | e' <- shrinkExpr e]
       Throw e       -> [Throw  e' | e' <- shrinkExpr e]
+      Catch t1 t2   -> [t1, t2]
+                    ++ [Catch t1' t2  | t1' <- shrinkTerm t1 ]
+                    ++ [Catch t1  t2' | t2' <- shrinkTerm t2 ]
       Retry         -> []
       ReadTVar _    -> []
 
@@ -739,6 +773,7 @@ shrinkExpr (ExprName (Name _ (TyRepVar _))) = []
 freeNamesTerm :: Term t -> Set NameId
 freeNamesTerm (Return e)      = freeNamesExpr e
 freeNamesTerm (Throw  e)      = freeNamesExpr e
+freeNamesTerm (Catch t1 t2)   = freeNamesTerm t1 <> freeNamesTerm t2
 freeNamesTerm  Retry          = Set.empty
 freeNamesTerm (ReadTVar  n)   = Set.singleton (nameId n)
 freeNamesTerm (WriteTVar n e) = Set.singleton (nameId n) <> freeNamesExpr e
@@ -769,6 +804,7 @@ prop_genSomeTerm (SomeTerm tyrep term) =
 termSize :: Term a -> Int
 termSize Return{}     = 1
 termSize Throw{}      = 1
+termSize (Catch a b)  = 1 + termSize a + termSize b
 termSize Retry{}      = 1
 termSize ReadTVar{}   = 1
 termSize WriteTVar{}  = 1
@@ -779,6 +815,7 @@ termSize (OrElse a b) = 1 + termSize a + termSize b
 termDepth :: Term a -> Int
 termDepth Return{}     = 1
 termDepth Throw{}      = 1
+termDepth (Catch a b)  = 1 + max (termDepth a) (termDepth b)
 termDepth Retry{}      = 1
 termDepth ReadTVar{}   = 1
 termDepth WriteTVar{}  = 1
@@ -791,6 +828,9 @@ showTerm p (Return e)      = showParen (p > 10) $
                                showString "return " . showExpr 11 e
 showTerm p (Throw  e)      = showParen (p > 10) $
                                showString "throwSTM " . showExpr 11 e
+showTerm p (Catch t1 t2)   = showParen (p > 9)  $
+                               showTerm 10 t1 . showString " `catch` "
+                             . showTerm 10 t2
 showTerm _  Retry          = showString "retry"
 showTerm p (ReadTVar  n)   = showParen (p > 10) $
                                showString "readTVar " . showName n
