@@ -900,7 +900,7 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
 
       ThrowStm e ->
         {-# SCC "execAtomically.go.ThrowStm" #-}
-        case ctl of 
+        case ctl of
           AtomicallyFrame -> do
             -- Revert all the TVar writes
             !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
@@ -913,19 +913,19 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
             -- Execute the catch handler with an empty written set
             let ctl'' = BranchFrame EmptyStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
             go ctl'' read Map.empty [] [] nextVid (h e)
-            -- 
+            --
           BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
             {-# SCC "execAtomically.go.branchFrame" #-} do
             -- Revert all the TVar writes within this orElse
             !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
-      CatchStm a h k -> 
+      CatchStm a h k ->
         {-# SCC "execAtomically.go.ThrowStm" #-} do
         -- Execute the left side in a new frame with an empty written set
         let ctl' = BranchFrame (CatchStmA h) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
-        
+
 
       Retry ->
         {-# SCC "execAtomically.go.Retry" #-}

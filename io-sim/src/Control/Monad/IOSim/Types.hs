@@ -319,7 +319,7 @@ instance Exceptions.MonadThrow (STM s) where
 instance MonadCatch (STM s) where
 
   catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler') k
-    where 
+    where
       handler' e = case fromException e of
         Nothing -> throwIO e  -- Rethrow the exception if handler does not handle it.
         Just e' -> handler e'
