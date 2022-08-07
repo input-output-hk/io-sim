@@ -881,21 +881,9 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
                                 (mapMaybe traceString $ ds ++ ds')
                                 nextVid
 
-        OrElseLeftFrame _b k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
-          -- Commit the TVars written in this sub-transaction that are also
-          -- in the written set of the outer transaction
-          !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar)
-                          (Map.intersection written writtenOuter)
-          -- Merge the written set of the inner with the outer
-          let written'    = Map.union written writtenOuter
-              writtenSeq' = filter (\(SomeTVar tvar) ->
-                                      tvarId tvar `Map.notMember` writtenOuter)
-                                    writtenSeq
-                         ++ writtenOuterSeq
-          -- Skip the orElse right hand and continue with the k continuation
-          go ctl' read written' writtenSeq' createdOuterSeq nextVid (k x)
-
-        OrElseRightFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+        BranchFrame _b k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
+          -- The branch has successfully completed the transaction. Hence,
+          -- the alternative branch can be ignored.
           -- Commit the TVars written in this sub-transaction that are also
           -- in the written set of the outer transaction
           !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar)
@@ -907,7 +895,7 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
                                     writtenSeq
                          ++ writtenOuterSeq
               createdSeq' = createdSeq ++ createdOuterSeq
-          -- Continue with the k continuation
+          -- Skip the right hand alternative and continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
       ThrowStm e ->
@@ -918,33 +906,32 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
 
       Retry ->
         {-# SCC "execAtomically.go.Retry" #-}
-        case ctl of
-        AtomicallyFrame -> do
-          -- Revert all the TVar writes
+        do
+          -- Always revert all the TVar writes for the retry
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-          -- Return vars read, so the thread can block on them
-          k0 $! StmTxBlocked $! (Map.elems read)
+          case ctl of
+            AtomicallyFrame -> do
+              -- Return vars read, so the thread can block on them
+              k0 $! StmTxBlocked $! (Map.elems read)
 
-        OrElseLeftFrame b k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-          {-# SCC "execAtomically.go.OrElseLeftFrame" #-} do
-          -- Revert all the TVar writes within this orElse
-          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-          -- Execute the orElse right hand with an empty written set
-          let ctl'' = OrElseRightFrame k writtenOuter writtenOuterSeq createdOuterSeq ctl'
-          go ctl'' read Map.empty [] [] nextVid b
+            BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+              {-# SCC "execAtomically.go.BranchFrame.OrElseStmA" #-} do
+              -- Execute the orElse right hand with an empty written set
+              let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
+              go ctl'' read Map.empty [] [] nextVid b
 
-        OrElseRightFrame _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-          {-# SCC "execAtomically.go.OrElseRightFrame" #-} do
-          -- Revert all the TVar writes within this orElse branch
-          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-          -- Skip the continuation and propagate the retry into the outer frame
-          -- using the written set for the outer frame
-          go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+            BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+              {-# SCC "execAtomically.go.BranchFrame" #-} do
+              -- Retry makes sense only within a OrElse context. If it is a branch other than
+              -- OrElse left side, then bubble up the `retry` to the frame above.
+              -- Skip the continuation and propagate the retry into the outer frame
+              -- using the written set for the outer frame
+              go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
       OrElse a b k ->
         {-# SCC "execAtomically.go.OrElse" #-} do
         -- Execute the left side in a new frame with an empty written set
-        let ctl' = OrElseLeftFrame b k written writtenSeq createdSeq ctl
+        let ctl' = BranchFrame (OrElseStmA b) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
 
       NewTVar !mbLabel x k ->

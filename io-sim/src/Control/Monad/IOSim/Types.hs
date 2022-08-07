@@ -28,6 +28,7 @@ module Control.Monad.IOSim.Types
   , runSTM
   , StmA (..)
   , StmTxResult (..)
+  , BranchStmA (..)
   , StmStack (..)
   , Timeout (..)
   , TimeoutException (..)
@@ -844,12 +845,18 @@ data StmTxResult s a =
        --
      | StmTxAborted  [SomeTVar s] SomeException
 
+
+-- | OrElse/Catch give rise to an alternate right hand side branch. A right branch
+-- can be a NoOp
+data BranchStmA s a = OrElseStmA (StmA s a) | NoOpStmA
+
 data StmStack s b a where
   -- | Executing in the context of a top level 'atomically'.
   AtomicallyFrame  :: StmStack s a a
 
-  -- | Executing in the context of the /left/ hand side of an 'orElse'
-  OrElseLeftFrame  :: StmA s a                -- orElse right alternative
+  -- | Executing in the context of the /left/ hand side of a branch.
+  -- A right branch is represented by a frame containing empty statement.
+  BranchFrame      :: !(BranchStmA s a)       -- right alternative, can be empty
                    -> (a -> StmA s b)         -- subsequent continuation
                    -> Map TVarId (SomeTVar s) -- saved written vars set
                    -> [SomeTVar s]            -- saved written vars list
@@ -857,13 +864,6 @@ data StmStack s b a where
                    -> StmStack s b c
                    -> StmStack s a c
 
-  -- | Executing in the context of the /right/ hand side of an 'orElse'
-  OrElseRightFrame :: (a -> StmA s b)         -- subsequent continuation
-                   -> Map TVarId (SomeTVar s) -- saved written vars set
-                   -> [SomeTVar s]            -- saved written vars list
-                   -> [SomeTVar s]            -- created vars list
-                   -> StmStack s b c
-                   -> StmStack s a c
 
 ---
 --- Schedules
