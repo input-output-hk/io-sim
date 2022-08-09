@@ -1,1 +1,0 @@
-{ ghcVersion = "ghc8107"; }
