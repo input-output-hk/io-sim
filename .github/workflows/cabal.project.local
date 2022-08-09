@@ -1,0 +1,15 @@
+documentation: True
+tests:         True
+benchmarks:    True
+
+package io-classes
+  ghc-options: -Werror
+  flags: +asserts
+
+package strict-stm
+  ghc-options: -Werror
+  flags: +asserts
+
+package io-sim
+  ghc-options: -Werror
+  flags: +asserts
