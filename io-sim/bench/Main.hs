@@ -11,7 +11,7 @@ import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTimer
 import           Control.Monad.IOSim
-import           Control.Tracer (Tracer (..), nullTracer)
+import           Control.Tracer (Tracer (..), emit, nullTracer)
 
 import           Criterion
 import           Criterion.Main
@@ -104,7 +104,7 @@ main = defaultMain
       , bench "events" $
         nf id ( selectTraceEventsSay
               $ runSimTrace
-              $ prop_channel Nothing n (Tracer $ say . show))
+              $ prop_channel Nothing n (Tracer $ emit $ say . show))
       ]
     , env (pure ()) $ \_ ->
       bgroup "delays"
