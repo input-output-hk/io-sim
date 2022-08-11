@@ -81,6 +81,7 @@ test-suite test
   other-modules:       Test.IOSim
                        Test.STM
                        Test.Control.Monad.IOSimPOR
+                       Test.Control.Monad.Class.MonadMVar
   default-language:    Haskell2010
   build-depends:       base,
                        array,
@@ -92,6 +93,7 @@ test-suite test
                        strict-stm,
                        tasty,
                        tasty-quickcheck,
+                       tasty-hunit,
                        time               >= 1.9.1
 
   ghc-options:         -Wall
