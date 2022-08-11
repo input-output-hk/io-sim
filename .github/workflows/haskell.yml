@@ -107,7 +107,9 @@ jobs:
         restore-keys: cache-dist-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
 
     - name: Build dependencies
-      run: cabal build --only-dependencies all
+      run: |
+        cabal build --only-dependencies io-sim
+        cabal build --only-dependencies io-classes
 
     - name: Build projects [build]
       run: cabal build all
