@@ -59,6 +59,7 @@ module Control.Monad.IOSim.Types
   , module Control.Monad.IOSim.CommonTypes
   , SimM
   , SimSTM
+  , Thrower (..)
   ) where
 
 import           Control.Applicative
@@ -112,6 +113,8 @@ import           Control.Monad.IOSim.CommonTypes
 import           Control.Monad.IOSim.STM
 import           Control.Monad.IOSimPOR.Types
 
+import           GHC.Conc (ThreadStatus)
+
 
 import qualified System.IO.Error as IO.Error (userError)
 
@@ -130,6 +133,8 @@ traceM x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())
 traceSTM :: Typeable a => a -> STMSim s ()
 traceSTM x = STM $ oneShot $ \k -> OutputStm (toDyn x) (k ())
 
+data Thrower = ThrowSelf | ThrowOther deriving (Ord, Eq, Show)
+
 data SimA s a where
   Return       :: a -> SimA s a
 
@@ -147,7 +152,7 @@ data SimA s a where
   UpdateTimeout:: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
   CancelTimeout:: Timeout (IOSim s) -> SimA s b -> SimA s b
 
-  Throw        :: SomeException -> SimA s a
+  Throw        :: Thrower -> SomeException -> SimA s a
   Catch        :: Exception e =>
                   SimA s a -> (e -> SimA s a) -> (a -> SimA s b) -> SimA s b
   Evaluate     :: a -> (a -> SimA s b) -> SimA s b
@@ -155,6 +160,7 @@ data SimA s a where
   Fork         :: IOSim s () -> (ThreadId -> SimA s b) -> SimA s b
   GetThreadId  :: (ThreadId -> SimA s b) -> SimA s b
   LabelThread  :: ThreadId -> String -> SimA s b -> SimA s b
+  ThreadStatus :: ThreadId -> (ThreadStatus -> SimA s b) -> SimA s b
 
   Atomically   :: STM  s a -> (a -> SimA s b) -> SimA s b
 
@@ -241,7 +247,7 @@ instance Monoid a => Monoid (IOSim s a) where
 #endif
 
 instance Fail.MonadFail (IOSim s) where
-  fail msg = IOSim $ oneShot $ \_ -> Throw (toException (IO.Error.userError msg))
+  fail msg = IOSim $ oneShot $ \_ -> Throw ThrowSelf (toException (IO.Error.userError msg))
 
 instance MonadFix (IOSim s) where
     mfix f = IOSim $ oneShot $ \k -> Fix f k
@@ -288,7 +294,7 @@ instance MonadSay (IOSim s) where
   say msg = IOSim $ oneShot $ \k -> Say msg (k ())
 
 instance MonadThrow (IOSim s) where
-  throwIO e = IOSim $ oneShot $ \_ -> Throw (toException e)
+  throwIO e = IOSim $ oneShot $ \_ -> Throw ThrowSelf (toException e)
 
 instance MonadEvaluate (IOSim s) where
   evaluate a = IOSim $ oneShot $ \k -> Evaluate a k
@@ -366,6 +372,7 @@ instance MonadThread (IOSim s) where
   type ThreadId (IOSim s) = ThreadId
   myThreadId       = IOSim $ oneShot $ \k -> GetThreadId k
   labelThread t l  = IOSim $ oneShot $ \k -> LabelThread t l (k ())
+  threadStatus t   = IOSim $ oneShot $ \k -> ThreadStatus t k
 
 instance MonadFork (IOSim s) where
   forkIO task        = IOSim $ oneShot $ \k -> Fork task k
@@ -799,6 +806,7 @@ data SimEventType
   | EventPerformAction StepId
   | EventReschedule           ScheduleControl
   | EventUnblocked     [ThreadId]
+  | EventThreadStatus  ThreadId ThreadId
   deriving Show
 
 type TraceEvent = SimEventType
