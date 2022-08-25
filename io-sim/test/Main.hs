@@ -12,5 +12,5 @@ tests :: TestTree
 tests =
   testGroup "IO Sim"
   [ Test.IOSim.tests
-  , Test.Control.Monad.Class.MonadMVar.tests
+  -- , Test.Control.Monad.Class.MonadMVar.tests
   ]

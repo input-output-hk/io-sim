@@ -14,6 +14,7 @@
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE RecordWildCards            #-}
 
 {-# OPTIONS_GHC -Wno-orphans            #-}
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
@@ -69,6 +70,7 @@ import           Deque.Strict (Deque)
 import qualified Deque.Strict as Deque
 
 import           GHC.Exts (fromList)
+import           GHC.Conc (ThreadStatus(..), BlockReason(..))
 
 import           Control.Exception (NonTermination (..), assert, throw)
 import           Control.Monad (join)
@@ -123,7 +125,6 @@ labelledThreads threadMap =
 --
 data TimerVars s = TimerVars !(TVar s TimeoutState) !(TVar s Bool)
 
-
 -- | Internal state.
 --
 data SimState s a = SimState {
@@ -131,6 +132,8 @@ data SimState s a = SimState {
        -- | All threads other than the currently running thread: both running
        -- and blocked threads.
        threads  :: !(Map ThreadId (Thread s a)),
+       -- | Keep track of the reason threads finished for 'threadStatus'
+       finished :: !(Map ThreadId FinishedReason),
        -- | current time
        curTime  :: !Time,
        -- | ordered list of timers
@@ -146,6 +149,7 @@ initialState =
     SimState {
       runqueue = mempty,
       threads  = Map.empty,
+      finished = Map.empty,
       curTime  = Time 0,
       timers   = PSQ.empty,
       clocks   = Map.singleton (ClockId []) epoch1970,
@@ -190,6 +194,7 @@ schedule !thread@Thread{
          !simstate@SimState {
            runqueue,
            threads,
+           finished,
            timers,
            clocks,
            nextVid, nextTmid,
@@ -208,9 +213,9 @@ schedule !thread@Thread{
 
       ForkFrame -> do
         -- this thread is done
-        !trace <- deschedule Terminated thread simstate
+        !trace <- deschedule (Terminated FinishedNormally) thread simstate
         return $ SimTrace time tid tlbl EventThreadFinished
-               $ SimTrace time tid tlbl (EventDeschedule Terminated)
+               $ SimTrace time tid tlbl (EventDeschedule $ Terminated FinishedNormally)
                $ trace
 
       MaskFrame k maskst' ctl' -> do
@@ -228,7 +233,7 @@ schedule !thread@Thread{
         let thread' = thread { threadControl = ThreadControl (k x) ctl' }
         schedule thread' simstate
 
-    Throw e -> {-# SCC "schedule.Throw" #-}
+    Throw thrower e -> {-# SCC "schedule.Throw" #-}
                case unwindControlStack e thread of
       Right thread'@Thread { threadMasking = maskst' } -> do
         -- We found a suitable exception handler, continue with that
@@ -247,10 +252,12 @@ schedule !thread@Thread{
 
         | otherwise -> do
           -- An unhandled exception in any other thread terminates the thread
-          !trace <- deschedule Terminated thread simstate
+          let reason | ThrowSelf <- thrower = FinishedNormally
+                     | otherwise            = FinishedDied
+          !trace <- deschedule (Terminated reason) thread simstate
           return $ SimTrace time tid tlbl (EventThrow e)
                  $ SimTrace time tid tlbl (EventThreadUnhandled e)
-                 $ SimTrace time tid tlbl (EventDeschedule Terminated)
+                 $ SimTrace time tid tlbl (EventDeschedule $ Terminated reason)
                  $ trace
 
     Catch action' handler k ->
@@ -266,7 +273,7 @@ schedule !thread@Thread{
       case mbWHNF of
         Left e -> do
           -- schedule this thread to immediately raise the exception
-          let thread' = thread { threadControl = ThreadControl (Throw e) ctl }
+          let thread' = thread { threadControl = ThreadControl (Throw ThrowSelf e) ctl }
           schedule thread' simstate
         Right whnf -> do
           -- continue with the resulting WHNF
@@ -466,7 +473,7 @@ schedule !thread@Thread{
 
         StmTxAborted _read e -> do
           -- schedule this thread to immediately raise the exception
-          let thread' = thread { threadControl = ThreadControl (Throw e) ctl }
+          let thread' = thread { threadControl = ThreadControl (Throw ThrowSelf e) ctl }
           !trace <- schedule thread' simstate
           return $ SimTrace time tid tlbl (EventTxAborted Nothing) trace
 
@@ -495,6 +502,19 @@ schedule !thread@Thread{
           threads' = Map.adjust (\t -> t { threadLabel = Just l }) tid' threads
       schedule thread' simstate { threads = threads' }
 
+    ThreadStatus tid' k ->
+      {-# SCC "schedule.ThreadStatus" #-} do
+      let result | Just r <- Map.lookup tid' finished = reasonToStatus r
+                 | Just t <- Map.lookup tid' threads  = threadStatus t
+                 | otherwise                          = error "The impossible happened - tried to loookup thread in state."
+          reasonToStatus FinishedNormally = ThreadFinished
+          reasonToStatus FinishedDied     = ThreadDied
+          threadStatus Thread{..} | threadBlocked = ThreadBlocked BlockedOnOther
+                                  | otherwise     = ThreadRunning
+
+          thread' = thread { threadControl = ThreadControl (k result) ctl }
+      schedule thread' simstate
+
     GetMaskState k ->
       {-# SCC "schedule.GetMaskState" #-} do
       let thread' = thread { threadControl = ThreadControl (k maskst) ctl }
@@ -519,7 +539,7 @@ schedule !thread@Thread{
       {-# SCC "schedule.ThrowTo" #-} do
       -- Throw to ourself is equivalent to a synchronous throw,
       -- and works irrespective of masking state since it does not block.
-      let thread' = thread { threadControl = ThreadControl (Throw e) ctl }
+      let thread' = thread { threadControl = ThreadControl (Throw ThrowSelf e) ctl }
       trace <- schedule thread' simstate
       return (SimTrace time tid tlbl (EventThrowTo e tid) trace)
 
@@ -549,8 +569,11 @@ schedule !thread@Thread{
           -- be resolved if the thread terminates or if it leaves the exception
           -- handler (when restoring the masking state would trigger the any
           -- new pending async exception).
-          let adjustTarget t@Thread{ threadControl = ThreadControl _ ctl' } =
-                t { threadControl = ThreadControl (Throw e) ctl'
+          let thrower = case threadMasking <$> Map.lookup tid' threads of
+                          Just Unmasked -> ThrowOther
+                          _             -> ThrowSelf
+              adjustTarget t@Thread{ threadControl = ThreadControl _ ctl' } =
+                t { threadControl = ThreadControl (Throw thrower e) ctl'
                   , threadBlocked = False
                   }
               simstate'@SimState { threads = threads' }
@@ -619,7 +642,7 @@ deschedule Interruptable !thread@Thread {
     -- So immediately raise the exception and unblock the blocked thread
     -- if possible.
     {-# SCC "deschedule.Interruptable.Unmasked" #-}
-    let thread' = thread { threadControl = ThreadControl (Throw e) ctl
+    let thread' = thread { threadControl = ThreadControl (Throw ThrowSelf e) ctl
                          , threadMasking = MaskedInterruptible
                          , threadThrowTo = etids }
         (unblocked,
@@ -654,13 +677,16 @@ deschedule Blocked !thread !simstate@SimState{threads} =
         threads' = Map.insert (threadId thread') thread' threads in
     reschedule simstate { threads = threads' }
 
-deschedule Terminated !thread !simstate@SimState{ curTime = time, threads } =
+deschedule (Terminated reason) !thread !simstate@SimState{ curTime = time, threads } =
     -- This thread is done. If there are other threads blocked in a
     -- ThrowTo targeted at this thread then we can wake them up now.
     {-# SCC "deschedule.Terminated" #-}
     let !wakeup      = map (l_labelled . snd) (reverse (threadThrowTo thread))
         (unblocked,
-         !simstate') = unblockThreads wakeup simstate
+         !simstate') = unblockThreads wakeup
+                        simstate { finished = Map.insert (threadId thread)
+                                                         reason
+                                                         (finished simstate) }
     in do
     !trace <- reschedule simstate'
     return $ traceMany
