@@ -80,5 +80,10 @@ instance Eq (TVar s a) where
 data SomeTVar s where
   SomeTVar :: !(TVar s a) -> SomeTVar s
 
-data Deschedule = Yield | Interruptable | Blocked | Terminated | Sleep
+-- | The reason a thread finished running
+data FinishedReason = FinishedNormally
+                    | FinishedDied
+                    deriving (Ord, Eq, Show, Enum, Bounded)
+
+data Deschedule = Yield | Interruptable | Blocked | Terminated FinishedReason | Sleep
   deriving Show

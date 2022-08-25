@@ -14,20 +14,22 @@ import           Control.Monad.IOSim.CommonTypes
 -- *IOSimPOR*.
 --
 data Effect = Effect {
-    effectReads  :: !(Set TVarId),
-    effectWrites :: !(Set TVarId),
-    effectForks  :: !(Set ThreadId),
-    effectThrows :: ![ThreadId],
-    effectWakeup :: ![ThreadId]
+    effectReads        :: !(Set TVarId),
+    effectWrites       :: !(Set TVarId),
+    effectForks        :: !(Set ThreadId),
+    effectThrows       :: ![ThreadId],
+    effectWakeup       :: ![ThreadId],
+    effectStatusReads  :: ![ThreadId],
+    effectStatusWrites :: ![ThreadId]
   }
   deriving (Eq, Show)
 
 instance Semigroup Effect where
-  Effect r w s ts wu <> Effect r' w' s' ts' wu' =
-    Effect (r<>r') (w<>w') (s<>s') (ts++ts') (wu++wu')
+  Effect r w s ts wu sr sw <> Effect r' w' s' ts' wu' sr' sw' =
+    Effect (r <> r') (w <> w') (s <> s') (ts ++ ts') (wu++wu') (sr ++ sr') (sw ++ sw')
 
 instance Monoid Effect where
-  mempty = Effect Set.empty Set.empty Set.empty [] []
+  mempty = Effect Set.empty Set.empty Set.empty [] [] [] []
 
 -- readEffect :: SomeTVar s -> Effect
 -- readEffect r = mempty{effectReads = Set.singleton $ someTvarId r }
@@ -50,6 +52,15 @@ throwToEffect tid = mempty{ effectThrows = [tid] }
 wakeupEffects :: [ThreadId] -> Effect
 wakeupEffects tids = mempty{effectWakeup = tids}
 
+statusReadEffects :: [ThreadId] -> Effect
+statusReadEffects tids = mempty{effectStatusReads = tids}
+
+statusWriteEffect :: ThreadId -> Effect
+statusWriteEffect tid = mempty{effectStatusWrites = [tid]}
+
+statusWriteEffects :: [ThreadId] -> Effect
+statusWriteEffects tids = mempty{effectStatusWrites = tids}
+
 someTvarId :: SomeTVar s -> TVarId
 someTvarId (SomeTVar r) = tvarId r
 
@@ -58,10 +69,12 @@ onlyReadEffect e = e { effectReads = effectReads mempty } == mempty
 
 racingEffects :: Effect -> Effect -> Bool
 racingEffects e e' =
-      effectThrows e `intersectsL` effectThrows e'
-   || effectReads  e `intersects`  effectWrites e'
-   || effectWrites e `intersects`  effectReads  e'
-   || effectWrites e `intersects`  effectWrites e'
+      effectThrows e       `intersectsL` effectThrows e'
+   || effectReads  e       `intersects`  effectWrites e'
+   || effectWrites e       `intersects`  effectReads  e'
+   || effectWrites e       `intersects`  effectWrites e'
+   || effectStatusReads e  `intersectsL` effectStatusWrites e'
+   || effectStatusWrites e `intersectsL` effectStatusWrites e'
   where
     intersects :: Ord a => Set a -> Set a -> Bool
     intersects a b = not $ a `Set.disjoint` b
