@@ -746,8 +746,7 @@ shrinkTerm t =
       Return e      -> [Return e' | e' <- shrinkExpr e]
       Throw e       -> [Throw  e' | e' <- shrinkExpr e]
       Catch t1 t2   -> [t1, t2]
-                    ++ [Catch t1' t2  | t1' <- shrinkTerm t1 ]
-                    ++ [Catch t1  t2' | t2' <- shrinkTerm t2 ]
+                    ++ [Catch t1' t2' | (t1', t2') <- liftShrink2 shrinkTerm shrinkTerm (t1, t2)]
       Retry         -> []
       ReadTVar _    -> []
 
@@ -756,12 +755,10 @@ shrinkTerm t =
       NewTVar e     -> [NewTVar e' | e' <- shrinkExpr e]
 
       Bind t1 n t2  -> [ t2 | nameId n `Set.notMember` freeNamesTerm t2 ]
-                    ++ [ Bind t1' n t2  | t1' <- shrinkTerm t1 ]
-                    ++ [ Bind t1  n t2' | t2' <- shrinkTerm t2 ]
+                    ++ [ Bind t1' n t2' | (t1', t2') <- liftShrink2 shrinkTerm shrinkTerm (t1, t2) ]
 
       OrElse t1 t2  -> [t1, t2]
-                    ++ [ OrElse t1' t2  | t1' <- shrinkTerm t1 ]
-                    ++ [ OrElse t1  t2' | t2' <- shrinkTerm t2 ]
+                    ++ [ OrElse t1' t2' | (t1', t2') <- liftShrink2 shrinkTerm shrinkTerm (t1, t2) ]
 
 shrinkExpr :: Expr t -> [Expr t]
 shrinkExpr  ExprUnit                        = []
