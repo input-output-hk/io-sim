@@ -67,6 +67,7 @@ data Term (t :: Type) where
 
     Return    :: Expr t -> Term t
     Throw     :: Expr a -> Term t
+    Catch     :: Term t -> Expr a -> Term t -> Term t
     Retry     :: Term t
 
     ReadTVar  :: Name (TyVar t) -> Term t

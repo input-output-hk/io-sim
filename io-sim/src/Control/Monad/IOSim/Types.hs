@@ -177,6 +177,7 @@ runSTM (STM k) = k ReturnStm
 data StmA s a where
   ReturnStm    :: a -> StmA s a
   ThrowStm     :: SomeException -> StmA s a
+  CatchStm     :: StmA s a -> (SomeException -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
   NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
@@ -314,6 +315,25 @@ instance MonadThrow (STM s) where
 
 instance Exceptions.MonadThrow (STM s) where
   throwM = MonadThrow.throwIO
+
+instance MonadCatch (STM s) where
+
+  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler') k
+    where 
+      handler' e = case fromException e of
+        Nothing -> throwIO e  -- Rethrow the exception if handler does not handle it.
+        Just e' -> handler e'
+
+  generalBracket acquire release use = do
+    resource <- acquire
+    b <- use resource `catch` \e -> do
+      _ <- release resource (ExitCaseException e)
+      throwIO e
+    c <- release resource (ExitCaseSuccess b)
+    return (b, c)
+
+instance Exceptions.MonadCatch (STM s) where
+  catch = MonadThrow.catch
 
 instance MonadCatch (IOSim s) where
   catch action handler =
@@ -846,9 +866,11 @@ data StmTxResult s a =
      | StmTxAborted  [SomeTVar s] SomeException
 
 
--- | OrElse/Catch give rise to an alternate right hand side branch. A right branch
--- can be a NoOp
-data BranchStmA s a = OrElseStmA (StmA s a) | NoOpStmA
+-- | OrElse/Catch give rise to an alternate branch. A branch of a branch is an
+-- empty one.
+data BranchStmA s a = OrElseStmA (StmA s a)
+                    | CatchStmA (SomeException -> StmA s a)
+                    | NoOpStmA
 
 data StmStack s b a where
   -- | Executing in the context of a top level 'atomically'.
