@@ -316,14 +316,18 @@ instance MonadThrow (STM s) where
 instance Exceptions.MonadThrow (STM s) where
   throwM = MonadThrow.throwIO
 
+
 instance MonadCatch (STM s) where
 
-  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . handler') k
+  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . fromHandler handler) k
     where
-      handler' e = case fromException e of
+      -- Get a total handler from the given handler
+      fromHandler :: Exception e => (e -> STM s a) -> SomeException -> STM s a
+      fromHandler h e = case fromException e of
         Nothing -> throwIO e  -- Rethrow the exception if handler does not handle it.
-        Just e' -> handler e'
+        Just e' -> h e'
 
+  -- No need to consider masking for STM
   generalBracket acquire release use = do
     resource <- acquire
     b <- use resource `catch` \e -> do

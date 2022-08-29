@@ -297,7 +297,7 @@ deriving instance Show (NfTerm t)
 -- | The STM transition rules. They reduce a 'Term' to a normal-form 'NfTerm'.
 --
 -- Compare the implementation of this against the operational semantics in
--- Figure 4 in the paper. Note that @catch@ is not included.
+-- Figure 4 in the paper including the `Catch` semantics from the Appendix A.
 --
 evalTerm :: Env -> Heap -> Allocs -> Term t -> (NfTerm t, Heap, Allocs)
 evalTerm !env !heap !allocs term = case term of
@@ -319,13 +319,13 @@ evalTerm !env !heap !allocs term = case term of
         --                M; heap, {} => return P; heap', allocs'
         -- --------------------------------------------------------
         -- S[catch M N]; heap, allocs => S[return P]; heap', allocs'
-        NfReturn v -> (NfReturn v, heap', allocs `mappend` allocs')
+        NfReturn v -> (NfReturn v, heap', allocs <> allocs')
 
         -- Rule XSTM2
         --                M; heap, {} => throw P; heap', allocs'
         -- --------------------------------------------------------
         -- S[catch M N]; heap, allocs => S[N P]; heap U allocs', allocs U allocs'
-        NfThrow _ -> evalTerm env (heap `mappend` allocs') (allocs `mappend` allocs') t2
+        NfThrow _ -> evalTerm env (heap <> allocs') (allocs <> allocs') t2
 
         -- Rule XSTM3
         --                M; heap, {} => retry; heap', allocs'
@@ -462,7 +462,7 @@ extendExecEnv (Name name _tyrep) v (ExecEnv env) =
 
 -- | Execute an STM 'Term' in the 'STM' monad.
 --
-execTerm :: (MonadSTM m, MonadThrow (STM m), MonadCatch (STM m))
+execTerm :: (MonadSTM m, MonadCatch (STM m))
          => ExecEnv m
          -> Term t
          -> STM m (ExecValue m t)
@@ -518,7 +518,7 @@ snapshotExecValue (ExecValInt x)   = return (ImmValInt x)
 snapshotExecValue (ExecValVar v _) = fmap ImmValVar
                                           (snapshotExecValue =<< readTVar v)
 
-execAtomically :: forall m t. (MonadSTM m, MonadThrow (STM m), MonadCatch m, MonadCatch (STM m))
+execAtomically :: forall m t. (MonadSTM m, MonadCatch (STM m), MonadCatch m)
                => Term t -> m TxResult
 execAtomically t =
     toTxResult <$> try (atomically action')
@@ -698,12 +698,12 @@ genTerm env tyrep =
         return (Bind t1 name t2)
 
     orElseTerm =
-      sized $ \sz -> resize (sz `div` 2) $
+      scale (`div` 2) $
         OrElse <$> genTerm env tyrep
                <*> genTerm env tyrep
 
     catchTerm =
-      sized $ \sz -> resize (sz `div` 2) $
+      scale (`div` 2) $
         Catch <$> genTerm env tyrep
               <*> genTerm env tyrep
 
