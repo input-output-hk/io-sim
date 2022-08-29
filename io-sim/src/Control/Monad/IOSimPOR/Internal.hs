@@ -1118,16 +1118,16 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
             k0 $ StmTxAborted [] (toException e)
 
           BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.branchFrame" #-} do
-            -- Revert all the TVar writes within this orElse
+            {-# SCC "execAtomically.go.BranchFrame" #-} do
+            -- Revert all the TVar writes within this catch
             !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
             -- Execute the catch handler with an empty written set
             let ctl'' = BranchFrame EmptyStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
             go ctl'' read Map.empty [] [] nextVid (h e)
             --
           BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.branchFrame" #-} do
-            -- Revert all the TVar writes within this orElse
+            {-# SCC "execAtomically.go.BranchFrame" #-} do
+            -- Revert all the TVar writes within this branch
             !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
