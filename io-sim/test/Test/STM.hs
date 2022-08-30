@@ -325,13 +325,13 @@ evalTerm !env !heap !allocs term = case term of
         --                M; heap, {} => throw P; heap', allocs'
         -- --------------------------------------------------------
         -- S[catch M N]; heap, allocs => S[N P]; heap U allocs', allocs U allocs'
-        NfThrow _ -> evalTerm env (heap <> allocs') (allocs <> allocs') t2
+        NfThrow _  -> evalTerm env (heap <> allocs') (allocs <> allocs') t2
 
         -- Rule XSTM3
         --                M; heap, {} => retry; heap', allocs'
         -- --------------------------------------------------------
         -- S[catch M N]; heap, allocs => S[retry]; heap, allocs
-        NfRetry -> (NfRetry, heap, allocs)
+        NfRetry    -> (NfRetry, heap, allocs)
 
 
     Retry    -> (NfRetry,                   heap, allocs)
