@@ -1437,8 +1437,8 @@ racingSteps s s' =
    || throwsTo s s'
    || throwsTo s' s)
   where throwsTo s1 s2 =
-             stepThreadId s1 `elem` effectThrows (stepEffect s2)
-          && stepEffect s1 /= mempty
+             stepThreadId s2 `elem` effectThrows (stepEffect s1)
+          && stepEffect s2 /= mempty
 
 currentStep :: Thread s a -> Step
 currentStep Thread { threadId     = tid,
