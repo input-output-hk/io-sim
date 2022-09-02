@@ -74,6 +74,7 @@ racingEffects e e' =
    || effectWrites e       `intersects`  effectReads  e'
    || effectWrites e       `intersects`  effectWrites e'
    || effectStatusReads e  `intersectsL` effectStatusWrites e'
+   || effectStatusWrites e `intersectsL` effectStatusReads  e'
    || effectStatusWrites e `intersectsL` effectStatusWrites e'
   where
     intersects :: Ord a => Set a -> Set a -> Bool
