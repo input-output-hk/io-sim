@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 -- to preserve 'HasCallstack' constraint on 'checkInvariant'
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}

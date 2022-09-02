@@ -12,9 +12,11 @@
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeFamilyDependencies     #-}
+{-# LANGUAGE TypeOperators              #-}
 -- undecidable instances needed for 'WrappedSTM' instances of 'MonadThrow' and
 -- 'MonadCatch' type classes.
 {-# LANGUAGE UndecidableInstances       #-}
+
 module Control.Monad.Class.MonadSTM
   ( MonadSTM (..)
   , MonadLabelledSTM (..)
