@@ -28,7 +28,6 @@ import           Data.List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Test.QuickCheck
-import qualified Debug.Trace as Debug
 
 data Step =
     WhenSet Int Int
