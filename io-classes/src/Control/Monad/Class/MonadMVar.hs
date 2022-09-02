@@ -1,6 +1,7 @@
 {-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE QuantifiedConstraints  #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE TypeOperators          #-}
 
 module Control.Monad.Class.MonadMVar
   ( MonadMVar (..)
