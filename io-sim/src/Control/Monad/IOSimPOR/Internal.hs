@@ -100,7 +100,7 @@ data Thread s a = Thread {
     threadId      :: !ThreadId,
     threadControl :: !(ThreadControl s a),
     threadBlocked :: !Bool,
-    threadDone    :: !Bool, -- TODO: do we need this when we keep track of finished threads separately?
+    threadDone    :: !Bool,
     threadMasking :: !MaskingState,
     -- other threads blocked in a ThrowTo to us because we are or were masked
     threadThrowTo :: ![(SomeException, Labelled ThreadId, VectorClock)],
