@@ -768,8 +768,7 @@ threadInterruptible thread =
 
 deschedule :: Deschedule -> Thread s a -> SimState s a -> ST s (SimTrace a)
 
-deschedule Yield thread@Thread { threadId     = tid
-                               , threadEffect = effect }
+deschedule Yield thread@Thread { threadId = tid }
                  simstate@SimState{runqueue, threads, control} =
 
     -- We don't interrupt runnable threads anywhere else.
@@ -779,7 +778,8 @@ deschedule Yield thread@Thread { threadId     = tid
         runqueue' = insertThread thread' runqueue
         threads'  = Map.insert tid thread' threads
         control'  = advanceControl (threadStepId thread) control in
-    reschedule simstate { runqueue = runqueue', threads  = threads',
+    reschedule simstate { runqueue = runqueue',
+                          threads  = threads',
                           races    = updateRacesInSimState thread simstate,
                           control  = control' }
 
