@@ -16,7 +16,6 @@
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE RecordWildCards               #-}
 
 {-# OPTIONS_GHC -Wno-orphans            #-}
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
@@ -365,10 +364,11 @@ schedule thread@Thread{
           let reason = if thrower == ThrowSelf then FinishedNormally else FinishedDied
               thread' = thread { threadEffect  = effect <> statusWriteEffect tid
                                }
-          !trace <- deschedule (Terminated reason) thread' simstate
+              terminated = Terminated reason
+          !trace <- deschedule terminated thread' simstate
           return $ SimPORTrace time tid tstep tlbl (EventThrow e)
                  $ SimPORTrace time tid tstep tlbl (EventThreadUnhandled e)
-                 $ SimPORTrace time tid tstep tlbl (EventDeschedule $ Terminated reason)
+                 $ SimPORTrace time tid tstep tlbl (EventDeschedule terminated)
                  $ trace
 
     Catch action' handler k -> do
@@ -528,9 +528,9 @@ schedule thread@Thread{
           thread'  = thread { threadControl = ThreadControl (k tid') ctl,
                               threadNextTId = nextTId + 1,
                               threadEffect  = effect
-                                            <> forkEffect tid'
-                                            <> statusWriteEffect tid'
-                                            <> statusWriteEffect tid
+                                           <> forkEffect tid'
+                                           <> statusWriteEffect tid'
+                                           <> statusWriteEffect tid
                               }
           thread'' = Thread { threadId      = tid'
                             , threadControl = ThreadControl (runIOSim a)
@@ -646,10 +646,10 @@ schedule thread@Thread{
                       | Just (_, c) <- Map.lookup tid' finished = c
                       | tid' == tid                             = vClock
                       | otherwise                               = error "The impossible happened"
-          reasonToStatus FinishedNormally = ThreadFinished
-          reasonToStatus FinishedDied     = ThreadDied
-          threadStatus Thread{..} | threadBlocked = ThreadBlocked BlockedOnOther
-                                  | otherwise     = ThreadRunning
+          reasonToStatus FinishedNormally  = ThreadFinished
+          reasonToStatus FinishedDied      = ThreadDied
+          threadStatus t | threadBlocked t = ThreadBlocked BlockedOnOther
+                         | otherwise       = ThreadRunning
 
           thread' = thread { threadControl = ThreadControl (k result) ctl
                            , threadVClock  = vClock `leastUpperBoundVClock` otherVClock

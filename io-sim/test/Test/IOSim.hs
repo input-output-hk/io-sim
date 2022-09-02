@@ -146,26 +146,45 @@ tests =
     , testProperty "lazy"       prop_mfix_lazy
     , testProperty "recdata"    prop_mfix_recdata
     ]
-  -- NOTE: Most of the tests below only work because the io-sim scheduler works the way it does.
+  -- NOTE: Most of the tests below only work because the io-sim
+  -- scheduler works the way it does.
   , testGroup "ThreadStatus"
-    [ testProperty "thread status finished (IOSim)"      $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_finished
-    , testProperty "thread status finished (IO)"         $ withMaxSuccess 1 $ ioProperty    prop_thread_status_finished
-    , testProperty "thread status running (IOSim)"       $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_running
-    , testProperty "thread status running (IO)"          $ withMaxSuccess 1 $ ioProperty    prop_thread_status_running
-    , testProperty "thread status blocked (IOSim)"       $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_blocked
-    , testProperty "thread status blocked (IO)"          $ withMaxSuccess 1 $ ioProperty    prop_thread_status_blocked
-    , testProperty "thread status blocked delay (IOSim)" $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_blocked_delay
-    , testProperty "thread status blocked delay (IO)"    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_blocked_delay
-    , testProperty "thread status died (IOSim)"          $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_died
-    , testProperty "thread status died (IO)"             $ withMaxSuccess 1 $ ioProperty    prop_thread_status_died
-    , testProperty "thread status died_own (IOSim)"      $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_died_own
-    , testProperty "thread status died_own (IO)"         $ withMaxSuccess 1 $ ioProperty    prop_thread_status_died_own
-    , testProperty "thread status yield (IOSim)"         $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_yield
-    , testProperty "thread status yield (IO)"            $ withMaxSuccess 1 $ ioProperty    prop_thread_status_yield
-    , testProperty "thread status mask (IOSim)"          $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_mask
-    , testProperty "thread status mask (IO)"             $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask
-    , testProperty "thread status mask blocked (IOSim)"  $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_mask_blocked
-    , testProperty "thread status mask blocked (IO)"     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask_blocked
+    [ testProperty "thread status finished (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_finished
+    , testProperty "thread status finished (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_finished
+    , testProperty "thread status running (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_running
+    , testProperty "thread status running (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_running
+    , testProperty "thread status blocked (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_blocked
+    , testProperty "thread status blocked (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_blocked
+    , testProperty "thread status blocked delay (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_blocked_delay
+    , testProperty "thread status blocked delay (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_blocked_delay
+    , testProperty "thread status died (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_died
+    , testProperty "thread status died (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_died
+    , testProperty "thread status died_own (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_died_own
+    , testProperty "thread status died_own (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_died_own
+    , testProperty "thread status yield (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_yield
+    , testProperty "thread status yield (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_yield
+    , testProperty "thread status mask (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_mask
+    , testProperty "thread status mask (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask
+    , testProperty "thread status mask blocked (IOSim)"
+    $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_mask_blocked
+    , testProperty "thread status mask blocked (IO)"
+    $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask_blocked
     ]
   ]
 
@@ -188,65 +207,117 @@ prop_two_threads_expect_ :: (MonadFork m, MonadThread m)
                          => m ()
                          -> (ThreadStatus -> Property)
                          -> m Property
-prop_two_threads_expect_ target prop = prop_two_threads_expect target (const $ yield) prop
+prop_two_threads_expect_ target prop =
+  prop_two_threads_expect target
+                          (const $ yield)
+                          prop
 
-prop_thread_status_finished :: (MonadFork m, MonadDelay m, MonadThread m) => m Property
+prop_thread_status_finished :: (MonadFork m, MonadDelay m, MonadThread m)
+                            => m Property
 prop_thread_status_finished =
   prop_two_threads_expect_ (pure ())
                            (ThreadFinished ===)
 
-prop_thread_status_running :: (MonadFork m, MonadDelay m, MonadThread m) => m Property
+prop_thread_status_running :: (MonadFork m, MonadDelay m, MonadThread m)
+                           => m Property
 prop_thread_status_running =
   prop_two_threads_expect_ (forever yield)
                            (ThreadRunning ===)
 
-prop_thread_status_blocked :: (MonadFork m, MonadDelay m, MonadThread m, MonadSTM m) => m Property
+prop_thread_status_blocked :: ( MonadFork m
+                              , MonadDelay m
+                              , MonadThread m
+                              , MonadSTM m
+                              )
+                           => m Property
 prop_thread_status_blocked = do
   var <- newEmptyTMVarIO
-  prop_two_threads_expect_ (atomically $ takeTMVar var)
-                           $ \ status -> case status of
-                                           ThreadBlocked _ -> property True
-                                           _               -> counterexample (show status ++ " /= ThreadBlocked _") False
+  prop_two_threads_expect_
+    (atomically $ takeTMVar var)
+    $ \ status -> case status of
+      ThreadBlocked _ -> property True
+      _               ->
+        counterexample (show status ++ " /= ThreadBlocked _")
+                       False
 
-prop_thread_status_blocked_delay :: (MonadFork m, MonadDelay m, MonadThread m) => m Property
+prop_thread_status_blocked_delay :: (MonadFork m, MonadDelay m, MonadThread m)
+                                 => m Property
 prop_thread_status_blocked_delay =
-  prop_two_threads_expect_ (threadDelay 1)
-                           $ \ status -> case status of
-                                           ThreadBlocked _ -> property True
-                                           _               -> counterexample (show status ++ " /= ThreadBlocked _") False
+  prop_two_threads_expect_
+    (threadDelay 1)
+    $ \ status -> case status of
+      ThreadBlocked _ -> property True
+      _               ->
+        counterexample (show status ++ " /= ThreadBlocked _")
+        False
 
-prop_thread_status_died :: (MonadFork m, MonadThrow m, MonadDelay m, MonadThread m) => m Property
+prop_thread_status_died :: ( MonadFork m
+                           , MonadThrow m
+                           , MonadDelay m
+                           , MonadThread m
+                           )
+                        => m Property
 prop_thread_status_died =
   prop_two_threads_expect (forever yield)
                           (\tid -> do throwTo tid DivideByZero; yield)
                           (ThreadDied ===)
 
-prop_thread_status_died_own :: (MonadFork m, MonadThrow m, MonadDelay m, MonadThread m) => m Property
+prop_thread_status_died_own :: ( MonadFork m
+                               , MonadThrow m
+                               , MonadDelay m
+                               , MonadThread m
+                               )
+                            => m Property
 prop_thread_status_died_own = do
   prop_two_threads_expect_ (throwIO DivideByZero)
                            (ThreadFinished ===)
 
-prop_thread_status_yield :: (MonadFork m, MonadThrow m, MonadDelay m, MonadThread m, MonadSTM m) => m Property
+prop_thread_status_yield :: ( MonadFork m
+                            , MonadThrow m
+                            , MonadDelay m
+                            , MonadThread m
+                            , MonadSTM m
+                            )
+                         => m Property
 prop_thread_status_yield = do
   var <- newEmptyTMVarIO
-  prop_two_threads_expect (do atomically (putTMVar var ()); forever yield)
-                          (const $ atomically (takeTMVar var))
-                          (ThreadRunning ===)
+  prop_two_threads_expect
+    (do atomically (putTMVar var ()); forever yield)
+    (const $ atomically (takeTMVar var))
+    (ThreadRunning ===)
 
-prop_thread_status_mask :: (MonadFork m, MonadThrow m, MonadDelay m, MonadThread m, MonadSTM m, MonadMask m) => m Property
+prop_thread_status_mask :: ( MonadFork m
+                           , MonadThrow m
+                           , MonadDelay m
+                           , MonadThread m
+                           , MonadSTM m
+                           , MonadMask m
+                           )
+                        => m Property
 prop_thread_status_mask = do
   var <- newEmptyTMVarIO
-  prop_two_threads_expect (mask_ (do atomically (putTMVar var ()); yield) >> forever yield)
-                          (\tid -> do atomically (takeTMVar var); throwTo tid DivideByZero; yield)
-                          (ThreadFinished ===)
+  prop_two_threads_expect
+    (mask_ (do atomically (putTMVar var ()); yield) >> forever yield)
+    (\tid -> do atomically (takeTMVar var)
+                throwTo tid DivideByZero
+                yield)
+    (ThreadFinished ===)
 
-prop_thread_status_mask_blocked :: (MonadFork m, MonadThrow m, MonadThread m, MonadMask m) => m Property
+prop_thread_status_mask_blocked :: ( MonadFork m
+                                   , MonadThrow m
+                                   , MonadThread m
+                                   , MonadMask m
+                                   )
+                                => m Property
 prop_thread_status_mask_blocked = do
   helper <- forkIO $ mask_ (forever yield)
-  prop_two_threads_expect_ (throwTo helper DivideByZero)
-                           $ \ status -> case status of
-                                            ThreadBlocked _ -> property True
-                                            _               -> counterexample (show status ++ " /= ThreadBlocked _") False
+  prop_two_threads_expect_
+    (throwTo helper DivideByZero)
+    $ \ status -> case status of
+      ThreadBlocked _ -> property True
+      _               ->
+        counterexample (show status ++ " /= ThreadBlocked _")
+                       False
 
 --
 -- Read/Write graph
@@ -367,12 +438,13 @@ test_timers xs =
     countUnique [] = 0
     countUnique (a:as) =
       let as' = filter (== a) as
-      in 1 + countUnique as'
+      in  1 + countUnique as'
 
     lbl :: Eq a => [a] -> String
     lbl as =
-      let p = (if null as then 0 else (100 * countUnique as) `div` length as) `mod` 10 * 10
-      in show p ++ "% unique"
+      let p = (if null as then 0 else (100 * countUnique as) `div` length as)
+              `mod` 10 * 10
+      in  show p ++ "% unique"
 
     experiment :: Probe m (DiffTime, Int) -> m ()
     experiment p = do
@@ -399,7 +471,7 @@ test_timers xs =
     sortFn :: DiffTime -> DiffTime -> Ordering
     sortFn a b | a >= 0 && b >= 0 = a `compare` b
                | a  < 0 && b  < 0 = EQ
-               | otherwise = a `compare` b
+               | otherwise        = a `compare` b
 
 prop_timers_ST :: TestMicro -> Property
 prop_timers_ST (TestMicro xs) =
@@ -450,12 +522,12 @@ prop_fork_order_IO = ioProperty . test_fork_order
 
 
 test_threadId_order :: forall m.
-                   ( MonadFork m
-                   , MonadSTM m
-                   , MonadTimer m
-                   )
-                => Positive Int
-                -> m Property
+                       ( MonadFork m
+                       , MonadSTM m
+                       , MonadTimer m
+                       )
+                    => Positive Int
+                    -> m Property
 test_threadId_order = \(Positive n) -> do
     isValid n <$> (forM [1..n] (const experiment))
   where
@@ -490,7 +562,7 @@ test_wakeup_order :: ( MonadFork m
                      , MonadSTM m
                      , MonadTimer m
                      )
-                => m Property
+                  => m Property
 test_wakeup_order = do
     v          <- newTVarIO False
     wakupOrder <-
@@ -1154,7 +1226,12 @@ prop_stm_referenceM (SomeTerm _tyrep t) = do
 -- | Check that 'timeout' does not deadlock when executed with asynchronous
 -- exceptions uninterruptibly masked.
 --
-prop_timeout_no_deadlockM :: forall m. ( MonadFork m, MonadSTM m, MonadTimer m, MonadMask m )
+prop_timeout_no_deadlockM :: forall m.
+                             ( MonadFork m
+                             , MonadSTM m
+                             , MonadTimer m
+                             , MonadMask m
+                             )
                           => m Bool
 prop_timeout_no_deadlockM = do
     v <- registerDelay' 0.01

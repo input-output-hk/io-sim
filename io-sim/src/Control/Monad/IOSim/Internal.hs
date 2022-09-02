@@ -14,7 +14,6 @@
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE RecordWildCards            #-}
 
 {-# OPTIONS_GHC -Wno-orphans            #-}
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
@@ -507,10 +506,10 @@ schedule !thread@Thread{
       let result | Just r <- Map.lookup tid' finished = reasonToStatus r
                  | Just t <- Map.lookup tid' threads  = threadStatus t
                  | otherwise                          = error "The impossible happened - tried to loookup thread in state."
-          reasonToStatus FinishedNormally = ThreadFinished
-          reasonToStatus FinishedDied     = ThreadDied
-          threadStatus Thread{..} | threadBlocked = ThreadBlocked BlockedOnOther
-                                  | otherwise     = ThreadRunning
+          reasonToStatus FinishedNormally  = ThreadFinished
+          reasonToStatus FinishedDied      = ThreadDied
+          threadStatus t | threadBlocked t = ThreadBlocked BlockedOnOther
+                         | otherwise       = ThreadRunning
 
           thread' = thread { threadControl = ThreadControl (k result) ctl }
       schedule thread' simstate
