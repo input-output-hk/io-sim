@@ -899,32 +899,28 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
       ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-}
+        {-# SCC "execAtomically.go.ThrowStm" #-} do
+        -- Rollback `TVar`s written since catch handler was installed
+        !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
         case ctl of
           AtomicallyFrame -> do
-            -- Revert all the TVar writes
-            !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
             k0 $ StmTxAborted (Map.elems read) (toException e)
 
           BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
             {-# SCC "execAtomically.go.BranchFrame" #-} do
-            -- Execute the catch handler with an empty written set.
-            -- Rollback `TVar`s written since catch handler was installed
-            -- but preserve ones that were set prior to it, as specified in the
-            -- [stm](https://hackage.haskell.org/package/stm/docs/Control-Monad-STM.html#v:catchSTM) package.
-            !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+            -- Execute the left side in a new frame with an empty written set
             let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
             go ctl'' read Map.empty [] [] nextVid (h e)
             --
           BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
             {-# SCC "execAtomically.go.BranchFrame" #-} do
-            -- Revert all the TVar writes within this branch
-            !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
       CatchStm a h k ->
         {-# SCC "execAtomically.go.ThrowStm" #-} do
-        -- Execute the left side in a new frame with an empty written set
+        -- Execute the catch handler with an empty written set.
+        -- but preserve ones that were set prior to it, as specified in the
+        -- [stm](https://hackage.haskell.org/package/stm/docs/Control-Monad-STM.html#v:catchSTM) package.
         let ctl' = BranchFrame (CatchStmA h) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
 
