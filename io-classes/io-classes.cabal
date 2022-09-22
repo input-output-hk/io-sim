@@ -12,7 +12,7 @@ maintainer:
 category:            Control
 build-type:          Simple
 cabal-version:       >=1.10
-tested-with:         GHC == 8.10.7, GHC == 9.2.2
+tested-with:         GHC == 8.10.7, GHC == 9.2.4
 
 source-repository head
   type:     git
@@ -51,13 +51,13 @@ library
                        FlexibleContexts
                        ScopedTypeVariables
                        RankNTypes
-  build-depends:       base  >=4.9 && <4.17,
+  build-depends:       base  >=4.9 && <4.18,
                        async >=2.1,
                        bytestring,
                        deque,
-                       mtl   >=2.2 && <2.3,
+                       mtl   >=2.2 && <2.4,
                        stm   >=2.5 && <2.6,
-                       time  >=1.9.1 && <1.11
+                       time  >=1.9.1 && <1.13
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
                        -Wcompat

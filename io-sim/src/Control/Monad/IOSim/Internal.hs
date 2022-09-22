@@ -1071,17 +1071,17 @@ saveTVar TVar{tvarCurrent, tvarUndo} = do
 revertTVar :: TVar s a -> ST s ()
 revertTVar TVar{tvarCurrent, tvarUndo} = do
     -- pop the undo stack, and revert the current value
-    (v:vs) <- readSTRef tvarUndo
-    !_ <- writeSTRef tvarCurrent v
-    !_ <- writeSTRef tvarUndo    vs
+    vs <- readSTRef tvarUndo
+    !_ <- writeSTRef tvarCurrent (head vs)
+    !_ <- writeSTRef tvarUndo    (tail vs)
     return ()
 {-# INLINE revertTVar #-}
 
 commitTVar :: TVar s a -> ST s ()
 commitTVar TVar{tvarUndo} = do
+    vs <- readSTRef tvarUndo
     -- pop the undo stack, leaving the current value unchanged
-    (_:vs) <- readSTRef tvarUndo
-    !_ <- writeSTRef tvarUndo vs
+    !_ <- writeSTRef tvarUndo (tail vs)
     return ()
 {-# INLINE commitTVar #-}
 

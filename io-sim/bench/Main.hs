@@ -30,7 +30,7 @@ import           Network.TypedProtocol.PingPong.Server
 import           Network.TypedProtocol.PingPong.Type
 
 
-prop_channel :: forall m. (MonadSTM m, MonadAsync m, MonadCatch m, MonadTimer m)
+prop_channel :: forall m. (MonadAsync m, MonadCatch m, MonadTimer m)
              => Maybe (DiffTime, DiffTime)
              -> Int
              -> Tracer m (Role, TraceSendRecv PingPong)
