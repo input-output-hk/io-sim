@@ -32,6 +32,7 @@ class (Monad m, Eq   (ThreadId m),
 class MonadThread m => MonadFork m where
 
   forkIO           :: m () -> m (ThreadId m)
+  forkOn           :: Int -> m () -> m (ThreadId m)
   forkIOWithUnmask :: ((forall a. m a -> m a) -> m ()) -> m (ThreadId m)
   throwTo          :: Exception e => ThreadId m -> e -> m ()
 
@@ -56,6 +57,7 @@ instance MonadThread IO where
 
 instance MonadFork IO where
   forkIO           = IO.forkIO
+  forkOn           = IO.forkOn
   forkIOWithUnmask = IO.forkIOWithUnmask
   throwTo          = IO.throwTo
   killThread       = IO.killThread
@@ -68,6 +70,7 @@ instance MonadThread m => MonadThread (ReaderT r m) where
 
 instance MonadFork m => MonadFork (ReaderT e m) where
   forkIO (ReaderT f)   = ReaderT $ \e -> forkIO (f e)
+  forkOn n (ReaderT f) = ReaderT $ \e -> forkOn n (f e)
   forkIOWithUnmask k   = ReaderT $ \e -> forkIOWithUnmask $ \restore ->
                        let restore' :: ReaderT e m a -> ReaderT e m a
                            restore' (ReaderT f) = ReaderT $ restore . f

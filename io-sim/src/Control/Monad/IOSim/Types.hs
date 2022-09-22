@@ -369,6 +369,7 @@ instance MonadThread (IOSim s) where
 
 instance MonadFork (IOSim s) where
   forkIO task        = IOSim $ oneShot $ \k -> Fork task k
+  forkOn _ task      = IOSim $ oneShot $ \k -> Fork task k
   forkIOWithUnmask f = forkIO (f unblock)
   throwTo tid e      = IOSim $ oneShot $ \k -> ThrowTo (toException e) tid (k ())
   yield              = IOSim $ oneShot $ \k -> YieldSim (k ())
@@ -470,6 +471,9 @@ instance MonadAsync (IOSim s) where
     MonadSTM.labelTMVarIO var ("async-" ++ show tid)
     return (Async tid (MonadSTM.readTMVar var))
 
+  asyncOn _  = async
+  asyncBound = async
+
   asyncThreadId (Async tid _) = tid
 
   waitCatchSTM (Async _ w) = w
@@ -479,6 +483,7 @@ instance MonadAsync (IOSim s) where
   cancelWith a@(Async tid _) e = throwTo tid e <* waitCatch a
 
   asyncWithUnmask k = async (k unblock)
+  asyncOnWithUnmask _ k = async (k unblock)
 
 instance MonadST (IOSim s) where
   withLiftST f = f liftST
