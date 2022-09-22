@@ -53,6 +53,40 @@ module Control.Monad.Class.MonadSTM.Strict
   , tryReadTMVar
   , swapTMVar
   , isEmptyTMVar
+    -- * 'StrictTQueue'
+  , StrictTQueue
+  , labelTQueue
+  , labelTQueueIO
+  , traceTQueue
+  , traceTQueueIO
+  , toLazyTQueue
+  , fromLazyTQueue
+  , newTQueue
+  , newTQueueIO
+  , readTQueue
+  , tryReadTQueue
+  , peekTQueue
+  , tryPeekTQueue
+  , writeTQueue
+  , isEmptyTQueue
+    -- * 'StrictTBQueue'
+  , StrictTBQueue
+  , labelTBQueue
+  , labelTBQueueIO
+  , traceTBQueue
+  , traceTBQueueIO
+  , toLazyTBQueue
+  , fromLazyTBQueue
+  , newTBQueue
+  , newTBQueueIO
+  , readTBQueue
+  , tryReadTBQueue
+  , peekTBQueue
+  , tryPeekTBQueue
+  , writeTBQueue
+  , lengthTBQueue
+  , isEmptyTBQueue
+  , isFullTBQueue
     -- ** Low-level API
   , checkInvariant
     -- * Deprecated API
@@ -64,23 +98,32 @@ module Control.Monad.Class.MonadSTM.Strict
   ) where
 
 import           Control.Monad.Class.MonadSTM as X hiding (LazyTMVar, LazyTVar,
-                     TMVar, TVar, isEmptyTMVar, labelTMVar, labelTMVarIO,
-                     labelTVar, labelTVarIO, modifyTVar, newEmptyTMVar,
-                     newEmptyTMVarIO, newEmptyTMVarM, newTMVar, newTMVarIO,
-                     newTMVarM, newTVar, newTVarIO, newTVarM, putTMVar,
-                     readTMVar, readTVar, readTVarIO, stateTVar, swapTMVar,
-                     swapTVar, takeTMVar, traceTMVar, traceTMVarIO, traceTVar,
-                     traceTVarIO, tryPutTMVar, tryReadTMVar, tryTakeTMVar,
-                     writeTVar)
+                     TMVar, TVar, isEmptyTBQueue, isEmptyTMVar, isEmptyTQueue,
+                     isFullTBQueue, labelTBQueue, labelTBQueueIO, labelTMVar,
+                     labelTMVarIO, labelTQueue, labelTQueueIO, labelTVar,
+                     labelTVarIO, lengthTBQueue, modifyTVar, newEmptyTMVar,
+                     newEmptyTMVarIO, newEmptyTMVarM, newTBQueue, newTBQueueIO,
+                     newTMVar, newTMVarIO, newTMVarM, newTQueue, newTQueueIO,
+                     newTVar, newTVarIO, newTVarM, peekTBQueue, peekTQueue,
+                     putTMVar, readTBQueue, readTMVar, readTQueue, readTVar,
+                     readTVarIO, stateTVar, swapTMVar, swapTVar, takeTMVar,
+                     traceTBQueue, traceTBQueueIO, traceTMVar, traceTMVarIO,
+                     traceTQueue, traceTQueueIO, traceTVar, traceTVarIO,
+                     tryPeekTBQueue, tryPeekTQueue, tryPutTMVar, tryReadTBQueue,
+                     tryReadTMVar, tryReadTQueue, tryTakeTMVar, writeTBQueue,
+                     writeTQueue, writeTVar)
 import qualified Control.Monad.Class.MonadSTM as Lazy
 import           GHC.Stack
+import           Numeric.Natural (Natural)
 
 {-------------------------------------------------------------------------------
   Lazy TVar
 -------------------------------------------------------------------------------}
 
-type LazyTVar  m = Lazy.TVar m
-type LazyTMVar m = Lazy.TMVar m
+type LazyTVar    m = Lazy.TVar m
+type LazyTMVar   m = Lazy.TMVar m
+type LazyTQueue  m = Lazy.TQueue m
+type LazyTBQueue m = Lazy.TBQueue m
 
 {-------------------------------------------------------------------------------
   Strict TVar
@@ -289,6 +332,119 @@ swapTMVar (StrictTMVar tmvar) !a = Lazy.swapTMVar tmvar a
 
 isEmptyTMVar :: MonadSTM m => StrictTMVar m a -> STM m Bool
 isEmptyTMVar (StrictTMVar tmvar) = Lazy.isEmptyTMVar tmvar
+
+{-------------------------------------------------------------------------------
+  Strict TQueue
+-------------------------------------------------------------------------------}
+
+newtype StrictTQueue m a = StrictTQueue { toLazyTQueue :: LazyTQueue m a }
+
+fromLazyTQueue :: LazyTQueue m a -> StrictTQueue m a
+fromLazyTQueue = StrictTQueue
+
+labelTQueue :: MonadLabelledSTM m => StrictTQueue m a -> String -> STM m ()
+labelTQueue (StrictTQueue queue) = Lazy.labelTQueue queue
+
+labelTQueueIO :: MonadLabelledSTM m => StrictTQueue m a -> String -> m ()
+labelTQueueIO (StrictTQueue queue) = Lazy.labelTQueueIO queue
+
+traceTQueue :: MonadTraceSTM m
+            => proxy m
+            -> StrictTQueue m a
+            -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
+            -> STM m ()
+traceTQueue p (StrictTQueue queue) = Lazy.traceTQueue p queue
+
+traceTQueueIO :: MonadTraceSTM m
+              => proxy m
+              -> StrictTQueue m a
+              -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
+              -> m ()
+traceTQueueIO p (StrictTQueue queue) = Lazy.traceTQueueIO p queue
+
+newTQueue :: MonadSTM m => STM m (StrictTQueue m a)
+newTQueue = StrictTQueue <$> Lazy.newTQueue
+
+newTQueueIO :: MonadSTM m => m (StrictTQueue m a)
+newTQueueIO = atomically newTQueue
+
+readTQueue :: MonadSTM m => StrictTQueue m a -> STM m a
+readTQueue = Lazy.readTQueue . toLazyTQueue
+
+tryReadTQueue :: MonadSTM m => StrictTQueue m a -> STM m (Maybe a)
+tryReadTQueue = Lazy.tryReadTQueue . toLazyTQueue
+
+peekTQueue :: MonadSTM m => StrictTQueue m a -> STM m a
+peekTQueue = Lazy.peekTQueue . toLazyTQueue
+
+tryPeekTQueue :: MonadSTM m => StrictTQueue m a -> STM m (Maybe a)
+tryPeekTQueue = Lazy.tryPeekTQueue . toLazyTQueue
+
+writeTQueue :: MonadSTM m => StrictTQueue m a -> a -> STM m ()
+writeTQueue (StrictTQueue tqueue) !a = Lazy.writeTQueue tqueue a
+
+isEmptyTQueue  :: MonadSTM m => StrictTQueue m a -> STM m Bool
+isEmptyTQueue = Lazy.isEmptyTQueue . toLazyTQueue
+
+{-------------------------------------------------------------------------------
+  Strict TBQueue
+-------------------------------------------------------------------------------}
+
+newtype StrictTBQueue m a = StrictTBQueue { toLazyTBQueue :: LazyTBQueue m a }
+
+fromLazyTBQueue :: LazyTBQueue m a -> StrictTBQueue m a
+fromLazyTBQueue = StrictTBQueue
+
+labelTBQueue :: MonadLabelledSTM m => StrictTBQueue m a -> String -> STM m ()
+labelTBQueue (StrictTBQueue queue) = Lazy.labelTBQueue queue
+
+labelTBQueueIO :: MonadLabelledSTM m => StrictTBQueue m a -> String -> m ()
+labelTBQueueIO (StrictTBQueue queue) = Lazy.labelTBQueueIO queue
+
+traceTBQueue :: MonadTraceSTM m
+             => proxy m
+             -> StrictTBQueue m a
+             -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
+             -> STM m ()
+traceTBQueue p (StrictTBQueue queue) = Lazy.traceTBQueue p queue
+
+traceTBQueueIO :: MonadTraceSTM m
+               => proxy m
+               -> StrictTBQueue m a
+               -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
+               -> m ()
+traceTBQueueIO p (StrictTBQueue queue) = Lazy.traceTBQueueIO p queue
+
+newTBQueue :: MonadSTM m => Natural -> STM m (StrictTBQueue m a)
+newTBQueue n = StrictTBQueue <$> Lazy.newTBQueue n
+
+newTBQueueIO :: MonadSTM m => Natural -> m (StrictTBQueue m a)
+newTBQueueIO = atomically . newTBQueue
+
+readTBQueue :: MonadSTM m => StrictTBQueue m a -> STM m a
+readTBQueue = Lazy.readTBQueue . toLazyTBQueue
+
+tryReadTBQueue :: MonadSTM m => StrictTBQueue m a -> STM m (Maybe a)
+tryReadTBQueue = Lazy.tryReadTBQueue . toLazyTBQueue
+
+peekTBQueue :: MonadSTM m => StrictTBQueue m a -> STM m a
+peekTBQueue = Lazy.peekTBQueue . toLazyTBQueue
+
+tryPeekTBQueue :: MonadSTM m => StrictTBQueue m a -> STM m (Maybe a)
+tryPeekTBQueue = Lazy.tryPeekTBQueue . toLazyTBQueue
+
+writeTBQueue :: MonadSTM m => StrictTBQueue m a -> a -> STM m ()
+writeTBQueue (StrictTBQueue tqueue) !a = Lazy.writeTBQueue tqueue a
+
+lengthTBQueue  :: MonadSTM m => StrictTBQueue m a -> STM m Natural
+lengthTBQueue = Lazy.lengthTBQueue . toLazyTBQueue
+
+isEmptyTBQueue  :: MonadSTM m => StrictTBQueue m a -> STM m Bool
+isEmptyTBQueue = Lazy.isEmptyTBQueue . toLazyTBQueue
+
+isFullTBQueue  :: MonadSTM m => StrictTBQueue m a -> STM m Bool
+isFullTBQueue = Lazy.isFullTBQueue . toLazyTBQueue
+
 
 {-------------------------------------------------------------------------------
   Dealing with invariants
