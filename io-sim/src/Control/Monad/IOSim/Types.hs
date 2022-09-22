@@ -382,7 +382,6 @@ instance MonadSay (STMSim s) where
 
 instance MonadLabelledSTM (IOSim s) where
   labelTVar tvar label = STM $ \k -> LabelTVar label tvar (k ())
-  labelTMVar   = MonadSTM.labelTMVarDefault
   labelTQueue  = labelTQueueDefault
   labelTBQueue = labelTBQueueDefault
 
@@ -400,17 +399,6 @@ instance MonadSTM (IOSim s) where
   writeTVar  tvar x = STM $ oneShot $ \k -> WriteTVar tvar x (k ())
   retry             = STM $ oneShot $ \_ -> Retry
   orElse        a b = STM $ oneShot $ \k -> OrElse (runSTM a) (runSTM b) k
-
-  newTMVar          = MonadSTM.newTMVarDefault
-  newEmptyTMVar     = MonadSTM.newEmptyTMVarDefault
-  takeTMVar         = MonadSTM.takeTMVarDefault
-  tryTakeTMVar      = MonadSTM.tryTakeTMVarDefault
-  putTMVar          = MonadSTM.putTMVarDefault
-  tryPutTMVar       = MonadSTM.tryPutTMVarDefault
-  readTMVar         = MonadSTM.readTMVarDefault
-  tryReadTMVar      = MonadSTM.tryReadTMVarDefault
-  swapTMVar         = MonadSTM.swapTMVarDefault
-  isEmptyTMVar      = MonadSTM.isEmptyTMVarDefault
 
   newTQueue         = newTQueueDefault
   readTQueue        = readTQueueDefault
@@ -430,9 +418,6 @@ instance MonadSTM (IOSim s) where
   lengthTBQueue     = lengthTBQueueDefault
   isEmptyTBQueue    = isEmptyTBQueueDefault
   isFullTBQueue     = isFullTBQueueDefault
-
-  newTMVarIO        = MonadSTM.newTMVarIODefault
-  newEmptyTMVarIO   = MonadSTM.newEmptyTMVarIODefault
 
 instance MonadInspectSTM (IOSim s) where
   type InspectMonad (IOSim s) = ST s

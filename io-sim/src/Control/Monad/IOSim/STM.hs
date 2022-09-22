@@ -14,7 +14,7 @@ import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
 import           Numeric.Natural (Natural)
 
 --
--- Default TQueue implementation in terms of 'Seq' (used by sim)
+-- Default TQueue implementation in terms of a 'TVar' (used by sim)
 --
 
 newtype TQueueDefault m a = TQueue (TVar m ([a], [a]))

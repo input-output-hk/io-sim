@@ -27,43 +27,10 @@ module Control.Monad.Class.MonadSTM
   , LazyTMVar
     -- * Default 'TMVar' implementation
   , TMVarDefault (..)
-  , labelTMVarDefault
-  , traceTMVarDefault
-  , newTMVarDefault
-  , newTMVarIODefault
-  , newEmptyTMVarDefault
-  , newEmptyTMVarIODefault
-  , takeTMVarDefault
-  , tryTakeTMVarDefault
-  , putTMVarDefault
-  , tryPutTMVarDefault
-  , readTMVarDefault
-  , tryReadTMVarDefault
-  , swapTMVarDefault
-  , isEmptyTMVarDefault
     -- * Default 'TBQueue' implementation
   , TQueueDefault (..)
-  , labelTQueueDefault
-  , newTQueueDefault
-  , readTQueueDefault
-  , tryReadTQueueDefault
-  , peekTQueueDefault
-  , tryPeekTQueueDefault
-  , writeTQueueDefault
-  , isEmptyTQueueDefault
     -- * Default 'TBQueue' implementation
   , TBQueueDefault (..)
-  , labelTBQueueDefault
-  , newTBQueueDefault
-  , readTBQueueDefault
-  , tryReadTBQueueDefault
-  , peekTBQueueDefault
-  , tryPeekTBQueueDefault
-  , writeTBQueueDefault
-  , isEmptyTBQueueDefault
-  , isFullTBQueueDefault
-  , lengthTBQueueDefault
-  , flushTBQueueDefault
     -- * MonadThrow aliases
   , throwSTM
   , catchSTM
@@ -73,7 +40,7 @@ module Control.Monad.Class.MonadSTM
   , newTMVarMDefault
   , newEmptyTMVarM
   , newEmptyTMVarMDefault
-    --
+    -- * Utils
   , WrappedSTM (..)
   ) where
 
@@ -188,12 +155,122 @@ class ( Monad m
   newTQueueIO      :: m (TQueue m a)
   newTBQueueIO     :: Natural -> m (TBQueue m a)
 
+  --
+  -- default implementations
+  --
+
+  default newTMVar :: TMVar m ~ TMVarDefault m
+                   => a -> STM m (TMVar m a)
+  newTMVar = newTMVarDefault
+
+  default newEmptyTMVar :: TMVar m ~ TMVarDefault m
+                        => STM m (TMVar m a)
+  newEmptyTMVar = newEmptyTMVarDefault
+
   newTVarIO       = atomically . newTVar
   readTVarIO      = atomically . readTVar
   newTMVarIO      = atomically . newTMVar
   newEmptyTMVarIO = atomically   newEmptyTMVar
   newTQueueIO     = atomically newTQueue
   newTBQueueIO    = atomically . newTBQueue
+
+  default takeTMVar :: TMVar m ~ TMVarDefault m
+                    => TMVar m a -> STM m a
+  takeTMVar = takeTMVarDefault
+
+  default tryTakeTMVar :: TMVar m ~ TMVarDefault m
+                       => TMVar m a -> STM m (Maybe a)
+  tryTakeTMVar = tryTakeTMVarDefault
+
+  default putTMVar :: TMVar m ~ TMVarDefault m => TMVar m a -> a -> STM m ()
+  putTMVar = putTMVarDefault
+
+  default tryPutTMVar :: TMVar m ~ TMVarDefault m => TMVar m a -> a -> STM m Bool
+  tryPutTMVar = tryPutTMVarDefault
+
+  default readTMVar :: TMVar m ~ TMVarDefault m
+                    => TMVar m a -> STM m a
+  readTMVar = readTMVarDefault
+
+  default tryReadTMVar :: TMVar m ~ TMVarDefault m
+                    => TMVar m a -> STM m (Maybe a)
+  tryReadTMVar = tryReadTMVarDefault
+
+  default swapTMVar :: TMVar m ~ TMVarDefault m
+                    => TMVar m a -> a -> STM m a
+  swapTMVar = swapTMVarDefault
+
+  default isEmptyTMVar :: TMVar m ~ TMVarDefault m
+                       => TMVar m a -> STM m Bool
+  isEmptyTMVar = isEmptyTMVarDefault
+
+  default newTQueue :: TQueue m ~ TQueueDefault m
+                    => STM m (TQueue m a)
+  newTQueue = newTQueueDefault
+
+  default writeTQueue :: TQueue m ~ TQueueDefault m
+                      => TQueue m a -> a -> STM m ()
+  writeTQueue = writeTQueueDefault
+
+  default readTQueue :: TQueue m ~ TQueueDefault m
+                     => TQueue m a -> STM m a
+  readTQueue = readTQueueDefault
+
+  default tryReadTQueue :: TQueue m ~ TQueueDefault m
+                         => TQueue m a -> STM m (Maybe a)
+  tryReadTQueue = tryReadTQueueDefault
+
+  default isEmptyTQueue :: TQueue m ~ TQueueDefault m
+                        => TQueue m a -> STM m Bool
+  isEmptyTQueue = isEmptyTQueueDefault
+
+  default peekTQueue :: TQueue m ~ TQueueDefault m
+                     => TQueue m a -> STM m a
+  peekTQueue = peekTQueueDefault
+
+  default tryPeekTQueue :: TQueue m ~ TQueueDefault m
+                        => TQueue m a -> STM m (Maybe a)
+  tryPeekTQueue = tryPeekTQueueDefault
+
+  default newTBQueue :: TBQueue m ~ TBQueueDefault m
+                     => Natural -> STM m (TBQueue m a)
+  newTBQueue = newTBQueueDefault
+
+  default writeTBQueue :: TBQueue m ~ TBQueueDefault m
+                       => TBQueue m a -> a -> STM m ()
+  writeTBQueue = writeTBQueueDefault
+
+  default readTBQueue :: TBQueue m ~ TBQueueDefault m
+                      => TBQueue m a -> STM m a
+  readTBQueue = readTBQueueDefault
+
+  default tryReadTBQueue :: TBQueue m ~ TBQueueDefault m
+                          => TBQueue m a -> STM m (Maybe a)
+  tryReadTBQueue = tryReadTBQueueDefault
+
+  default isEmptyTBQueue :: TBQueue m ~ TBQueueDefault m
+                         => TBQueue m a -> STM m Bool
+  isEmptyTBQueue = isEmptyTBQueueDefault
+
+  default peekTBQueue :: TBQueue m ~ TBQueueDefault m
+                      => TBQueue m a -> STM m a
+  peekTBQueue = peekTBQueueDefault
+
+  default tryPeekTBQueue :: TBQueue m ~ TBQueueDefault m
+                         => TBQueue m a -> STM m (Maybe a)
+  tryPeekTBQueue = tryPeekTBQueueDefault
+
+  default isFullTBQueue :: TBQueue m ~ TBQueueDefault m
+                        => TBQueue m a -> STM m Bool
+  isFullTBQueue = isFullTBQueueDefault
+
+  default lengthTBQueue :: TBQueue m ~ TBQueueDefault m
+                        => TBQueue m a -> STM m Natural
+  lengthTBQueue = lengthTBQueueDefault
+
+  default flushTBQueue :: TBQueue m ~ TBQueueDefault m
+                       => TBQueue m a -> STM m [a]
+  flushTBQueue = flushTBQueueDefault
 
 
 stateTVarDefault :: MonadSTM m => TVar m s -> (s -> (a, s)) -> STM m a
@@ -236,6 +313,22 @@ class MonadSTM m
   labelTMVarIO   :: TMVar   m a -> String -> m ()
   labelTQueueIO  :: TQueue  m a -> String -> m ()
   labelTBQueueIO :: TBQueue m a -> String -> m ()
+
+  --
+  -- default implementations
+  --
+
+  default labelTMVar :: TMVar m ~ TMVarDefault m
+                     => TMVar m a -> String -> STM m ()
+  labelTMVar = labelTMVarDefault
+
+  default labelTQueue :: TQueue m ~ TQueueDefault m
+                      => TQueue m a -> String -> STM m ()
+  labelTQueue = labelTQueueDefault
+
+  default labelTBQueue :: TBQueue m ~ TBQueueDefault m
+                       => TBQueue m a -> String -> STM m ()
+  labelTBQueue = labelTBQueueDefault
 
   default labelTVarIO :: TVar m a -> String -> m ()
   labelTVarIO = \v l -> atomically (labelTVar v l)
@@ -524,6 +617,7 @@ newTMVarIODefault :: MonadSTM m => a -> m (TMVarDefault m a)
 newTMVarIODefault a = do
   t <- newTVarM (Just a)
   return (TMVar t)
+{-# DEPRECATED newTMVarIODefault "MonadSTM provides a default implementation" #-}
 
 newTMVarMDefault :: MonadSTM m => a -> m (TMVarDefault m a)
 newTMVarMDefault = newTMVarIODefault
@@ -538,6 +632,7 @@ newEmptyTMVarIODefault :: MonadSTM m => m (TMVarDefault m a)
 newEmptyTMVarIODefault = do
   t <- newTVarIO Nothing
   return (TMVar t)
+{-# DEPRECATED newEmptyTMVarIODefault "MonadSTM provides a default implementation" #-}
 
 newEmptyTMVarMDefault :: MonadSTM m => m (TMVarDefault m a)
 newEmptyTMVarMDefault = newEmptyTMVarIODefault
