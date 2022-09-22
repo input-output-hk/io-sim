@@ -53,15 +53,19 @@ class ( MonadSTM m
       , MonadThread m
       ) => MonadAsync m where
 
-  {-# MINIMAL async, asyncThreadId, cancel, cancelWith, asyncWithUnmask,
-              waitCatchSTM, pollSTM #-}
+  {-# MINIMAL async, asyncBound, asyncOn, asyncThreadId, cancel, cancelWith,
+              asyncWithUnmask, asyncOnWithUnmask, waitCatchSTM, pollSTM #-}
 
   -- | An asynchronous action
   type Async m          = (async :: Type -> Type) | async -> m
 
   async                 :: m a -> m (Async m a)
+  asyncBound            :: m a -> m (Async m a)
+  asyncOn               :: Int -> m a -> m (Async m a)
   asyncThreadId         :: Async m a -> ThreadId m
   withAsync             :: m a -> (Async m a -> m b) -> m b
+  withAsyncBound        :: m a -> (Async m a -> m b) -> m b
+  withAsyncOn           :: Int -> m a -> (Async m a -> m b) -> m b
 
   waitSTM               :: Async m a -> STM m a
   pollSTM               :: Async m a -> STM m (Maybe (Either SomeException a))
@@ -144,9 +148,23 @@ class ( MonadSTM m
   concurrently_         :: m a -> m b -> m ()
 
   asyncWithUnmask       :: ((forall b . m b -> m b) ->  m a) -> m (Async m a)
+  asyncOnWithUnmask     :: Int -> ((forall b . m b -> m b) ->  m a) -> m (Async m a)
+  withAsyncWithUnmask   :: ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
+  withAsyncOnWithUnmask :: Int -> ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
+
+  compareAsyncs         :: Async m a -> Async m b -> Ordering
 
   -- default implementations
   default withAsync     :: MonadMask m => m a -> (Async m a -> m b) -> m b
+  default withAsyncBound:: MonadMask m => m a -> (Async m a -> m b) -> m b
+  default withAsyncOn   :: MonadMask m => Int -> m a -> (Async m a -> m b) -> m b
+  default withAsyncWithUnmask
+                        :: MonadMask m => ((forall c. m c -> m c) ->  m a)
+                                       -> (Async m a -> m b) -> m b
+  default withAsyncOnWithUnmask
+                        :: MonadMask m => Int
+                                       -> ((forall c. m c -> m c) ->  m a)
+                                       -> (Async m a -> m b) -> m b
   default uninterruptibleCancel
                         :: MonadMask m => Async m a -> m ()
   default waitAnyCancel         :: MonadThrow m => [Async m a] -> m (Async m a, a)
@@ -157,11 +175,34 @@ class ( MonadSTM m
   default waitEitherCatchCancel :: MonadThrow m => Async m a -> Async m b
                                 -> m (Either (Either SomeException a)
                                              (Either SomeException b))
+  default compareAsyncs         :: Ord (ThreadId m)
+                                => Async m a -> Async m b -> Ordering
 
   withAsync action inner = mask $ \restore -> do
                              a <- async (restore action)
                              restore (inner a)
                                `finally` uninterruptibleCancel a
+
+  withAsyncBound action inner = mask $ \restore -> do
+                                  a <- asyncBound (restore action)
+                                  restore (inner a)
+                                    `finally` uninterruptibleCancel a
+
+  withAsyncOn n action inner = mask $ \restore -> do
+                                 a <- asyncOn n (restore action)
+                                 restore (inner a)
+                                   `finally` uninterruptibleCancel a
+
+
+  withAsyncWithUnmask action inner = mask $ \restore -> do
+                                       a <- asyncWithUnmask action
+                                       restore (inner a)
+                                         `finally` uninterruptibleCancel a
+
+  withAsyncOnWithUnmask n action inner = mask $ \restore -> do
+                                           a <- asyncOnWithUnmask n action
+                                           restore (inner a)
+                                             `finally` uninterruptibleCancel a
 
   wait      = atomically . waitSTM
   poll      = atomically . pollSTM
@@ -201,6 +242,8 @@ class ( MonadSTM m
                                  waitBoth a b
 
   concurrently_   left right = void $ concurrently left right
+
+  compareAsyncs a b = asyncThreadId a `compare` asyncThreadId b
 
 -- | Similar to 'Async.Concurrently' but which works for any 'MonadAsync'
 -- instance.
@@ -265,8 +308,12 @@ instance MonadAsync IO where
   type Async IO         = Async.Async
 
   async                 = Async.async
+  asyncBound            = Async.asyncBound
+  asyncOn               = Async.asyncOn
   asyncThreadId         = Async.asyncThreadId
   withAsync             = Async.withAsync
+  withAsyncBound        = Async.withAsyncBound
+  withAsyncOn           = Async.withAsyncOn
 
   waitSTM               = Async.waitSTM
   pollSTM               = Async.pollSTM
@@ -303,6 +350,11 @@ instance MonadAsync IO where
   concurrently_         = Async.concurrently_
 
   asyncWithUnmask       = Async.asyncWithUnmask
+  asyncOnWithUnmask     = Async.asyncOnWithUnmask
+  withAsyncWithUnmask   = Async.withAsyncWithUnmask
+  withAsyncOnWithUnmask = Async.withAsyncOnWithUnmask
+
+  compareAsyncs         = Async.compareAsyncs
 
 
 --
@@ -410,11 +462,41 @@ instance ( MonadAsync m
     asyncThreadId (WrappedAsync a) = asyncThreadId a
 
     async      (ReaderT ma)  = ReaderT $ \r -> WrappedAsync <$> async (ma r)
+    asyncBound (ReaderT ma)  = ReaderT $ \r -> WrappedAsync <$> asyncBound (ma r)
+    asyncOn n  (ReaderT ma)  = ReaderT $ \r -> WrappedAsync <$> asyncOn n (ma r)
     withAsync (ReaderT ma) f = ReaderT $ \r -> withAsync (ma r)
                                        $ \a -> runReaderT (f (WrappedAsync a)) r
+    withAsyncBound (ReaderT ma) f = ReaderT $ \r -> withAsyncBound (ma r)
+                                       $ \a -> runReaderT (f (WrappedAsync a)) r
+    withAsyncOn  n (ReaderT ma) f = ReaderT $ \r -> withAsyncOn n (ma r)
+                                       $ \a -> runReaderT (f (WrappedAsync a)) r
+
     asyncWithUnmask f        = ReaderT $ \r -> fmap WrappedAsync
                                              $ asyncWithUnmask
                                              $ \unmask -> runReaderT (f (liftF unmask)) r
+      where
+        liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
+        liftF g (ReaderT r) = ReaderT (g . r)
+
+    asyncOnWithUnmask n f   = ReaderT $ \r -> fmap WrappedAsync
+                                            $ asyncOnWithUnmask n
+                                            $ \unmask -> runReaderT (f (liftF unmask)) r
+      where
+        liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
+        liftF g (ReaderT r) = ReaderT (g . r)
+
+    withAsyncWithUnmask action f  =
+      ReaderT $ \r -> withAsyncWithUnmask (\unmask -> case action (liftF unmask) of
+                                                        ReaderT ma -> ma r)
+              $ \a -> runReaderT (f (WrappedAsync a)) r
+      where
+        liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
+        liftF g (ReaderT r) = ReaderT (g . r)
+
+    withAsyncOnWithUnmask n action f  =
+      ReaderT $ \r -> withAsyncOnWithUnmask n (\unmask -> case action (liftF unmask) of
+                                                            ReaderT ma -> ma r)
+              $ \a -> runReaderT (f (WrappedAsync a)) r
       where
         liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
         liftF g (ReaderT r) = ReaderT (g . r)
