@@ -84,6 +84,11 @@ tryPeekTQueueDefault (TQueue queue) = do
       x :_ -> Just x
       []   -> Nothing
 
+unGetTQueueDefault :: MonadSTM m => TQueueDefault m a -> a -> STM m ()
+unGetTQueueDefault (TQueue queue) a = do
+    (xs, ys) <- readTVar queue
+    writeTVar queue (a : xs, ys)
+
 --
 -- Default TBQueue implementation in terms of 'Seq' (used by sim)
 --
@@ -190,3 +195,13 @@ flushTBQueueDefault (TBQueue queue size) = do
     else do
       writeTVar queue $! ([], 0, [], size)
       return (xs ++ reverse ys)
+
+unGetTBQueueDefault :: MonadSTM m => TBQueueDefault m a -> a -> STM m ()
+unGetTBQueueDefault (TBQueue queue _size) a = do
+  (xs, r, ys, w) <- readTVar queue
+  if (r > 0)
+     then do writeTVar queue (a : xs, r - 1, ys, w)
+     else do
+          if (w > 0)
+             then writeTVar queue (a : xs, r, ys, w - 1)
+             else retry
