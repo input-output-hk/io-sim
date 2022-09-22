@@ -69,6 +69,7 @@ module Control.Monad.Class.MonadSTM.Strict
   , tryPeekTQueue
   , writeTQueue
   , isEmptyTQueue
+  , unGetTQueue
     -- * 'StrictTBQueue'
   , StrictTBQueue
   , labelTBQueue
@@ -87,6 +88,7 @@ module Control.Monad.Class.MonadSTM.Strict
   , lengthTBQueue
   , isEmptyTBQueue
   , isFullTBQueue
+  , unGetTBQueue
     -- ** Low-level API
   , checkInvariant
     -- * Deprecated API
@@ -110,8 +112,8 @@ import           Control.Monad.Class.MonadSTM as X hiding (LazyTMVar, LazyTVar,
                      traceTBQueue, traceTBQueueIO, traceTMVar, traceTMVarIO,
                      traceTQueue, traceTQueueIO, traceTVar, traceTVarIO,
                      tryPeekTBQueue, tryPeekTQueue, tryPutTMVar, tryReadTBQueue,
-                     tryReadTMVar, tryReadTQueue, tryTakeTMVar, writeTBQueue,
-                     writeTQueue, writeTVar)
+                     tryReadTMVar, tryReadTQueue, tryTakeTMVar, unGetTBQueue,
+                     unGetTQueue, writeTBQueue, writeTQueue, writeTVar)
 import qualified Control.Monad.Class.MonadSTM as Lazy
 import           GHC.Stack
 import           Numeric.Natural (Natural)
@@ -386,6 +388,9 @@ writeTQueue (StrictTQueue tqueue) !a = Lazy.writeTQueue tqueue a
 isEmptyTQueue  :: MonadSTM m => StrictTQueue m a -> STM m Bool
 isEmptyTQueue = Lazy.isEmptyTQueue . toLazyTQueue
 
+unGetTQueue :: MonadSTM m => StrictTQueue m a -> a -> STM m ()
+unGetTQueue (StrictTQueue queue) !a = Lazy.unGetTQueue queue a
+
 {-------------------------------------------------------------------------------
   Strict TBQueue
 -------------------------------------------------------------------------------}
@@ -444,6 +449,9 @@ isEmptyTBQueue = Lazy.isEmptyTBQueue . toLazyTBQueue
 
 isFullTBQueue  :: MonadSTM m => StrictTBQueue m a -> STM m Bool
 isFullTBQueue = Lazy.isFullTBQueue . toLazyTBQueue
+
+unGetTBQueue :: MonadSTM m => StrictTBQueue m a -> a -> STM m ()
+unGetTBQueue (StrictTBQueue queue) !a = Lazy.unGetTBQueue queue a
 
 
 {-------------------------------------------------------------------------------

@@ -407,6 +407,7 @@ instance MonadSTM (IOSim s) where
   tryPeekTQueue     = tryPeekTQueueDefault
   writeTQueue       = writeTQueueDefault
   isEmptyTQueue     = isEmptyTQueueDefault
+  unGetTQueue       = unGetTQueueDefault
 
   newTBQueue        = newTBQueueDefault
   readTBQueue       = readTBQueueDefault
@@ -418,6 +419,7 @@ instance MonadSTM (IOSim s) where
   lengthTBQueue     = lengthTBQueueDefault
   isEmptyTBQueue    = isEmptyTBQueueDefault
   isFullTBQueue     = isFullTBQueueDefault
+  unGetTBQueue      = unGetTBQueueDefault
 
 instance MonadInspectSTM (IOSim s) where
   type InspectMonad (IOSim s) = ST s

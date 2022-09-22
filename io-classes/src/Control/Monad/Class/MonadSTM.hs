@@ -132,6 +132,7 @@ class ( Monad m
   tryPeekTQueue  :: TQueue m a -> STM m (Maybe a)
   writeTQueue    :: TQueue m a -> a -> STM m ()
   isEmptyTQueue  :: TQueue m a -> STM m Bool
+  unGetTQueue    :: TQueue m a -> a -> STM m ()
 
   type TBQueue m ::  Type -> Type
   newTBQueue     :: Natural -> STM m (TBQueue m a)
@@ -145,6 +146,7 @@ class ( Monad m
   lengthTBQueue  :: TBQueue m a -> STM m Natural
   isEmptyTBQueue :: TBQueue m a -> STM m Bool
   isFullTBQueue  :: TBQueue m a -> STM m Bool
+  unGetTBQueue   :: TBQueue m a -> a -> STM m ()
 
   -- Helpful derived functions with default implementations
 
@@ -224,6 +226,10 @@ class ( Monad m
                         => TQueue m a -> STM m Bool
   isEmptyTQueue = isEmptyTQueueDefault
 
+  default unGetTQueue :: TQueue m ~ TQueueDefault m
+                      => TQueue m a -> a -> STM m ()
+  unGetTQueue = unGetTQueueDefault
+
   default peekTQueue :: TQueue m ~ TQueueDefault m
                      => TQueue m a -> STM m a
   peekTQueue = peekTQueueDefault
@@ -271,6 +277,10 @@ class ( Monad m
   default flushTBQueue :: TBQueue m ~ TBQueueDefault m
                        => TBQueue m a -> STM m [a]
   flushTBQueue = flushTBQueueDefault
+
+  default unGetTBQueue :: TBQueue m ~ TBQueueDefault m
+                      => TBQueue m a -> a -> STM m ()
+  unGetTBQueue = unGetTBQueueDefault
 
 
 stateTVarDefault :: MonadSTM m => TVar m s -> (s -> (a, s)) -> STM m a
@@ -530,6 +540,7 @@ instance MonadSTM IO where
   flushTBQueue   = STM.flushTBQueue
   writeTQueue    = STM.writeTQueue
   isEmptyTQueue  = STM.isEmptyTQueue
+  unGetTQueue    = STM.unGetTQueue
   newTBQueue     = STM.newTBQueue
   readTBQueue    = STM.readTBQueue
   tryReadTBQueue = STM.tryReadTBQueue
@@ -539,6 +550,7 @@ instance MonadSTM IO where
   lengthTBQueue  = STM.lengthTBQueue
   isEmptyTBQueue = STM.isEmptyTBQueue
   isFullTBQueue  = STM.isFullTBQueue
+  unGetTBQueue   = STM.unGetTBQueue
 
   newTVarIO       = STM.newTVarIO
   readTVarIO      = STM.readTVarIO
@@ -758,6 +770,11 @@ tryPeekTQueueDefault (TQueue read _write) = do
       (x:_) -> return (Just x)
       _     -> return Nothing
 
+unGetTQueueDefault :: MonadSTM m => TQueueDefault m a -> a -> STM m ()
+unGetTQueueDefault (TQueue read _write) a = modifyTVar read (a:)
+
+
+
 --
 -- Default TBQueue implementation in terms of TVars
 --
@@ -879,6 +896,19 @@ flushTBQueueDefault (TBQueue rsize read wsize write size) = do
       writeTVar wsize size
       return (xs ++ reverse ys)
 
+unGetTBQueueDefault :: MonadSTM m => TBQueueDefault m a -> a -> STM m ()
+unGetTBQueueDefault (TBQueue rsize read wsize _write _size) a = do
+  r <- readTVar rsize
+  if (r > 0)
+     then do writeTVar rsize $! r - 1
+     else do
+          w <- readTVar wsize
+          if (w > 0)
+             then writeTVar wsize $! w - 1
+             else retry
+  xs <- readTVar read
+  writeTVar read (a:xs)
+
 
 -- | 'throwIO' specialised to @stm@ monad.
 --
@@ -976,6 +1006,7 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     tryPeekTQueue  = WrappedSTM . tryPeekTQueue
     writeTQueue v  = WrappedSTM . writeTQueue v
     isEmptyTQueue  = WrappedSTM . isEmptyTQueue
+    unGetTQueue    = WrappedSTM .: unGetTQueue
 
     type TBQueue (ContT r m) = TBQueue m
     newTBQueue     = WrappedSTM .  newTBQueue
@@ -988,6 +1019,7 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     lengthTBQueue  = WrappedSTM .  lengthTBQueue
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
+    unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
 
 instance MonadSTM m => MonadSTM (ReaderT r m) where
@@ -1021,12 +1053,13 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
 
     type TQueue (ReaderT r m) = TQueue m
     newTQueue      = WrappedSTM newTQueue
-    readTQueue     = WrappedSTM . readTQueue
-    tryReadTQueue  = WrappedSTM . tryReadTQueue
-    peekTQueue     = WrappedSTM . peekTQueue
-    tryPeekTQueue  = WrappedSTM . tryPeekTQueue
-    writeTQueue v  = WrappedSTM . writeTQueue v
-    isEmptyTQueue  = WrappedSTM . isEmptyTQueue
+    readTQueue     = WrappedSTM .  readTQueue
+    tryReadTQueue  = WrappedSTM .  tryReadTQueue
+    peekTQueue     = WrappedSTM .  peekTQueue
+    tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    writeTQueue v  = WrappedSTM .  writeTQueue v
+    isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
+    unGetTQueue    = WrappedSTM .: unGetTQueue
 
     type TBQueue (ReaderT r m) = TBQueue m
     newTBQueue     = WrappedSTM .  newTBQueue
@@ -1039,6 +1072,7 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     lengthTBQueue  = WrappedSTM .  lengthTBQueue
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
+    unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
 
 instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
@@ -1072,12 +1106,13 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
 
     type TQueue (WriterT w m) = TQueue m
     newTQueue      = WrappedSTM newTQueue
-    readTQueue     = WrappedSTM . readTQueue
-    tryReadTQueue  = WrappedSTM . tryReadTQueue
-    peekTQueue     = WrappedSTM . peekTQueue
-    tryPeekTQueue  = WrappedSTM . tryPeekTQueue
-    writeTQueue v  = WrappedSTM . writeTQueue v
-    isEmptyTQueue  = WrappedSTM . isEmptyTQueue
+    readTQueue     = WrappedSTM .  readTQueue
+    tryReadTQueue  = WrappedSTM .  tryReadTQueue
+    peekTQueue     = WrappedSTM .  peekTQueue
+    tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    writeTQueue v  = WrappedSTM .  writeTQueue v
+    isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
+    unGetTQueue    = WrappedSTM .: unGetTQueue
 
     type TBQueue (WriterT w m) = TBQueue m
     newTBQueue     = WrappedSTM .  newTBQueue
@@ -1090,6 +1125,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     lengthTBQueue  = WrappedSTM .  lengthTBQueue
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
+    unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
 
 instance MonadSTM m => MonadSTM (StateT s m) where
@@ -1129,6 +1165,7 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     tryPeekTQueue  = WrappedSTM . tryPeekTQueue
     writeTQueue v  = WrappedSTM . writeTQueue v
     isEmptyTQueue  = WrappedSTM . isEmptyTQueue
+    unGetTQueue    = WrappedSTM .: unGetTQueue
 
     type TBQueue (StateT s m) = TBQueue m
     newTBQueue     = WrappedSTM .  newTBQueue
@@ -1141,6 +1178,7 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     lengthTBQueue  = WrappedSTM .  lengthTBQueue
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
+    unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
 
 instance MonadSTM m => MonadSTM (ExceptT e m) where
@@ -1174,12 +1212,13 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
 
     type TQueue (ExceptT e m) = TQueue m
     newTQueue      = WrappedSTM newTQueue
-    readTQueue     = WrappedSTM . readTQueue
-    tryReadTQueue  = WrappedSTM . tryReadTQueue
-    peekTQueue     = WrappedSTM . peekTQueue
-    tryPeekTQueue  = WrappedSTM . tryPeekTQueue
-    writeTQueue v  = WrappedSTM . writeTQueue v
-    isEmptyTQueue  = WrappedSTM . isEmptyTQueue
+    readTQueue     = WrappedSTM .  readTQueue
+    tryReadTQueue  = WrappedSTM .  tryReadTQueue
+    peekTQueue     = WrappedSTM .  peekTQueue
+    tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    writeTQueue v  = WrappedSTM .  writeTQueue v
+    isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
+    unGetTQueue    = WrappedSTM .: unGetTQueue
 
     type TBQueue (ExceptT e m) = TBQueue m
     newTBQueue     = WrappedSTM .  newTBQueue
@@ -1192,6 +1231,7 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
     lengthTBQueue  = WrappedSTM .  lengthTBQueue
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
+    unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
 
 instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
@@ -1225,12 +1265,13 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
 
     type TQueue (RWST r w s m) = TQueue m
     newTQueue      = WrappedSTM newTQueue
-    readTQueue     = WrappedSTM . readTQueue
-    tryReadTQueue  = WrappedSTM . tryReadTQueue
-    peekTQueue     = WrappedSTM . peekTQueue
-    tryPeekTQueue  = WrappedSTM . tryPeekTQueue
-    writeTQueue v  = WrappedSTM . writeTQueue v
-    isEmptyTQueue  = WrappedSTM . isEmptyTQueue
+    readTQueue     = WrappedSTM .  readTQueue
+    tryReadTQueue  = WrappedSTM .  tryReadTQueue
+    peekTQueue     = WrappedSTM .  peekTQueue
+    tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    writeTQueue v  = WrappedSTM .  writeTQueue v
+    isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
+    unGetTQueue    = WrappedSTM .: unGetTQueue
 
     type TBQueue (RWST r w s m) = TBQueue m
     newTBQueue     = WrappedSTM . newTBQueue
@@ -1243,6 +1284,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     lengthTBQueue  = WrappedSTM . lengthTBQueue
     isEmptyTBQueue = WrappedSTM . isEmptyTBQueue
     isFullTBQueue  = WrappedSTM . isFullTBQueue
+    unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
