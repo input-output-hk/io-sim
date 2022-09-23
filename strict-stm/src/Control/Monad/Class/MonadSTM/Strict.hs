@@ -99,6 +99,21 @@ module Control.Monad.Class.MonadSTM.Strict
   , StrictTArray
   , toLazyTArray
   , fromLazyTArray
+    -- * 'StrictTChan'
+  , StrictTChan
+  , toLazyTChan
+  , fromLazyTChan
+  , newTChan
+  , newBroadcastTChan
+  , writeTChan
+  , readTChan
+  , tryReadTChan
+  , peekTChan
+  , tryPeekTChan
+  , dupTChan
+  , unGetTChan
+  , isEmptyTChan
+  , cloneTChan
     -- ** Low-level API
   , checkInvariant
     -- * Deprecated API
@@ -110,20 +125,23 @@ module Control.Monad.Class.MonadSTM.Strict
   ) where
 
 import           Control.Monad.Class.MonadSTM as X hiding (LazyTMVar, LazyTVar,
-                     TMVar, TVar, isEmptyTBQueue, isEmptyTMVar, isEmptyTQueue,
-                     isFullTBQueue, labelTBQueue, labelTBQueueIO, labelTMVar,
-                     labelTMVarIO, labelTQueue, labelTQueueIO, labelTVar,
-                     labelTVarIO, lengthTBQueue, modifyTVar, newEmptyTMVar,
-                     newEmptyTMVarIO, newEmptyTMVarM, newTBQueue, newTBQueueIO,
-                     newTMVar, newTMVarIO, newTMVarM, newTQueue, newTQueueIO,
-                     newTVar, newTVarIO, newTVarM, peekTBQueue, peekTQueue,
-                     putTMVar, readTBQueue, readTMVar, readTQueue, readTVar,
-                     readTVarIO, stateTVar, swapTMVar, swapTVar, takeTMVar,
-                     traceTBQueue, traceTBQueueIO, traceTMVar, traceTMVarIO,
-                     traceTQueue, traceTQueueIO, traceTVar, traceTVarIO,
-                     tryPeekTBQueue, tryPeekTQueue, tryPutTMVar, tryReadTBQueue,
-                     tryReadTMVar, tryReadTQueue, tryTakeTMVar, unGetTBQueue,
-                     unGetTQueue, writeTBQueue, writeTQueue, writeTVar)
+                     TMVar, TVar, cloneTChan, dupTChan, isEmptyTBQueue,
+                     isEmptyTChan, isEmptyTMVar, isEmptyTQueue, isFullTBQueue,
+                     labelTBQueue, labelTBQueueIO, labelTMVar, labelTMVarIO,
+                     labelTQueue, labelTQueueIO, labelTVar, labelTVarIO,
+                     lengthTBQueue, modifyTVar, newBroadcastTChan,
+                     newEmptyTMVar, newEmptyTMVarIO, newEmptyTMVarM, newTBQueue,
+                     newTBQueueIO, newTChan, newTMVar, newTMVarIO, newTMVarM,
+                     newTQueue, newTQueueIO, newTVar, newTVarIO, newTVarM,
+                     peekTBQueue, peekTChan, peekTQueue, putTMVar, readTBQueue,
+                     readTChan, readTMVar, readTQueue, readTVar, readTVarIO,
+                     stateTVar, swapTMVar, swapTVar, takeTMVar, traceTBQueue,
+                     traceTBQueueIO, traceTMVar, traceTMVarIO, traceTQueue,
+                     traceTQueueIO, traceTVar, traceTVarIO, tryPeekTBQueue,
+                     tryPeekTChan, tryPeekTQueue, tryPutTMVar, tryReadTBQueue,
+                     tryReadTChan, tryReadTMVar, tryReadTQueue, tryTakeTMVar,
+                     unGetTBQueue, unGetTChan, unGetTQueue, writeTBQueue,
+                     writeTChan, writeTQueue, writeTVar)
 import qualified Control.Monad.Class.MonadSTM as Lazy
 import           Data.Array.Base (MArray (..))
 import           GHC.Stack
@@ -138,6 +156,7 @@ type LazyTMVar   m = Lazy.TMVar m
 type LazyTQueue  m = Lazy.TQueue m
 type LazyTBQueue m = Lazy.TBQueue m
 type LazyTArray  m = Lazy.TArray m
+type LazyTChan   m = Lazy.TChan m
 
 {-------------------------------------------------------------------------------
   Strict TVar
@@ -484,6 +503,48 @@ instance ( MArray (Lazy.TArray m) e stm
     unsafeRead     (StrictTArray arr) i    = unsafeRead arr i
     unsafeWrite    (StrictTArray arr) i !e = unsafeWrite arr i e
     getNumElements (StrictTArray arr)      = getNumElements arr
+
+{-------------------------------------------------------------------------------
+  StrictTChan
+-------------------------------------------------------------------------------}
+
+newtype StrictTChan m a = StrictTChan { toLazyTChan :: LazyTChan m a }
+
+fromLazyTChan :: LazyTChan m a -> StrictTChan m a
+fromLazyTChan = StrictTChan
+
+newTChan :: MonadSTM m => STM m (StrictTChan m a)
+newTChan = StrictTChan <$> Lazy.newTChan
+
+newBroadcastTChan :: MonadSTM m => STM m (StrictTChan m a)
+newBroadcastTChan = StrictTChan <$> Lazy.newBroadcastTChan
+
+writeTChan :: MonadSTM m => StrictTChan m a -> a -> STM m ()
+writeTChan (StrictTChan chan) !a = Lazy.writeTChan chan a
+
+readTChan :: MonadSTM m => StrictTChan m a -> STM m a
+readTChan = Lazy.readTChan . toLazyTChan
+
+tryReadTChan :: MonadSTM m => StrictTChan m a -> STM m (Maybe a)
+tryReadTChan = Lazy.tryReadTChan . toLazyTChan
+
+peekTChan :: MonadSTM m => StrictTChan m a -> STM m a
+peekTChan = Lazy.peekTChan . toLazyTChan
+
+tryPeekTChan :: MonadSTM m => StrictTChan m a -> STM m (Maybe a)
+tryPeekTChan = Lazy.tryPeekTChan . toLazyTChan
+
+dupTChan :: MonadSTM m => StrictTChan m a -> STM m (StrictTChan m a)
+dupTChan = fmap fromLazyTChan . Lazy.dupTChan . toLazyTChan
+
+unGetTChan :: MonadSTM m => StrictTChan m a -> a -> STM m ()
+unGetTChan (StrictTChan chan) !a = Lazy.unGetTChan chan a
+
+isEmptyTChan :: MonadSTM m => StrictTChan m a -> STM m Bool
+isEmptyTChan = Lazy.isEmptyTChan . toLazyTChan
+
+cloneTChan :: MonadSTM m => StrictTChan m a -> STM m (StrictTChan m a)
+cloneTChan = fmap fromLazyTChan . Lazy.cloneTChan . toLazyTChan
 
 {-------------------------------------------------------------------------------
   Dealing with invariants
