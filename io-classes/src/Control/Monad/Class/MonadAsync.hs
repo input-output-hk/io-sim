@@ -433,10 +433,17 @@ link2Only shouldThrow left  right =
     tr = asyncThreadId right
 
 -- | Generalization of 'link' that links an async to an arbitrary thread.
+--
+-- Non standard (not in 'async' library)
+--
 linkTo :: (MonadAsync m, MonadFork m, MonadMask m)
        => ThreadId m -> Async m a -> m ()
 linkTo tid = linkToOnly tid (not . isCancel)
 
+-- | Generalization of 'linkOnly' that links an async to an arbitrary thread.
+--
+-- Non standard (not in 'async' library).
+--
 linkToOnly :: forall m a. (MonadAsync m, MonadFork m, MonadMask m)
            => ThreadId m -> (SomeException -> Bool) -> Async m a -> m ()
 linkToOnly tid shouldThrow a = do
