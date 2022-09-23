@@ -188,11 +188,10 @@ traceTVar :: MonadTraceSTM m
 traceTVar p StrictTVar {tvar} = Lazy.traceTVar p tvar
 
 traceTVarIO :: MonadTraceSTM m
-            => proxy m
-            -> StrictTVar m a
+            => StrictTVar m a
             -> (Maybe a -> a -> InspectMonad m TraceValue)
             -> m ()
-traceTVarIO p StrictTVar {tvar} = Lazy.traceTVarIO p tvar
+traceTVarIO StrictTVar {tvar} = Lazy.traceTVarIO tvar
 
 castStrictTVar :: LazyTVar m ~ LazyTVar n
                => StrictTVar m a -> StrictTVar n a
@@ -312,11 +311,10 @@ traceTMVar :: MonadTraceSTM m
 traceTMVar p (StrictTMVar var) = Lazy.traceTMVar p var
 
 traceTMVarIO :: MonadTraceSTM m
-             => proxy m
-             -> StrictTMVar m a
+             => StrictTMVar m a
              -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
              -> m ()
-traceTMVarIO p (StrictTMVar var) = Lazy.traceTMVarIO p var
+traceTMVarIO (StrictTMVar var) = Lazy.traceTMVarIO var
 
 castStrictTMVar :: LazyTMVar m ~ LazyTMVar n
                 => StrictTMVar m a -> StrictTMVar n a
@@ -389,11 +387,10 @@ traceTQueue :: MonadTraceSTM m
 traceTQueue p (StrictTQueue queue) = Lazy.traceTQueue p queue
 
 traceTQueueIO :: MonadTraceSTM m
-              => proxy m
-              -> StrictTQueue m a
+              => StrictTQueue m a
               -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
               -> m ()
-traceTQueueIO p (StrictTQueue queue) = Lazy.traceTQueueIO p queue
+traceTQueueIO (StrictTQueue queue) = Lazy.traceTQueueIO queue
 
 newTQueue :: MonadSTM m => STM m (StrictTQueue m a)
 newTQueue = StrictTQueue <$> Lazy.newTQueue
@@ -445,11 +442,10 @@ traceTBQueue :: MonadTraceSTM m
 traceTBQueue p (StrictTBQueue queue) = Lazy.traceTBQueue p queue
 
 traceTBQueueIO :: MonadTraceSTM m
-               => proxy m
-               -> StrictTBQueue m a
+               => StrictTBQueue m a
                -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
                -> m ()
-traceTBQueueIO p (StrictTBQueue queue) = Lazy.traceTBQueueIO p queue
+traceTBQueueIO (StrictTBQueue queue) = Lazy.traceTBQueueIO queue
 
 newTBQueue :: MonadSTM m => Natural -> STM m (StrictTBQueue m a)
 newTBQueue n = StrictTBQueue <$> Lazy.newTBQueue n
