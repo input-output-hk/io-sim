@@ -2,9 +2,12 @@
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 -- to preserve 'HasCallstack' constraint on 'checkInvariant'
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
@@ -13,6 +16,9 @@ module Control.Monad.Class.MonadSTM.Strict
   ( module X
   , LazyTVar
   , LazyTMVar
+  , LazyTQueue
+  , LazyTBQueue
+  , LazyTArray
     -- * 'StrictTVar'
   , StrictTVar
   , labelTVar
@@ -89,6 +95,10 @@ module Control.Monad.Class.MonadSTM.Strict
   , isEmptyTBQueue
   , isFullTBQueue
   , unGetTBQueue
+    -- * 'StrictTArray'
+  , StrictTArray
+  , toLazyTArray
+  , fromLazyTArray
     -- ** Low-level API
   , checkInvariant
     -- * Deprecated API
@@ -115,6 +125,7 @@ import           Control.Monad.Class.MonadSTM as X hiding (LazyTMVar, LazyTVar,
                      tryReadTMVar, tryReadTQueue, tryTakeTMVar, unGetTBQueue,
                      unGetTQueue, writeTBQueue, writeTQueue, writeTVar)
 import qualified Control.Monad.Class.MonadSTM as Lazy
+import           Data.Array.Base (MArray (..))
 import           GHC.Stack
 import           Numeric.Natural (Natural)
 
@@ -126,6 +137,7 @@ type LazyTVar    m = Lazy.TVar m
 type LazyTMVar   m = Lazy.TMVar m
 type LazyTQueue  m = Lazy.TQueue m
 type LazyTBQueue m = Lazy.TBQueue m
+type LazyTArray  m = Lazy.TArray m
 
 {-------------------------------------------------------------------------------
   Strict TVar
@@ -453,6 +465,25 @@ isFullTBQueue = Lazy.isFullTBQueue . toLazyTBQueue
 unGetTBQueue :: MonadSTM m => StrictTBQueue m a -> a -> STM m ()
 unGetTBQueue (StrictTBQueue queue) !a = Lazy.unGetTBQueue queue a
 
+{-------------------------------------------------------------------------------
+  StrictTArray
+-------------------------------------------------------------------------------}
+
+newtype StrictTArray m i e = StrictTArray { toLazyTArray :: LazyTArray m i e }
+
+fromLazyTArray :: LazyTArray m i e -> StrictTArray m i e
+fromLazyTArray = StrictTArray
+
+instance ( MArray (Lazy.TArray m) e stm
+         , Monad stm
+         )
+      => MArray (StrictTArray m) e stm where
+    getBounds (StrictTArray arr) = getBounds arr
+    newArray  b !e = StrictTArray <$> newArray b e
+    newArray_ b    = StrictTArray <$> newArray_ b
+    unsafeRead     (StrictTArray arr) i    = unsafeRead arr i
+    unsafeWrite    (StrictTArray arr) i !e = unsafeWrite arr i e
+    getNumElements (StrictTArray arr)      = getNumElements arr
 
 {-------------------------------------------------------------------------------
   Dealing with invariants

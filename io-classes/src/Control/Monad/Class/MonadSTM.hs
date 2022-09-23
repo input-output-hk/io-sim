@@ -2,6 +2,7 @@
 {-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -31,6 +32,8 @@ module Control.Monad.Class.MonadSTM
   , TQueueDefault (..)
     -- * Default 'TBQueue' implementation
   , TBQueueDefault (..)
+    -- * Default 'TArray' implementation
+  , TArrayDefault (..)
     -- * MonadThrow aliases
   , throwSTM
   , catchSTM
@@ -46,6 +49,7 @@ module Control.Monad.Class.MonadSTM
 
 import           Prelude hiding (read)
 
+import qualified Control.Concurrent.STM.TArray as STM
 import qualified Control.Concurrent.STM.TBQueue as STM
 import qualified Control.Concurrent.STM.TMVar as STM
 import qualified Control.Concurrent.STM.TQueue as STM
@@ -65,7 +69,13 @@ import qualified Control.Monad.Class.MonadThrow as MonadThrow
 
 import           Control.Applicative (Alternative (..))
 import           Control.Exception
+import           Data.Array (Array, bounds)
+import qualified Data.Array as Array
+import           Data.Array.Base (IArray (numElements), MArray (..),
+                     arrEleBottom, listArray, unsafeAt)
+import           Data.Foldable (traverse_)
 import           Data.Function (on)
+import           Data.Ix (Ix, rangeSize)
 import           Data.Kind (Type)
 import           Data.Typeable (Typeable)
 import           GHC.Stack
@@ -147,6 +157,8 @@ class ( Monad m
   isEmptyTBQueue :: TBQueue m a -> STM m Bool
   isFullTBQueue  :: TBQueue m a -> STM m Bool
   unGetTBQueue   :: TBQueue m a -> a -> STM m ()
+
+  type TArray m  :: Type -> Type -> Type
 
   -- Helpful derived functions with default implementations
 
@@ -314,15 +326,19 @@ newEmptyTMVarM = newEmptyTMVarIO
 --
 class MonadSTM m
    => MonadLabelledSTM m where
-  labelTVar    :: TVar    m a -> String -> STM m ()
-  labelTMVar   :: TMVar   m a -> String -> STM m ()
-  labelTQueue  :: TQueue  m a -> String -> STM m ()
-  labelTBQueue :: TBQueue m a -> String -> STM m ()
+  labelTVar    :: TVar    m a   -> String -> STM m ()
+  labelTMVar   :: TMVar   m a   -> String -> STM m ()
+  labelTQueue  :: TQueue  m a   -> String -> STM m ()
+  labelTBQueue :: TBQueue m a   -> String -> STM m ()
+  labelTArray  :: (Ix i, Show i)
+               => TArray  m i e -> String -> STM m ()
 
-  labelTVarIO    :: TVar    m a -> String -> m ()
-  labelTMVarIO   :: TMVar   m a -> String -> m ()
-  labelTQueueIO  :: TQueue  m a -> String -> m ()
-  labelTBQueueIO :: TBQueue m a -> String -> m ()
+  labelTVarIO    :: TVar    m a   -> String -> m ()
+  labelTMVarIO   :: TMVar   m a   -> String -> m ()
+  labelTQueueIO  :: TQueue  m a   -> String -> m ()
+  labelTBQueueIO :: TBQueue m a   -> String -> m ()
+  labelTArrayIO  :: (Ix i, Show i)
+                 => TArray  m i e -> String -> m ()
 
   --
   -- default implementations
@@ -340,6 +356,13 @@ class MonadSTM m
                        => TBQueue m a -> String -> STM m ()
   labelTBQueue = labelTBQueueDefault
 
+  default labelTArray :: ( TArray m ~ TArrayDefault m
+                         , Ix i
+                         , Show i
+                         )
+                      => TArray m i e -> String -> STM m ()
+  labelTArray = labelTArrayDefault
+
   default labelTVarIO :: TVar m a -> String -> m ()
   labelTVarIO = \v l -> atomically (labelTVar v l)
 
@@ -351,6 +374,10 @@ class MonadSTM m
 
   default labelTBQueueIO :: TBQueue m a -> String -> m ()
   labelTBQueueIO = \v l -> atomically (labelTBQueue v l)
+
+  default labelTArrayIO :: (Ix i, Show i)
+                        => TArray m i e -> String -> m ()
+  labelTArrayIO = \v l -> atomically (labelTArray v l)
 
 
 -- | This type class is indented for 'io-sim', where one might want to access
@@ -511,6 +538,7 @@ instance MonadSTM IO where
   type TMVar   IO = STM.TMVar
   type TQueue  IO = STM.TQueue
   type TBQueue IO = STM.TBQueue
+  type TArray  IO = STM.TArray
 
   newTVar        = STM.newTVar
   readTVar       = STM.readTVar
@@ -566,11 +594,13 @@ instance MonadLabelledSTM IO where
   labelTMVar   = \_  _ -> return ()
   labelTQueue  = \_  _ -> return ()
   labelTBQueue = \_  _ -> return ()
+  labelTArray  = \_  _ -> return ()
 
   labelTVarIO    = \_  _ -> return ()
   labelTMVarIO   = \_  _ -> return ()
   labelTQueueIO  = \_  _ -> return ()
   labelTBQueueIO = \_  _ -> return ()
+  labelTArrayIO  = \_  _ -> return ()
 
 -- | noop instance
 --
@@ -910,6 +940,47 @@ unGetTBQueueDefault (TBQueue rsize read wsize _write _size) a = do
   writeTVar read (a:xs)
 
 
+--
+-- Default `TArray` implementation
+--
+
+-- | Default implementation of 'TArray'.
+--
+data TArrayDefault m i e = TArray (Array i (TVar m e))
+  deriving Typeable
+
+deriving instance (Eq (TVar m e), Ix i) => Eq (TArrayDefault m i e)
+
+instance (Monad stm, MonadSTM m, stm ~ STM m)
+      => MArray (TArrayDefault m) e stm where
+    getBounds (TArray a) = return (bounds a)
+    newArray b e = do
+      a <- rep (rangeSize b) (newTVar e)
+      return $ TArray (listArray b a)
+    newArray_ b = do
+      a <- rep (rangeSize b) (newTVar arrEleBottom)
+      return $ TArray (listArray b a)
+    unsafeRead (TArray a) i = readTVar $ unsafeAt a i
+    unsafeWrite (TArray a) i e = writeTVar (unsafeAt a i) e
+    getNumElements (TArray a) = return (numElements a)
+
+rep :: Monad m => Int -> m a -> m [a]
+rep n m = go n []
+    where
+      go 0 xs = return xs
+      go i xs = do
+          x <- m
+          go (i-1) (x:xs)
+
+labelTArrayDefault :: ( MonadLabelledSTM m
+                      , Ix i
+                      , Show i
+                      )
+                   => TArrayDefault m i e -> String -> STM m ()
+labelTArrayDefault (TArray arr) name = do
+    let as = Array.assocs arr
+    traverse_ (\(i, v) -> labelTVar v (name ++ ":" ++ show i)) as
+
 -- | 'throwIO' specialised to @stm@ monad.
 --
 throwSTM :: (MonadSTM m, MonadThrow.MonadThrow (STM m), Exception e)
@@ -1021,6 +1092,8 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
+    type TArray (ContT r m) = TArray m
+
 
 instance MonadSTM m => MonadSTM (ReaderT r m) where
     type STM (ReaderT r m) = WrappedSTM Reader r m
@@ -1073,6 +1146,8 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
+
+    type TArray (ReaderT r m) = TArray m
 
 
 instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
@@ -1127,6 +1202,8 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
+    type TArray (WriterT w m) = TArray m
+
 
 instance MonadSTM m => MonadSTM (StateT s m) where
     type STM (StateT s m) = WrappedSTM State s m
@@ -1179,6 +1256,8 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
+
+    type TArray (StateT s m) = TArray m
 
 
 instance MonadSTM m => MonadSTM (ExceptT e m) where
@@ -1233,6 +1312,8 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
     isFullTBQueue  = WrappedSTM .  isFullTBQueue
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
+    type TArray (ExceptT e m) = TArray m
+
 
 instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     type STM (RWST r w s m) = WrappedSTM RWS (r, w, s) m
@@ -1285,6 +1366,8 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     isEmptyTBQueue = WrappedSTM . isEmptyTBQueue
     isFullTBQueue  = WrappedSTM . isFullTBQueue
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
+
+    type TArray (RWST r w s m) = TArray m
 
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
