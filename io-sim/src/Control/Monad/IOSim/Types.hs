@@ -339,6 +339,12 @@ instance MonadMask (IOSim s) where
 
 instance MonadMaskingState (IOSim s) where
   getMaskingState = getMaskingStateImpl
+  interruptible action = do
+      b <- getMaskingStateImpl
+      case b of
+        Unmasked              -> action
+        MaskedInterruptible   -> unblock action
+        MaskedUninterruptible -> action
 
 instance Exceptions.MonadMask (IOSim s) where
   mask                = MonadThrow.mask
