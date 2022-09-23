@@ -186,7 +186,14 @@ class MonadCatch m => MonadMask m where
 
 
 class MonadMask m => MonadMaskingState m where
+  {-# MINIMAL getMaskingState, interruptible #-}
   getMaskingState :: m MaskingState
+  interruptible   :: m a -> m a
+  allowInterrupt  :: m ()
+
+  allowInterrupt = interruptible (return ())
+
+
 
 -- | Monads which can 'evaluate'.
 --
@@ -230,6 +237,8 @@ instance MonadMask IO where
 
 instance MonadMaskingState IO where
   getMaskingState = IO.getMaskingState
+  interruptible   = IO.interruptible
+  allowInterrupt  = IO.allowInterrupt
 
 instance MonadEvaluate IO where
   evaluate = IO.evaluate
