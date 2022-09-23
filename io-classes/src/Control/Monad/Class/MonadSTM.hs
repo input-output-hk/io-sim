@@ -34,6 +34,8 @@ module Control.Monad.Class.MonadSTM
   , TBQueueDefault (..)
     -- * Default 'TArray' implementation
   , TArrayDefault (..)
+    -- * Default 'TSem' implementation
+  , TSemDefault (..)
     -- * MonadThrow aliases
   , throwSTM
   , catchSTM
@@ -53,8 +55,9 @@ import qualified Control.Concurrent.STM.TArray as STM
 import qualified Control.Concurrent.STM.TBQueue as STM
 import qualified Control.Concurrent.STM.TMVar as STM
 import qualified Control.Concurrent.STM.TQueue as STM
+import qualified Control.Concurrent.STM.TSem as STM
 import qualified Control.Concurrent.STM.TVar as STM
-import           Control.Monad (MonadPlus (..))
+import           Control.Monad (MonadPlus (..), when)
 import qualified Control.Monad.STM as STM
 
 import           Control.Monad.Cont (ContT (..))
@@ -159,6 +162,12 @@ class ( Monad m
   unGetTBQueue   :: TBQueue m a -> a -> STM m ()
 
   type TArray m  :: Type -> Type -> Type
+
+  type TSem m :: Type
+  newTSem     :: Integer -> STM m (TSem m)
+  waitTSem    :: TSem m -> STM m ()
+  signalTSem  :: TSem m -> STM m ()
+  signalTSemN :: Natural -> TSem m -> STM m ()
 
   -- Helpful derived functions with default implementations
 
@@ -294,6 +303,22 @@ class ( Monad m
                       => TBQueue m a -> a -> STM m ()
   unGetTBQueue = unGetTBQueueDefault
 
+  default newTSem :: TSem m ~ TSemDefault m
+                  => Integer -> STM m (TSem m)
+  newTSem = newTSemDefault
+
+  default waitTSem :: TSem m ~ TSemDefault m
+                   => TSem m -> STM m ()
+  waitTSem = waitTSemDefault
+
+  default signalTSem :: TSem m ~ TSemDefault m
+                     => TSem m -> STM m ()
+  signalTSem = signalTSemDefault
+
+  default signalTSemN :: TSem m ~ TSemDefault m
+                      => Natural -> TSem m -> STM m ()
+  signalTSemN = signalTSemNDefault
+
 
 stateTVarDefault :: MonadSTM m => TVar m s -> (s -> (a, s)) -> STM m a
 stateTVarDefault var f = do
@@ -332,6 +357,7 @@ class MonadSTM m
   labelTBQueue :: TBQueue m a   -> String -> STM m ()
   labelTArray  :: (Ix i, Show i)
                => TArray  m i e -> String -> STM m ()
+  labelTSem    :: TSem    m     -> String -> STM m ()
 
   labelTVarIO    :: TVar    m a   -> String -> m ()
   labelTMVarIO   :: TMVar   m a   -> String -> m ()
@@ -339,6 +365,7 @@ class MonadSTM m
   labelTBQueueIO :: TBQueue m a   -> String -> m ()
   labelTArrayIO  :: (Ix i, Show i)
                  => TArray  m i e -> String -> m ()
+  labelTSemIO    :: TSem    m     -> String -> m ()
 
   --
   -- default implementations
@@ -355,6 +382,10 @@ class MonadSTM m
   default labelTBQueue :: TBQueue m ~ TBQueueDefault m
                        => TBQueue m a -> String -> STM m ()
   labelTBQueue = labelTBQueueDefault
+
+  default labelTSem :: TSem m ~ TSemDefault m
+                    => TSem m -> String -> STM m ()
+  labelTSem = labelTSemDefault
 
   default labelTArray :: ( TArray m ~ TArrayDefault m
                          , Ix i
@@ -378,6 +409,9 @@ class MonadSTM m
   default labelTArrayIO :: (Ix i, Show i)
                         => TArray m i e -> String -> m ()
   labelTArrayIO = \v l -> atomically (labelTArray v l)
+
+  default labelTSemIO :: TSem m -> String -> m ()
+  labelTSemIO = \v l -> atomically (labelTSem v l)
 
 
 -- | This type class is indented for 'io-sim', where one might want to access
@@ -471,13 +505,24 @@ class MonadInspectSTM m
                -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
                -> STM m ()
 
-  default traceTMVar :: ( TMVar m a ~ TMVarDefault m a
-                        )
+  traceTSem    :: proxy m
+               -> TSem m
+               -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+               -> STM m ()
+
+  default traceTMVar :: TMVar m a ~ TMVarDefault m a
                      => proxy m
                      -> TMVar m a
                      -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
                      -> STM m ()
   traceTMVar = traceTMVarDefault
+
+  default traceTSem :: TSem m ~ TSemDefault m
+                    => proxy m
+                    -> TSem m
+                    -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                    -> STM m ()
+  traceTSem = traceTSemDefault
 
 
   traceTVarIO    :: proxy m
@@ -498,6 +543,11 @@ class MonadInspectSTM m
   traceTBQueueIO :: proxy m
                  -> TBQueue m a
                  -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+                 -> m ()
+
+  traceTSemIO    :: proxy m
+                 -> TSem m
+                 -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
                  -> m ()
 
   default traceTVarIO :: proxy m
@@ -524,6 +574,12 @@ class MonadInspectSTM m
                          -> m ()
   traceTBQueueIO = \p v f -> atomically (traceTBQueue p v f)
 
+  default traceTSemIO :: proxy m
+                      -> TSem m
+                      -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                      -> m ()
+  traceTSemIO = \p v f -> atomically (traceTSem p v f)
+
 
 --
 -- Instance for IO uses the existing STM library implementations
@@ -539,6 +595,7 @@ instance MonadSTM IO where
   type TQueue  IO = STM.TQueue
   type TBQueue IO = STM.TBQueue
   type TArray  IO = STM.TArray
+  type TSem    IO = STM.TSem
 
   newTVar        = STM.newTVar
   readTVar       = STM.readTVar
@@ -579,6 +636,10 @@ instance MonadSTM IO where
   isEmptyTBQueue = STM.isEmptyTBQueue
   isFullTBQueue  = STM.isFullTBQueue
   unGetTBQueue   = STM.unGetTBQueue
+  newTSem        = STM.newTSem
+  waitTSem       = STM.waitTSem
+  signalTSem     = STM.signalTSem
+  signalTSemN    = STM.signalTSemN
 
   newTVarIO       = STM.newTVarIO
   readTVarIO      = STM.readTVarIO
@@ -595,12 +656,14 @@ instance MonadLabelledSTM IO where
   labelTQueue  = \_  _ -> return ()
   labelTBQueue = \_  _ -> return ()
   labelTArray  = \_  _ -> return ()
+  labelTSem    = \_  _ -> return ()
 
   labelTVarIO    = \_  _ -> return ()
   labelTMVarIO   = \_  _ -> return ()
   labelTQueueIO  = \_  _ -> return ()
   labelTBQueueIO = \_  _ -> return ()
   labelTArrayIO  = \_  _ -> return ()
+  labelTSemIO    = \_  _ -> return ()
 
 -- | noop instance
 --
@@ -609,11 +672,13 @@ instance MonadTraceSTM IO where
   traceTMVar   = \_ _ _ -> return ()
   traceTQueue  = \_ _ _ -> return ()
   traceTBQueue = \_ _ _ -> return ()
+  traceTSem    = \_ _ _ -> return ()
 
   traceTVarIO    = \_ _ _ -> return ()
   traceTMVarIO   = \_ _ _ -> return ()
   traceTQueueIO  = \_ _ _ -> return ()
   traceTBQueueIO = \_ _ _ -> return ()
+  traceTSemIO    = \_ _ _ -> return ()
 
 -- | Wrapper around 'BlockedIndefinitelyOnSTM' that stores a call stack
 data BlockedIndefinitely = BlockedIndefinitely {
@@ -981,6 +1046,44 @@ labelTArrayDefault (TArray arr) name = do
     let as = Array.assocs arr
     traverse_ (\(i, v) -> labelTVar v (name ++ ":" ++ show i)) as
 
+
+--
+-- Default `TSem` implementation
+--
+
+newtype TSemDefault m = TSem (TVar m Integer)
+
+labelTSemDefault :: MonadLabelledSTM m => TSemDefault m -> String -> STM m ()
+labelTSemDefault (TSem t) = labelTVar t
+
+traceTSemDefault :: MonadTraceSTM m
+                 => proxy m
+                 -> TSemDefault m
+                 -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                 -> STM m ()
+traceTSemDefault proxy (TSem t) k = traceTVar proxy t k
+
+newTSemDefault :: MonadSTM m => Integer -> STM m (TSemDefault m)
+newTSemDefault i = TSem <$> (newTVar $! i)
+
+waitTSemDefault :: MonadSTM m => TSemDefault m -> STM m ()
+waitTSemDefault (TSem t) = do
+  i <- readTVar t
+  when (i <= 0) retry
+  writeTVar t $! (i-1)
+
+signalTSemDefault :: MonadSTM m => TSemDefault m -> STM m ()
+signalTSemDefault (TSem t) = do
+  i <- readTVar t
+  writeTVar t $! i+1
+
+signalTSemNDefault :: MonadSTM m => Natural -> TSemDefault m -> STM m ()
+signalTSemNDefault 0 _ = return ()
+signalTSemNDefault 1 s = signalTSemDefault s
+signalTSemNDefault n (TSem t) = do
+  i <- readTVar t
+  writeTVar t $! i+(toInteger n)
+
 -- | 'throwIO' specialised to @stm@ monad.
 --
 throwSTM :: (MonadSTM m, MonadThrow.MonadThrow (STM m), Exception e)
@@ -1094,6 +1197,12 @@ instance MonadSTM m => MonadSTM (ContT r m) where
 
     type TArray (ContT r m) = TArray m
 
+    type TSem (ContT r m) = TSem m
+    newTSem        = WrappedSTM .  newTSem
+    waitTSem       = WrappedSTM .  waitTSem
+    signalTSem     = WrappedSTM .  signalTSem
+    signalTSemN    = WrappedSTM .: signalTSemN
+
 
 instance MonadSTM m => MonadSTM (ReaderT r m) where
     type STM (ReaderT r m) = WrappedSTM Reader r m
@@ -1148,6 +1257,12 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
     type TArray (ReaderT r m) = TArray m
+
+    type TSem (ReaderT r m) = TSem m
+    newTSem        = WrappedSTM .  newTSem
+    waitTSem       = WrappedSTM .  waitTSem
+    signalTSem     = WrappedSTM .  signalTSem
+    signalTSemN    = WrappedSTM .: signalTSemN
 
 
 instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
@@ -1204,6 +1319,12 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
 
     type TArray (WriterT w m) = TArray m
 
+    type TSem (WriterT w m) = TSem m
+    newTSem        = WrappedSTM .  newTSem
+    waitTSem       = WrappedSTM .  waitTSem
+    signalTSem     = WrappedSTM .  signalTSem
+    signalTSemN    = WrappedSTM .: signalTSemN
+
 
 instance MonadSTM m => MonadSTM (StateT s m) where
     type STM (StateT s m) = WrappedSTM State s m
@@ -1258,6 +1379,12 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
     type TArray (StateT s m) = TArray m
+
+    type TSem (StateT s m) = TSem m
+    newTSem        = WrappedSTM .  newTSem
+    waitTSem       = WrappedSTM .  waitTSem
+    signalTSem     = WrappedSTM .  signalTSem
+    signalTSemN    = WrappedSTM .: signalTSemN
 
 
 instance MonadSTM m => MonadSTM (ExceptT e m) where
@@ -1314,6 +1441,12 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
 
     type TArray (ExceptT e m) = TArray m
 
+    type TSem (ExceptT e m) = TSem m
+    newTSem        = WrappedSTM .  newTSem
+    waitTSem       = WrappedSTM .  waitTSem
+    signalTSem     = WrappedSTM .  signalTSem
+    signalTSemN    = WrappedSTM .: signalTSemN
+
 
 instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     type STM (RWST r w s m) = WrappedSTM RWS (r, w, s) m
@@ -1368,6 +1501,12 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     unGetTBQueue   = WrappedSTM .: unGetTBQueue
 
     type TArray (RWST r w s m) = TArray m
+
+    type TSem (RWST r w s m) = TSem m
+    newTSem        = WrappedSTM .  newTSem
+    waitTSem       = WrappedSTM .  waitTSem
+    signalTSem     = WrappedSTM .  signalTSem
+    signalTSemN    = WrappedSTM .: signalTSemN
 
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
