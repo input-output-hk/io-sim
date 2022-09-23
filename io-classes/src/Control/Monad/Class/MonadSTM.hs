@@ -36,6 +36,8 @@ module Control.Monad.Class.MonadSTM
   , TArrayDefault (..)
     -- * Default 'TSem' implementation
   , TSemDefault (..)
+    -- * Default 'TChan' implementation
+  , TChanDefault (..)
     -- * MonadThrow aliases
   , throwSTM
   , catchSTM
@@ -53,6 +55,7 @@ import           Prelude hiding (read)
 
 import qualified Control.Concurrent.STM.TArray as STM
 import qualified Control.Concurrent.STM.TBQueue as STM
+import qualified Control.Concurrent.STM.TChan as STM
 import qualified Control.Concurrent.STM.TMVar as STM
 import qualified Control.Concurrent.STM.TQueue as STM
 import qualified Control.Concurrent.STM.TSem as STM
@@ -169,14 +172,30 @@ class ( Monad m
   signalTSem  :: TSem m -> STM m ()
   signalTSemN :: Natural -> TSem m -> STM m ()
 
+  type TChan m      :: Type -> Type
+  newTChan          :: STM m (TChan m a)
+  newBroadcastTChan :: STM m (TChan m a)
+  dupTChan          :: TChan m a -> STM m (TChan m a)
+  cloneTChan        :: TChan m a -> STM m (TChan m a)
+  readTChan         :: TChan m a -> STM m a
+  tryReadTChan      :: TChan m a -> STM m (Maybe a)
+  peekTChan         :: TChan m a -> STM m a
+  tryPeekTChan      :: TChan m a -> STM m (Maybe a)
+  writeTChan        :: TChan m a -> a -> STM m ()
+  unGetTChan        :: TChan m a -> a -> STM m ()
+  isEmptyTChan      :: TChan m a -> STM m Bool
+
+
   -- Helpful derived functions with default implementations
 
-  newTVarIO        :: a -> m (TVar  m a)
-  readTVarIO       :: TVar m a -> m a
-  newTMVarIO       :: a -> m (TMVar m a)
-  newEmptyTMVarIO  ::      m (TMVar m a)
-  newTQueueIO      :: m (TQueue m a)
-  newTBQueueIO     :: Natural -> m (TBQueue m a)
+  newTVarIO           :: a -> m (TVar  m a)
+  readTVarIO          :: TVar m a -> m a
+  newTMVarIO          :: a -> m (TMVar m a)
+  newEmptyTMVarIO     ::      m (TMVar m a)
+  newTQueueIO         :: m (TQueue m a)
+  newTBQueueIO        :: Natural -> m (TBQueue m a)
+  newTChanIO          :: m (TChan m a)
+  newBroadcastTChanIO :: m (TChan m a)
 
   --
   -- default implementations
@@ -190,12 +209,14 @@ class ( Monad m
                         => STM m (TMVar m a)
   newEmptyTMVar = newEmptyTMVarDefault
 
-  newTVarIO       = atomically . newTVar
-  readTVarIO      = atomically . readTVar
-  newTMVarIO      = atomically . newTMVar
-  newEmptyTMVarIO = atomically   newEmptyTMVar
-  newTQueueIO     = atomically newTQueue
-  newTBQueueIO    = atomically . newTBQueue
+  newTVarIO           = atomically . newTVar
+  readTVarIO          = atomically . readTVar
+  newTMVarIO          = atomically . newTMVar
+  newEmptyTMVarIO     = atomically   newEmptyTMVar
+  newTQueueIO         = atomically   newTQueue
+  newTBQueueIO        = atomically . newTBQueue
+  newTChanIO          = atomically   newTChan
+  newBroadcastTChanIO = atomically   newBroadcastTChan
 
   default takeTMVar :: TMVar m ~ TMVarDefault m
                     => TMVar m a -> STM m a
@@ -318,6 +339,50 @@ class ( Monad m
   default signalTSemN :: TSem m ~ TSemDefault m
                       => Natural -> TSem m -> STM m ()
   signalTSemN = signalTSemNDefault
+
+  default newTChan :: TChan m ~ TChanDefault m
+                   => STM m (TChan m a)
+  newTChan = newTChanDefault
+
+  default newBroadcastTChan :: TChan m ~ TChanDefault m
+                            => STM m (TChan m a)
+  newBroadcastTChan = newBroadcastTChanDefault
+
+  default writeTChan :: TChan m ~ TChanDefault m
+                     => TChan m a -> a -> STM m ()
+  writeTChan = writeTChanDefault
+
+  default readTChan :: TChan m ~ TChanDefault m
+                     => TChan m a -> STM m a
+  readTChan = readTChanDefault
+
+  default tryReadTChan :: TChan m ~ TChanDefault m
+                       => TChan m a -> STM m (Maybe a)
+  tryReadTChan = tryReadTChanDefault
+
+  default peekTChan :: TChan m ~ TChanDefault m
+                     => TChan m a -> STM m a
+  peekTChan = peekTChanDefault
+
+  default tryPeekTChan :: TChan m ~ TChanDefault m
+                       => TChan m a -> STM m (Maybe a)
+  tryPeekTChan = tryPeekTChanDefault
+
+  default dupTChan :: TChan m ~ TChanDefault m
+                   => TChan m a -> STM m (TChan m a)
+  dupTChan = dupTChanDefault
+
+  default unGetTChan :: TChan m ~ TChanDefault m
+                     => TChan m a -> a -> STM m ()
+  unGetTChan = unGetTChanDefault
+
+  default isEmptyTChan :: TChan m ~ TChanDefault m
+                        => TChan m a -> STM m Bool
+  isEmptyTChan = isEmptyTChanDefault
+
+  default cloneTChan :: TChan m ~ TChanDefault m
+                     => TChan m a -> STM m (TChan m a)
+  cloneTChan = cloneTChanDefault
 
 
 stateTVarDefault :: MonadSTM m => TVar m s -> (s -> (a, s)) -> STM m a
@@ -596,6 +661,7 @@ instance MonadSTM IO where
   type TBQueue IO = STM.TBQueue
   type TArray  IO = STM.TArray
   type TSem    IO = STM.TSem
+  type TChan   IO = STM.TChan
 
   newTVar        = STM.newTVar
   readTVar       = STM.readTVar
@@ -641,12 +707,26 @@ instance MonadSTM IO where
   signalTSem     = STM.signalTSem
   signalTSemN    = STM.signalTSemN
 
-  newTVarIO       = STM.newTVarIO
-  readTVarIO      = STM.readTVarIO
-  newTMVarIO      = STM.newTMVarIO
-  newEmptyTMVarIO = STM.newEmptyTMVarIO
-  newTQueueIO     = STM.newTQueueIO
-  newTBQueueIO    = STM.newTBQueueIO
+  newTChan          = STM.newTChan
+  newBroadcastTChan = STM.newBroadcastTChan
+  dupTChan          = STM.dupTChan
+  cloneTChan        = STM.cloneTChan
+  readTChan         = STM.readTChan
+  tryReadTChan      = STM.tryReadTChan
+  peekTChan         = STM.peekTChan
+  tryPeekTChan      = STM.tryPeekTChan
+  writeTChan        = STM.writeTChan
+  unGetTChan        = STM.unGetTChan
+  isEmptyTChan      = STM.isEmptyTChan
+
+  newTVarIO           = STM.newTVarIO
+  readTVarIO          = STM.readTVarIO
+  newTMVarIO          = STM.newTMVarIO
+  newEmptyTMVarIO     = STM.newEmptyTMVarIO
+  newTQueueIO         = STM.newTQueueIO
+  newTBQueueIO        = STM.newTBQueueIO
+  newTChanIO          = STM.newTChanIO
+  newBroadcastTChanIO = STM.newBroadcastTChanIO
 
 -- | noop instance
 --
@@ -1084,6 +1164,99 @@ signalTSemNDefault n (TSem t) = do
   i <- readTVar t
   writeTVar t $! i+(toInteger n)
 
+--
+-- Default `TChan` implementation
+--
+
+type TVarList m a = TVar m (TList m a)
+data TList m a = TNil | TCons a (TVarList m a)
+
+data TChanDefault m a = TChan (TVar m (TVarList m a)) (TVar m (TVarList m a))
+
+newTChanDefault :: MonadSTM m => STM m (TChanDefault m a)
+newTChanDefault = do
+  hole <- newTVar TNil
+  read <- newTVar hole
+  write <- newTVar hole
+  return (TChan read write)
+
+newBroadcastTChanDefault :: MonadSTM m => STM m (TChanDefault m a)
+newBroadcastTChanDefault = do
+    write_hole <- newTVar TNil
+    read <- newTVar (error "reading from a TChan created by newBroadcastTChan; use dupTChan first")
+    write <- newTVar write_hole
+    return (TChan read write)
+
+writeTChanDefault :: MonadSTM m => TChanDefault m a -> a -> STM m ()
+writeTChanDefault (TChan _read write) a = do
+  listend <- readTVar write -- listend == TVar pointing to TNil
+  new_listend <- newTVar TNil
+  writeTVar listend (TCons a new_listend)
+  writeTVar write new_listend
+
+readTChanDefault :: MonadSTM m => TChanDefault m a -> STM m a
+readTChanDefault (TChan read _write) = do
+  listhead <- readTVar read
+  head_ <- readTVar listhead
+  case head_ of
+    TNil -> retry
+    TCons a tail_ -> do
+        writeTVar read tail_
+        return a
+
+tryReadTChanDefault :: MonadSTM m => TChanDefault m a -> STM m (Maybe a)
+tryReadTChanDefault (TChan read _write) = do
+  listhead <- readTVar read
+  head_ <- readTVar listhead
+  case head_ of
+    TNil       -> return Nothing
+    TCons a tl -> do
+      writeTVar read tl
+      return (Just a)
+
+peekTChanDefault :: MonadSTM m => TChanDefault m a -> STM m a
+peekTChanDefault (TChan read _write) = do
+  listhead <- readTVar read
+  head_ <- readTVar listhead
+  case head_ of
+    TNil      -> retry
+    TCons a _ -> return a
+
+tryPeekTChanDefault :: MonadSTM m => TChanDefault m a -> STM m (Maybe a)
+tryPeekTChanDefault (TChan read _write) = do
+  listhead <- readTVar read
+  head_ <- readTVar listhead
+  case head_ of
+    TNil      -> return Nothing
+    TCons a _ -> return (Just a)
+
+dupTChanDefault :: MonadSTM m => TChanDefault m a -> STM m (TChanDefault m a)
+dupTChanDefault (TChan _read write) = do
+  hole <- readTVar write
+  new_read <- newTVar hole
+  return (TChan new_read write)
+
+unGetTChanDefault :: MonadSTM m => TChanDefault m a -> a -> STM m ()
+unGetTChanDefault (TChan read _write) a = do
+   listhead <- readTVar read
+   newhead <- newTVar (TCons a listhead)
+   writeTVar read newhead
+
+isEmptyTChanDefault :: MonadSTM m => TChanDefault m a -> STM m Bool
+isEmptyTChanDefault (TChan read _write) = do
+  listhead <- readTVar read
+  head_ <- readTVar listhead
+  case head_ of
+    TNil      -> return True
+    TCons _ _ -> return False
+
+cloneTChanDefault :: MonadSTM m => TChanDefault m a -> STM m (TChanDefault m a)
+cloneTChanDefault (TChan read write) = do
+  readpos <- readTVar read
+  new_read <- newTVar readpos
+  return (TChan new_read write)
+
+
 -- | 'throwIO' specialised to @stm@ monad.
 --
 throwSTM :: (MonadSTM m, MonadThrow.MonadThrow (STM m), Exception e)
@@ -1203,6 +1376,19 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     signalTSem     = WrappedSTM .  signalTSem
     signalTSemN    = WrappedSTM .: signalTSemN
 
+    type TChan (ContT r m) = TChan m
+    newTChan          = WrappedSTM    newTChan
+    newBroadcastTChan = WrappedSTM    newBroadcastTChan
+    dupTChan          = WrappedSTM .  dupTChan
+    cloneTChan        = WrappedSTM .  cloneTChan
+    readTChan         = WrappedSTM .  readTChan
+    tryReadTChan      = WrappedSTM .  tryReadTChan
+    peekTChan         = WrappedSTM .  peekTChan
+    tryPeekTChan      = WrappedSTM .  tryPeekTChan
+    writeTChan        = WrappedSTM .: writeTChan
+    unGetTChan        = WrappedSTM .: unGetTChan
+    isEmptyTChan      = WrappedSTM .  isEmptyTChan
+
 
 instance MonadSTM m => MonadSTM (ReaderT r m) where
     type STM (ReaderT r m) = WrappedSTM Reader r m
@@ -1263,6 +1449,19 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     waitTSem       = WrappedSTM .  waitTSem
     signalTSem     = WrappedSTM .  signalTSem
     signalTSemN    = WrappedSTM .: signalTSemN
+
+    type TChan (ReaderT r m) = TChan m
+    newTChan          = WrappedSTM    newTChan
+    newBroadcastTChan = WrappedSTM    newBroadcastTChan
+    dupTChan          = WrappedSTM .  dupTChan
+    cloneTChan        = WrappedSTM .  cloneTChan
+    readTChan         = WrappedSTM .  readTChan
+    tryReadTChan      = WrappedSTM .  tryReadTChan
+    peekTChan         = WrappedSTM .  peekTChan
+    tryPeekTChan      = WrappedSTM .  tryPeekTChan
+    writeTChan        = WrappedSTM .: writeTChan
+    unGetTChan        = WrappedSTM .: unGetTChan
+    isEmptyTChan      = WrappedSTM .  isEmptyTChan
 
 
 instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
@@ -1325,6 +1524,19 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     signalTSem     = WrappedSTM .  signalTSem
     signalTSemN    = WrappedSTM .: signalTSemN
 
+    type TChan (WriterT w m) = TChan m
+    newTChan          = WrappedSTM    newTChan
+    newBroadcastTChan = WrappedSTM    newBroadcastTChan
+    dupTChan          = WrappedSTM .  dupTChan
+    cloneTChan        = WrappedSTM .  cloneTChan
+    readTChan         = WrappedSTM .  readTChan
+    tryReadTChan      = WrappedSTM .  tryReadTChan
+    peekTChan         = WrappedSTM .  peekTChan
+    tryPeekTChan      = WrappedSTM .  tryPeekTChan
+    writeTChan        = WrappedSTM .: writeTChan
+    unGetTChan        = WrappedSTM .: unGetTChan
+    isEmptyTChan      = WrappedSTM .  isEmptyTChan
+
 
 instance MonadSTM m => MonadSTM (StateT s m) where
     type STM (StateT s m) = WrappedSTM State s m
@@ -1385,6 +1597,19 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     waitTSem       = WrappedSTM .  waitTSem
     signalTSem     = WrappedSTM .  signalTSem
     signalTSemN    = WrappedSTM .: signalTSemN
+
+    type TChan (StateT s m) = TChan m
+    newTChan          = WrappedSTM    newTChan
+    newBroadcastTChan = WrappedSTM    newBroadcastTChan
+    dupTChan          = WrappedSTM .  dupTChan
+    cloneTChan        = WrappedSTM .  cloneTChan
+    readTChan         = WrappedSTM .  readTChan
+    tryReadTChan      = WrappedSTM .  tryReadTChan
+    peekTChan         = WrappedSTM .  peekTChan
+    tryPeekTChan      = WrappedSTM .  tryPeekTChan
+    writeTChan        = WrappedSTM .: writeTChan
+    unGetTChan        = WrappedSTM .: unGetTChan
+    isEmptyTChan      = WrappedSTM .  isEmptyTChan
 
 
 instance MonadSTM m => MonadSTM (ExceptT e m) where
@@ -1447,6 +1672,19 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
     signalTSem     = WrappedSTM .  signalTSem
     signalTSemN    = WrappedSTM .: signalTSemN
 
+    type TChan (ExceptT e m) = TChan m
+    newTChan          = WrappedSTM    newTChan
+    newBroadcastTChan = WrappedSTM    newBroadcastTChan
+    dupTChan          = WrappedSTM .  dupTChan
+    cloneTChan        = WrappedSTM .  cloneTChan
+    readTChan         = WrappedSTM .  readTChan
+    tryReadTChan      = WrappedSTM .  tryReadTChan
+    peekTChan         = WrappedSTM .  peekTChan
+    tryPeekTChan      = WrappedSTM .  tryPeekTChan
+    writeTChan        = WrappedSTM .: writeTChan
+    unGetTChan        = WrappedSTM .: unGetTChan
+    isEmptyTChan      = WrappedSTM .  isEmptyTChan
+
 
 instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     type STM (RWST r w s m) = WrappedSTM RWS (r, w, s) m
@@ -1507,6 +1745,19 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     waitTSem       = WrappedSTM .  waitTSem
     signalTSem     = WrappedSTM .  signalTSem
     signalTSemN    = WrappedSTM .: signalTSemN
+
+    type TChan (RWST r w s m) = TChan m
+    newTChan          = WrappedSTM    newTChan
+    newBroadcastTChan = WrappedSTM    newBroadcastTChan
+    dupTChan          = WrappedSTM .  dupTChan
+    cloneTChan        = WrappedSTM .  cloneTChan
+    readTChan         = WrappedSTM .  readTChan
+    tryReadTChan      = WrappedSTM .  tryReadTChan
+    peekTChan         = WrappedSTM .  peekTChan
+    tryPeekTChan      = WrappedSTM .  tryPeekTChan
+    writeTChan        = WrappedSTM .: writeTChan
+    unGetTChan        = WrappedSTM .: unGetTChan
+    isEmptyTChan      = WrappedSTM .  isEmptyTChan
 
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
