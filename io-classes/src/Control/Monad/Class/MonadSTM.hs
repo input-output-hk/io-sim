@@ -83,6 +83,7 @@ import           Data.Foldable (traverse_)
 import           Data.Function (on)
 import           Data.Ix (Ix, rangeSize)
 import           Data.Kind (Type)
+import           Data.Proxy (Proxy (..))
 import           Data.Typeable (Typeable)
 import           GHC.Stack
 import           Numeric.Natural (Natural)
@@ -590,60 +591,50 @@ class MonadInspectSTM m
   traceTSem = traceTSemDefault
 
 
-  traceTVarIO    :: proxy m
-                 -> TVar m a
+  traceTVarIO    :: TVar m a
                  -> (Maybe a -> a -> InspectMonad m TraceValue)
                  -> m ()
 
-  traceTMVarIO   :: proxy m
-                 -> TMVar m a
+  traceTMVarIO   :: TMVar m a
                  -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
                  -> m ()
 
-  traceTQueueIO  :: proxy m
-                 -> TQueue m a
+  traceTQueueIO  :: TQueue m a
                  -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
                  -> m ()
 
-  traceTBQueueIO :: proxy m
-                 -> TBQueue m a
+  traceTBQueueIO :: TBQueue m a
                  -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
                  -> m ()
 
-  traceTSemIO    :: proxy m
-                 -> TSem m
+  traceTSemIO    :: TSem m
                  -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
                  -> m ()
 
-  default traceTVarIO :: proxy m
-                      -> TVar m a
+  default traceTVarIO :: TVar m a
                       -> (Maybe a -> a -> InspectMonad m TraceValue)
                       -> m ()
-  traceTVarIO = \p v f -> atomically (traceTVar p v f)
+  traceTVarIO = \v f -> atomically (traceTVar Proxy v f)
 
-  default traceTMVarIO :: proxy m
-                       -> TMVar m a
+  default traceTMVarIO :: TMVar m a
                        -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
                        -> m ()
-  traceTMVarIO = \p v f -> atomically (traceTMVar p v f)
+  traceTMVarIO = \v f -> atomically (traceTMVar Proxy v f)
 
-  default traceTQueueIO :: proxy m
-                        -> TQueue m a
+  default traceTQueueIO :: TQueue m a
                         -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
                         -> m ()
-  traceTQueueIO = \p v f -> atomically (traceTQueue p v f)
+  traceTQueueIO = \v f -> atomically (traceTQueue Proxy v f)
 
-  default traceTBQueueIO :: proxy m
-                         -> TBQueue m a
+  default traceTBQueueIO :: TBQueue m a
                          -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
                          -> m ()
-  traceTBQueueIO = \p v f -> atomically (traceTBQueue p v f)
+  traceTBQueueIO = \v f -> atomically (traceTBQueue Proxy v f)
 
-  default traceTSemIO :: proxy m
-                      -> TSem m
+  default traceTSemIO :: TSem m
                       -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
                       -> m ()
-  traceTSemIO = \p v f -> atomically (traceTSem p v f)
+  traceTSemIO = \v f -> atomically (traceTSem Proxy v f)
 
 
 --
@@ -754,11 +745,11 @@ instance MonadTraceSTM IO where
   traceTBQueue = \_ _ _ -> return ()
   traceTSem    = \_ _ _ -> return ()
 
-  traceTVarIO    = \_ _ _ -> return ()
-  traceTMVarIO   = \_ _ _ -> return ()
-  traceTQueueIO  = \_ _ _ -> return ()
-  traceTBQueueIO = \_ _ _ -> return ()
-  traceTSemIO    = \_ _ _ -> return ()
+  traceTVarIO    = \_ _ -> return ()
+  traceTMVarIO   = \_ _ -> return ()
+  traceTQueueIO  = \_ _ -> return ()
+  traceTBQueueIO = \_ _ -> return ()
+  traceTSemIO    = \_ _ -> return ()
 
 -- | Wrapper around 'BlockedIndefinitelyOnSTM' that stores a call stack
 data BlockedIndefinitely = BlockedIndefinitely {
