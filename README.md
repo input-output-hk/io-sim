@@ -87,7 +87,8 @@ ones that come from `base`, `async`, or `excpetions` packages:
 * `Handler` (origin: `base`)
 * `MaskingState` (origin: `base`)
 * `Concurrently` (origin: `async`)
-* `ExceptionInLinkedThread` (origin: `async`)
+* `ExceptionInLinkedThread` (origin: `async`): `io-class`es version does not
+  store `Async`
 * `ExitCase` (origin: `exceptions`)
 
 
