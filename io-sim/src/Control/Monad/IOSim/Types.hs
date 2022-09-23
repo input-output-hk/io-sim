@@ -76,7 +76,7 @@ import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
-                     TArrayDefault, TMVarDefault, TraceValue)
+                     TArrayDefault, TMVarDefault, TSemDefault, TraceValue)
 import qualified Control.Monad.Class.MonadSTM as MonadSTM
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
@@ -399,6 +399,7 @@ instance MonadSTM (IOSim s) where
   type TQueue    (IOSim s) = TQueueDefault (IOSim s)
   type TBQueue   (IOSim s) = TBQueueDefault (IOSim s)
   type TArray    (IOSim s) = TArrayDefault (IOSim s)
+  type TSem      (IOSim s) = TSemDefault (IOSim s)
 
   atomically action = IOSim $ oneShot $ \k -> Atomically action k
 
