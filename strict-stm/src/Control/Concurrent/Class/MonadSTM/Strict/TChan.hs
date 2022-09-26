@@ -3,6 +3,7 @@
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE NamedFieldPuns     #-}
+{-# LANGUAGE TypeOperators      #-}
 
 -- | This module corresponds to `Control.Concurrent.STM.TChan` in "stm" package
 --
