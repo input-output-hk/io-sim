@@ -11,6 +11,7 @@ module Control.Concurrent.Class.MonadSTM.TQueue
   , tryReadTQueue
   , peekTQueue
   , tryPeekTQueue
+  , flushTQueue
   , writeTQueue
   , unGetTQueue
   , isEmptyTQueue

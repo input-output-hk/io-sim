@@ -18,6 +18,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TQueue
   , tryReadTQueue
   , peekTQueue
   , tryPeekTQueue
+  , flushTQueue
   , writeTQueue
   , unGetTQueue
   , isEmptyTQueue
@@ -77,6 +78,9 @@ peekTQueue = Lazy.peekTQueue . toLazyTQueue
 
 tryPeekTQueue :: MonadSTM m => StrictTQueue m a -> STM m (Maybe a)
 tryPeekTQueue = Lazy.tryPeekTQueue . toLazyTQueue
+
+flushTQueue :: MonadSTM m => StrictTQueue m a -> STM m [a]
+flushTQueue = Lazy.flushTQueue . toLazyTQueue
 
 writeTQueue :: MonadSTM m => StrictTQueue m a -> a -> STM m ()
 writeTQueue (StrictTQueue tqueue) !a = Lazy.writeTQueue tqueue a

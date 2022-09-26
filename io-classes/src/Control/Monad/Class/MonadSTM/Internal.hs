@@ -64,7 +64,7 @@ import qualified Control.Concurrent.STM.TMVar as STM
 import qualified Control.Concurrent.STM.TQueue as STM
 import qualified Control.Concurrent.STM.TSem as STM
 import qualified Control.Concurrent.STM.TVar as STM
-import           Control.Monad (MonadPlus (..), when)
+import           Control.Monad (MonadPlus (..), unless, when)
 import qualified Control.Monad.STM as STM
 
 import           Control.Monad.Cont (ContT (..))
@@ -151,6 +151,7 @@ class ( Monad m
   tryReadTQueue  :: TQueue m a -> STM m (Maybe a)
   peekTQueue     :: TQueue m a -> STM m a
   tryPeekTQueue  :: TQueue m a -> STM m (Maybe a)
+  flushTQueue    :: TQueue m a -> STM m [a]
   writeTQueue    :: TQueue m a -> a -> STM m ()
   isEmptyTQueue  :: TQueue m a -> STM m Bool
   unGetTQueue    :: TQueue m a -> a -> STM m ()
@@ -284,6 +285,10 @@ class ( Monad m
   default tryPeekTQueue :: TQueue m ~ TQueueDefault m
                         => TQueue m a -> STM m (Maybe a)
   tryPeekTQueue = tryPeekTQueueDefault
+
+  default flushTQueue :: TQueue m ~ TQueueDefault m
+                      => TQueue m a -> STM m [a]
+  flushTQueue = flushTQueueDefault
 
   default newTBQueue :: TBQueue m ~ TBQueueDefault m
                      => Natural -> STM m (TBQueue m a)
@@ -683,7 +688,7 @@ instance MonadSTM IO where
   tryReadTQueue  = STM.tryReadTQueue
   peekTQueue     = STM.peekTQueue
   tryPeekTQueue  = STM.tryPeekTQueue
-  flushTBQueue   = STM.flushTBQueue
+  flushTQueue    = STM.flushTQueue
   writeTQueue    = STM.writeTQueue
   isEmptyTQueue  = STM.isEmptyTQueue
   unGetTQueue    = STM.unGetTQueue
@@ -693,6 +698,7 @@ instance MonadSTM IO where
   peekTBQueue    = STM.peekTBQueue
   tryPeekTBQueue = STM.tryPeekTBQueue
   writeTBQueue   = STM.writeTBQueue
+  flushTBQueue   = STM.flushTBQueue
   lengthTBQueue  = STM.lengthTBQueue
   isEmptyTBQueue = STM.isEmptyTBQueue
   isFullTBQueue  = STM.isFullTBQueue
@@ -939,6 +945,15 @@ tryPeekTQueueDefault (TQueue read _write) = do
     case xs of
       (x:_) -> return (Just x)
       _     -> return Nothing
+
+
+flushTQueueDefault :: MonadSTM m => TQueueDefault m a -> STM m [a]
+flushTQueueDefault (TQueue read write) = do
+  xs <- readTVar read
+  ys <- readTVar write
+  unless (null xs) $ writeTVar read []
+  unless (null ys) $ writeTVar write []
+  return (xs ++ reverse ys)
 
 unGetTQueueDefault :: MonadSTM m => TQueueDefault m a -> a -> STM m ()
 unGetTQueueDefault (TQueue read _write) a = modifyTVar read (a:)
@@ -1346,6 +1361,7 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     tryReadTQueue  = WrappedSTM . tryReadTQueue
     peekTQueue     = WrappedSTM . peekTQueue
     tryPeekTQueue  = WrappedSTM . tryPeekTQueue
+    flushTQueue    = WrappedSTM .  flushTQueue
     writeTQueue v  = WrappedSTM . writeTQueue v
     isEmptyTQueue  = WrappedSTM . isEmptyTQueue
     unGetTQueue    = WrappedSTM .: unGetTQueue
@@ -1420,6 +1436,7 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     tryReadTQueue  = WrappedSTM .  tryReadTQueue
     peekTQueue     = WrappedSTM .  peekTQueue
     tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    flushTQueue    = WrappedSTM .  flushTQueue
     writeTQueue v  = WrappedSTM .  writeTQueue v
     isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
     unGetTQueue    = WrappedSTM .: unGetTQueue
@@ -1494,6 +1511,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     tryReadTQueue  = WrappedSTM .  tryReadTQueue
     peekTQueue     = WrappedSTM .  peekTQueue
     tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    flushTQueue    = WrappedSTM .  flushTQueue
     writeTQueue v  = WrappedSTM .  writeTQueue v
     isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
     unGetTQueue    = WrappedSTM .: unGetTQueue
@@ -1568,6 +1586,7 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     tryReadTQueue  = WrappedSTM . tryReadTQueue
     peekTQueue     = WrappedSTM . peekTQueue
     tryPeekTQueue  = WrappedSTM . tryPeekTQueue
+    flushTQueue    = WrappedSTM .  flushTQueue
     writeTQueue v  = WrappedSTM . writeTQueue v
     isEmptyTQueue  = WrappedSTM . isEmptyTQueue
     unGetTQueue    = WrappedSTM .: unGetTQueue
@@ -1642,6 +1661,7 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
     tryReadTQueue  = WrappedSTM .  tryReadTQueue
     peekTQueue     = WrappedSTM .  peekTQueue
     tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    flushTQueue    = WrappedSTM .  flushTQueue
     writeTQueue v  = WrappedSTM .  writeTQueue v
     isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
     unGetTQueue    = WrappedSTM .: unGetTQueue
@@ -1716,6 +1736,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     tryReadTQueue  = WrappedSTM .  tryReadTQueue
     peekTQueue     = WrappedSTM .  peekTQueue
     tryPeekTQueue  = WrappedSTM .  tryPeekTQueue
+    flushTQueue    = WrappedSTM .  flushTQueue
     writeTQueue v  = WrappedSTM .  writeTQueue v
     isEmptyTQueue  = WrappedSTM .  isEmptyTQueue
     unGetTQueue    = WrappedSTM .: unGetTQueue
