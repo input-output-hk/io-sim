@@ -74,11 +74,11 @@ import           Control.Monad.Class.MonadFork hiding (ThreadId)
 import qualified Control.Monad.Class.MonadFork as MonadFork
 import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadST
-import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
+import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
                      TArrayDefault, TChanDefault, TMVarDefault, TSemDefault,
                      TraceValue)
-import qualified Control.Monad.Class.MonadSTM as MonadSTM
+import qualified Control.Monad.Class.MonadSTM.Internal as MonadSTM
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow as MonadThrow hiding

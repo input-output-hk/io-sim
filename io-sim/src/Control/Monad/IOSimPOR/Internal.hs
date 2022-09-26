@@ -77,7 +77,8 @@ import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
 
-import           Control.Monad.Class.MonadSTM hiding (STM, TVar)
+import           Control.Concurrent.Class.MonadSTM.TVar hiding (TVar)
+import           Control.Monad.Class.MonadSTM hiding (STM)
 import           Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer

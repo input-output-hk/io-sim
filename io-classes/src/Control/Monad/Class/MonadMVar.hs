@@ -16,6 +16,7 @@ module Control.Monad.Class.MonadMVar
   , isEmptyMVarDefault
   ) where
 
+import           Control.Concurrent.Class.MonadSTM.TVar
 import qualified Control.Concurrent.MVar as IO
 import           Control.Exception (SomeAsyncException (..))
 import           Control.Monad.Class.MonadSTM

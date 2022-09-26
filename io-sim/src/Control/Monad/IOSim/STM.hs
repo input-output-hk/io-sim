@@ -7,8 +7,9 @@
 --
 module Control.Monad.IOSim.STM where
 
+import           Control.Concurrent.Class.MonadSTM.TVar
 import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
-                     MonadLabelledSTM (..), MonadSTM (..), MonadTraceSTM (..),
+                     MonadLabelledSTM, MonadSTM (..), MonadTraceSTM,
                      TraceValue (..))
 
 import           Numeric.Natural (Natural)
