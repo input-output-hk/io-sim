@@ -7,6 +7,8 @@ module Control.Concurrent.Class.MonadSTM.TMVar
     type TMVar
   , newTMVar
   , newEmptyTMVar
+  , newTMVarIO
+  , newEmptyTMVarIO
   , takeTMVar
   , tryTakeTMVar
   , putTMVar
