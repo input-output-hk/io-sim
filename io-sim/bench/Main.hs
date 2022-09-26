@@ -3,10 +3,10 @@
 
 module Main (main) where
 
+import           Control.Concurrent.Class.MonadSTM
 import           Control.Monad (replicateM)
 import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadSTM
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTimer

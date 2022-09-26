@@ -30,6 +30,7 @@ import qualified Data.Set as Set
 import           Data.Type.Equality
 import           Prelude hiding (exp)
 
+import           Control.Concurrent.Class.MonadSTM.TVar as STM
 import           Control.Monad.Class.MonadSTM as STM
 import           Control.Monad.Class.MonadThrow
 
