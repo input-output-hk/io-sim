@@ -24,9 +24,9 @@ import           Control.Monad
 import           Control.Monad.Fix
 import           System.IO.Error (ioeGetErrorString, isUserError)
 
+import           Control.Concurrent.Class.MonadSTM.Strict
+import qualified Control.Concurrent.Class.MonadSTM.TVar as LazySTM
 import           Control.Monad.Class.MonadFork
-import qualified Control.Monad.Class.MonadSTM as LazySTM
-import           Control.Monad.Class.MonadSTM.Strict
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime

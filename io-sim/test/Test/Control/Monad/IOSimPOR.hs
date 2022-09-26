@@ -8,6 +8,7 @@
 
 module Test.Control.Monad.IOSimPOR where
 
+import           Control.Concurrent.Class.MonadSTM.TVar
 import           Control.Monad
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSTM
