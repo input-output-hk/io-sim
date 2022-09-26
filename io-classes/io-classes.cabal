@@ -37,6 +37,15 @@ library
                        Control.Monad.Class.MonadSay
                        Control.Monad.Class.MonadST
                        Control.Monad.Class.MonadSTM
+                       Control.Concurrent.Class.MonadSTM
+                       Control.Concurrent.Class.MonadSTM.TArray
+                       Control.Concurrent.Class.MonadSTM.TBQueue
+                       Control.Concurrent.Class.MonadSTM.TChan
+                       Control.Concurrent.Class.MonadSTM.TMVar
+                       Control.Concurrent.Class.MonadSTM.TQueue
+                       Control.Concurrent.Class.MonadSTM.TSem
+                       Control.Concurrent.Class.MonadSTM.TVar
+                       Control.Monad.Class.MonadSTM.Internal
                        Control.Monad.Class.MonadThrow
                        Control.Monad.Class.MonadTime
                        Control.Monad.Class.MonadTimer

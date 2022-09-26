@@ -15,6 +15,7 @@ module Control.Monad.Class.MonadTimer
   ) where
 
 import qualified Control.Concurrent as IO
+import           Control.Concurrent.Class.MonadSTM.TVar
 import qualified Control.Concurrent.STM.TVar as STM
 import           Control.Exception (assert)
 #if defined(mingw32_HOST_OS)
