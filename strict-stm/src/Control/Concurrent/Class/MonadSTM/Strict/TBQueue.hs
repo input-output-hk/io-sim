@@ -11,6 +11,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TBQueue
   , LazyTBQueue
   , toLazyTBQueue
   , fromLazyTBQueue
+  , castStrictTBQueue
   , newTBQueue
   , newTBQueueIO
   , readTBQueue
@@ -44,6 +45,10 @@ newtype StrictTBQueue m a = StrictTBQueue { toLazyTBQueue :: LazyTBQueue m a }
 
 fromLazyTBQueue :: LazyTBQueue m a -> StrictTBQueue m a
 fromLazyTBQueue = StrictTBQueue
+
+castStrictTBQueue :: LazyTBQueue m ~ LazyTBQueue n
+                  => StrictTBQueue m a -> StrictTBQueue n a
+castStrictTBQueue (StrictTBQueue var) = StrictTBQueue var
 
 labelTBQueue :: MonadLabelledSTM m => StrictTBQueue m a -> String -> STM m ()
 labelTBQueue (StrictTBQueue queue) = Lazy.labelTBQueue queue
