@@ -433,6 +433,7 @@ class MonadSTM m
   labelTArray  :: (Ix i, Show i)
                => TArray  m i e -> String -> STM m ()
   labelTSem    :: TSem    m     -> String -> STM m ()
+  labelTChan   :: TChan   m a   -> String -> STM m ()
 
   labelTVarIO    :: TVar    m a   -> String -> m ()
   labelTMVarIO   :: TMVar   m a   -> String -> m ()
@@ -441,6 +442,7 @@ class MonadSTM m
   labelTArrayIO  :: (Ix i, Show i)
                  => TArray  m i e -> String -> m ()
   labelTSemIO    :: TSem    m     -> String -> m ()
+  labelTChanIO   :: TChan   m a   -> String -> m ()
 
   --
   -- default implementations
@@ -461,6 +463,10 @@ class MonadSTM m
   default labelTSem :: TSem m ~ TSemDefault m
                     => TSem m -> String -> STM m ()
   labelTSem = labelTSemDefault
+
+  default labelTChan :: TChan m ~ TChanDefault m
+                     => TChan m a -> String -> STM m ()
+  labelTChan = labelTChanDefault
 
   default labelTArray :: ( TArray m ~ TArrayDefault m
                          , Ix i
@@ -487,6 +493,9 @@ class MonadSTM m
 
   default labelTSemIO :: TSem m -> String -> m ()
   labelTSemIO = \v l -> atomically (labelTSem v l)
+
+  default labelTChanIO :: TChan m a -> String -> m ()
+  labelTChanIO = \v l -> atomically (labelTChan v l)
 
 
 -- | This type class is indented for 'io-sim', where one might want to access
@@ -738,6 +747,7 @@ instance MonadLabelledSTM IO where
   labelTBQueue = \_  _ -> return ()
   labelTArray  = \_  _ -> return ()
   labelTSem    = \_  _ -> return ()
+  labelTChan   = \_  _ -> return ()
 
   labelTVarIO    = \_  _ -> return ()
   labelTMVarIO   = \_  _ -> return ()
@@ -745,6 +755,7 @@ instance MonadLabelledSTM IO where
   labelTBQueueIO = \_  _ -> return ()
   labelTArrayIO  = \_  _ -> return ()
   labelTSemIO    = \_  _ -> return ()
+  labelTChanIO   = \_  _ -> return ()
 
 -- | noop instance
 --
@@ -1182,6 +1193,11 @@ type TVarList m a = TVar m (TList m a)
 data TList m a = TNil | TCons a (TVarList m a)
 
 data TChanDefault m a = TChan (TVar m (TVarList m a)) (TVar m (TVarList m a))
+
+labelTChanDefault :: MonadLabelledSTM m => TChanDefault m a -> String -> STM m ()
+labelTChanDefault (TChan read write) name = do
+  labelTVar read  (name ++ ":read")
+  labelTVar write (name ++ ":write")
 
 newTChanDefault :: MonadSTM m => STM m (TChanDefault m a)
 newTChanDefault = do
