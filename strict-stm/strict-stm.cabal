@@ -41,6 +41,7 @@ library
                        Control.Concurrent.Class.MonadSTM.Strict.TMVar
                        Control.Concurrent.Class.MonadSTM.Strict.TQueue
                        Control.Concurrent.Class.MonadSTM.Strict.TVar
+  reexported-modules: Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
   default-language:    Haskell2010
   build-depends:       base  >=4.9 && <4.18,
                        array,
