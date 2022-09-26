@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP                #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE GADTs              #-}
+{-# LANGUAGE TypeOperators      #-}
 
 -- | This module corresponds to `Control.Concurrent.STM.TBQueue` in "stm" package
 --
