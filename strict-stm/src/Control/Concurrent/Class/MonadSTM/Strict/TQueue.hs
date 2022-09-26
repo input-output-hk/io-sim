@@ -12,6 +12,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TQueue
   , LazyTQueue
   , toLazyTQueue
   , fromLazyTQueue
+  , castStrictTQueue
   , newTQueue
   , newTQueueIO
   , readTQueue
@@ -41,6 +42,10 @@ newtype StrictTQueue m a = StrictTQueue { toLazyTQueue :: LazyTQueue m a }
 
 fromLazyTQueue :: LazyTQueue m a -> StrictTQueue m a
 fromLazyTQueue = StrictTQueue
+
+castStrictTQueue :: LazyTQueue m ~ LazyTQueue n
+                 => StrictTQueue m a -> StrictTQueue n a
+castStrictTQueue (StrictTQueue var) = StrictTQueue var
 
 labelTQueue :: MonadLabelledSTM m => StrictTQueue m a -> String -> STM m ()
 labelTQueue (StrictTQueue queue) = Lazy.labelTQueue queue

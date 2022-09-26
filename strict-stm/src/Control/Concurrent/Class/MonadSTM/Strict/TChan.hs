@@ -11,6 +11,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TChan
   , LazyTChan
   , toLazyTChan
   , fromLazyTChan
+  , castStrictTChan
   , newTChan
   , newBroadcastTChan
   , writeTChan
@@ -35,6 +36,10 @@ newtype StrictTChan m a = StrictTChan { toLazyTChan :: LazyTChan m a }
 
 fromLazyTChan :: LazyTChan m a -> StrictTChan m a
 fromLazyTChan = StrictTChan
+
+castStrictTChan :: LazyTChan m ~ LazyTChan n
+                => StrictTChan m a -> StrictTChan n a
+castStrictTChan (StrictTChan var) = StrictTChan var
 
 newTChan :: MonadSTM m => STM m (StrictTChan m a)
 newTChan = StrictTChan <$> Lazy.newTChan
