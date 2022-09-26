@@ -416,6 +416,7 @@ instance MonadSTM (IOSim s) where
   tryReadTQueue     = tryReadTQueueDefault
   peekTQueue        = peekTQueueDefault
   tryPeekTQueue     = tryPeekTQueueDefault
+  flushTQueue       = flushTQueueDefault
   writeTQueue       = writeTQueueDefault
   isEmptyTQueue     = isEmptyTQueueDefault
   unGetTQueue       = unGetTQueueDefault
