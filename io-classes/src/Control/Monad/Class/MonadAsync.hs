@@ -20,8 +20,6 @@ module Control.Monad.Class.MonadAsync
   , linkOnly
   , link2
   , link2Only
-  , linkTo
-  , linkToOnly
   , mapConcurrently
   , forConcurrently
   , mapConcurrently_
@@ -366,14 +364,10 @@ instance MonadAsync IO where
 -- Adapted from "Control.Concurrent.Async"
 --
 -- We don't use the implementation of linking from 'Control.Concurrent.Async'
--- directly because:
---
--- 1. If we /did/ use the real implementation, then the mock implementation and
---    the real implementation would not be able to throw the same exception,
---    because the exception type used by the real implementation is
--- 2. We need a generalized form of linking that links an async to an arbitrary
---    thread ('linkTo'), which is exposed only if cabal flag `+non-standard` is
---    used.
+-- directly because  if we /did/ use the real implementation, then the mock
+-- implementation and the real implementation would not be able to throw the
+-- same exception, because the exception type used by the real implementation
+-- is
 --
 -- > data ExceptionInLinkedThread =
 -- >   forall a . ExceptionInLinkedThread (Async a) SomeException
@@ -410,8 +404,19 @@ link = linkOnly (not . isCancel)
 linkOnly :: forall m a. (MonadAsync m, MonadFork m, MonadMask m)
          => (SomeException -> Bool) -> Async m a -> m ()
 linkOnly shouldThrow a = do
-    me <- myThreadId
-    linkToOnly me shouldThrow a
+    tid <- myThreadId
+    void $ forkRepeat ("linkToOnly " <> show linkedThreadId) $ do
+      r <- waitCatch a
+      case r of
+        Left e | shouldThrow e -> throwTo tid (exceptionInLinkedThread e)
+        _otherwise             -> return ()
+  where
+    linkedThreadId :: ThreadId m
+    linkedThreadId = asyncThreadId a
+
+    exceptionInLinkedThread :: SomeException -> ExceptionInLinkedThread
+    exceptionInLinkedThread =
+        ExceptionInLinkedThread (show linkedThreadId)
 
 link2 :: (MonadAsync m, MonadFork m, MonadMask m)
       => Async m a -> Async m b -> m ()
@@ -431,34 +436,6 @@ link2Only shouldThrow left  right =
   where
     tl = asyncThreadId left
     tr = asyncThreadId right
-
--- | Generalization of 'link' that links an async to an arbitrary thread.
---
--- Non standard (not in 'async' library)
---
-linkTo :: (MonadAsync m, MonadFork m, MonadMask m)
-       => ThreadId m -> Async m a -> m ()
-linkTo tid = linkToOnly tid (not . isCancel)
-
--- | Generalization of 'linkOnly' that links an async to an arbitrary thread.
---
--- Non standard (not in 'async' library).
---
-linkToOnly :: forall m a. (MonadAsync m, MonadFork m, MonadMask m)
-           => ThreadId m -> (SomeException -> Bool) -> Async m a -> m ()
-linkToOnly tid shouldThrow a = do
-    void $ forkRepeat ("linkToOnly " <> show linkedThreadId) $ do
-      r <- waitCatch a
-      case r of
-        Left e | shouldThrow e -> throwTo tid (exceptionInLinkedThread e)
-        _otherwise             -> return ()
-  where
-    linkedThreadId :: ThreadId m
-    linkedThreadId = asyncThreadId a
-
-    exceptionInLinkedThread :: SomeException -> ExceptionInLinkedThread
-    exceptionInLinkedThread =
-        ExceptionInLinkedThread (show linkedThreadId)
 
 isCancel :: SomeException -> Bool
 isCancel e
