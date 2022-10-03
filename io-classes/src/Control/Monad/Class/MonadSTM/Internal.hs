@@ -1319,6 +1319,12 @@ deriving instance MonadSTM m => Monad       (WrappedSTM t r m)
 deriving instance MonadSTM m => Alternative (WrappedSTM t r m)
 deriving instance MonadSTM m => MonadPlus   (WrappedSTM t r m)
 
+instance ( Semigroup a, MonadSTM m ) => Semigroup (WrappedSTM t r m a) where
+    a <> b = (<>) <$> a <*> b
+instance ( Monoid a , MonadSTM m ) => Monoid (WrappedSTM t r m a) where
+    mempty = pure mempty
+
+
 -- note: this (and the following) instance requires 'UndecidableInstances'
 -- extension because it violates 3rd Paterson condition, however `STM m` will
 -- resolve to a concrete type of kind (Type -> Type), and thus no larger than

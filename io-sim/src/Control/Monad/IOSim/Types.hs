@@ -178,6 +178,12 @@ data SimA s a where
 
 newtype STM s a = STM { unSTM :: forall r. (a -> StmA s r) -> StmA s r }
 
+instance Semigroup a => Semigroup (STM s a) where
+    a <> b = (<>) <$> a <*> b
+
+instance Monoid a => Monoid (STM s a) where
+    mempty = pure mempty
+
 runSTM :: STM s a -> StmA s a
 runSTM (STM k) = k ReturnStm
 
