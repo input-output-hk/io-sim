@@ -1,5 +1,11 @@
 # Change Log
 
+# Circa 2022.10.03 (pre release)
+
+- Added `Semigroup` and `Monoid` instances for `STM` and `WrappedSTM` monads
+- Added `MArray` instance for `WrappedSTM` monad
+- Added `MonadFix` instance for `STM`
+
 # Circa 2022.09.27 (pre release)
 
 - Module structure of `MonadSTM` changed to follow `stm` package structure.
