@@ -205,6 +205,9 @@ data StmA s a where
                -> (Maybe a -> a -> ST s TraceValue)
                -> StmA s b -> StmA s b
 
+  LiftSTStm    :: StrictST.ST s a -> (a -> StmA s b) -> StmA s b
+  FixStm       :: (x -> STM s x) -> (x -> StmA s r) -> StmA s r
+
 -- Exported type
 type STMSim = STM
 
@@ -296,6 +299,9 @@ instance Alternative (STM s) where
     (<|>) = MonadSTM.orElse
 
 instance MonadPlus (STM s) where
+
+instance MonadFix (STM s) where
+    mfix f = STM $ oneShot $ \k -> FixStm f k
 
 instance MonadSay (IOSim s) where
   say msg = IOSim $ oneShot $ \k -> Say msg (k ())
