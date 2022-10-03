@@ -1008,6 +1008,19 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
         trace <- go ctl read written writtenSeq createdSeq nextVid k
         return $ SimTrace time tid tlbl (EventLog x) trace
 
+      LiftSTStm st k ->
+        {-# SCC "schedule.LiftSTStm" #-} do
+        x <- strictToLazyST st
+        go ctl read written writtenSeq createdSeq nextVid (k x)
+
+      FixStm f k ->
+        {-# SCC "execAtomically.go.FixStm" #-} do
+        r <- newSTRef (throw NonTermination)
+        x <- unsafeInterleaveST $ readSTRef r
+        let k' = unSTM (f x) $ \x' ->
+                    LiftSTStm (lazyToStrictST (writeSTRef r x')) (\() -> k x')
+        go ctl read written writtenSeq createdSeq nextVid k'
+
       where
         localInvariant =
             Map.keysSet written

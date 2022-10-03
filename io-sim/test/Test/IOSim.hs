@@ -139,12 +139,18 @@ tests =
     [ testProperty "Reference vs IO"    prop_stm_referenceIO
     , testProperty "Reference vs Sim"   prop_stm_referenceSim
     ]
-  , testGroup "MonadFix instance"
-    [ testProperty "purity"     prop_mfix_purity
-    , testProperty "purity2"    prop_mfix_purity_2
-    , testProperty "tightening" prop_mfix_left_shrinking
-    , testProperty "lazy"       prop_mfix_lazy
-    , testProperty "recdata"    prop_mfix_recdata
+  , testGroup "MonadFix instances"
+    [ testGroup "IOSim"
+      [ testProperty "purity"     prop_mfix_purity_IOSim
+      , testProperty "purity2"    prop_mfix_purity_2
+      , testProperty "tightening" prop_mfix_left_shrinking_IOSim
+      , testProperty "lazy"       prop_mfix_lazy
+      , testProperty "recdata"    prop_mfix_recdata
+      ]
+    , testGroup "STM"
+      [ testProperty "purity"     prop_mfix_purity_STM
+      , testProperty "tightening" prop_mfix_left_shrinking_STM
+      ]
     ]
   -- NOTE: Most of the tests below only work because the io-sim
   -- scheduler works the way it does.
@@ -592,15 +598,18 @@ test_wakeup_order = do
 
 -- | Purity demands that @mfix (return . f) = return (fix f)@.
 --
-prop_mfix_purity :: Positive Int -> Bool
-prop_mfix_purity (Positive n) =
-       runSimOrThrow
-         (mfix (return . factorial)) n
-    == fix factorial n
+prop_mfix_purity_m :: forall m. MonadFix m => Positive Int -> m Bool
+prop_mfix_purity_m (Positive n) =
+    (== fix factorial n) . ($ n) <$> mfix (return . factorial)
   where
     factorial :: (Int -> Int) -> Int -> Int
     factorial = \rec_ k -> if k <= 1 then 1 else k * rec_ (k - 1)
 
+prop_mfix_purity_IOSim :: Positive Int -> Bool
+prop_mfix_purity_IOSim a = runSimOrThrow $ prop_mfix_purity_m a
+
+prop_mfix_purity_STM:: Positive Int -> Bool
+prop_mfix_purity_STM a = runSimOrThrow $ atomically $ prop_mfix_purity_m a
 
 prop_mfix_purity_2 :: [Positive Int] -> Bool
 prop_mfix_purity_2 as =
@@ -634,12 +643,12 @@ prop_mfix_purity_2 as =
                       (realToFrac `map` as')
 
 
-prop_mfix_left_shrinking
+prop_mfix_left_shrinking_IOSim
     :: Int
     -> NonNegative Int
     -> Positive Int
     -> Bool
-prop_mfix_left_shrinking n (NonNegative d) (Positive i) =
+prop_mfix_left_shrinking_IOSim n (NonNegative d) (Positive i) =
    let mn :: IOSim s Int
        mn = do say ""
                threadDelay (realToFrac d)
@@ -655,6 +664,25 @@ prop_mfix_left_shrinking n (NonNegative d) (Positive i) =
           mn >>= \a ->
             (mfix (\rec_ -> do
               threadDelay (realToFrac d) $> a : rec_)))
+
+
+prop_mfix_left_shrinking_STM
+    :: Int
+    -> Positive Int
+    -> Bool
+prop_mfix_left_shrinking_STM n (Positive i) =
+   let mn :: STMSim s Int
+       mn = do say ""
+               return n
+   in
+        take i
+        (runSimOrThrow $ atomically $
+          mfix (\rec_ -> mn >>= \a -> return $ a : rec_))
+      ==
+        take i
+        (runSimOrThrow $ atomically $
+          mn >>= \a ->
+            (mfix (\rec_ -> return $ a : rec_)))
 
 
 
@@ -756,7 +784,7 @@ probeOutput probe x = atomically (modifyTVar probe (x:))
 
 
 --
--- Syncronous exceptions
+-- Synchronous exceptions
 --
 
 unit_catch_0, unit_catch_1, unit_catch_2, unit_catch_3, unit_catch_4,
