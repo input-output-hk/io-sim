@@ -1321,8 +1321,14 @@ deriving instance MonadSTM m => MonadPlus   (WrappedSTM t r m)
 
 instance ( Semigroup a, MonadSTM m ) => Semigroup (WrappedSTM t r m a) where
     a <> b = (<>) <$> a <*> b
-instance ( Monoid a , MonadSTM m ) => Monoid (WrappedSTM t r m a) where
+instance ( Monoid a, MonadSTM m )    => Monoid (WrappedSTM t r m a) where
     mempty = pure mempty
+
+instance ( MonadSTM m, MArray e a (STM m) ) => MArray e a (WrappedSTM t r m) where
+    getBounds         = WrappedSTM . getBounds
+    getNumElements    = WrappedSTM . getNumElements
+    unsafeRead arr    = WrappedSTM . unsafeRead arr
+    unsafeWrite arr i = WrappedSTM . unsafeWrite arr i
 
 
 -- note: this (and the following) instance requires 'UndecidableInstances'
