@@ -8,6 +8,7 @@
 
 module Test.Control.Monad.IOSimPOR where
 
+import           Control.Concurrent.Class.MonadSTM.TVar
 import           Control.Monad
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSTM
@@ -33,6 +34,7 @@ data Step =
   | ThrowTo Int
   | Delay Int
   | Timeout TimeoutStep
+  | CheckStatus Int
   deriving (Eq, Ord, Show)
 
 data TimeoutStep =
@@ -50,11 +52,14 @@ instance Arbitrary Step where
                                return $ ThrowTo i),
                          (1,do Positive i <- arbitrary
                                return $ Delay i),
+                         (1,do NonNegative i <- arbitrary
+                               return $ CheckStatus i),
                          (1,Timeout <$> arbitrary)]
 
   shrink (WhenSet m n) = map (WhenSet m) (shrink n) ++
                          map (`WhenSet` n) (filter (>=n) (shrink m))
   shrink (ThrowTo i) = map ThrowTo (shrink i)
+  shrink (CheckStatus i) = map CheckStatus (shrink i)
   shrink (Delay i)   = map Delay (shrink i)
   shrink (Timeout t) = map Timeout (shrink t)
 
@@ -98,16 +103,16 @@ newtype Tasks = Tasks [Task]
   deriving Show
 
 instance Arbitrary Tasks where
-  arbitrary = Tasks . fixThrowTos <$> scale (min 20) arbitrary
-  shrink (Tasks ts) = Tasks . fixThrowTos <$>
+  arbitrary = Tasks . fixSymbolicThreadIds <$> scale (min 20) arbitrary
+  shrink (Tasks ts) = Tasks . fixSymbolicThreadIds <$>
          removeTask ts ++
          shrink ts ++
          shrinkDelays ts ++
          advanceThrowTo ts ++
          sortTasks ts
 
-fixThrowTos :: [Task] -> [Task]
-fixThrowTos tasks = mapThrowTos (`mod` length tasks) tasks
+fixSymbolicThreadIds :: [Task] -> [Task]
+fixSymbolicThreadIds tasks = mapSymThreadIds (`mod` length tasks) tasks
 
 shrinkDelays :: [Task] -> [[Task]]
 shrinkDelays tasks
@@ -142,6 +147,13 @@ advanceThrowTo (Task steps:ts) =
         advance (s:steppes) = (s:) <$> advance steppes
         advance []          = []
 
+mapSymThreadIds :: (Int -> Int) -> [Task] -> [Task]
+mapSymThreadIds f tasks = map mapTask tasks
+  where mapTask (Task steps) = Task (map mapStep steps)
+        mapStep (ThrowTo i) = ThrowTo (f i)
+        mapStep (CheckStatus i) = CheckStatus (f i)
+        mapStep s           = s
+
 mapThrowTos :: (Int -> Int) -> [Task] -> [Task]
 mapThrowTos f tasks = map mapTask tasks
   where mapTask (Task steps) = Task (map mapStep steps)
@@ -166,6 +178,7 @@ interpret r t (Task steps) = forkIO $ do
           when (a/=m) retry
           writeTVar r n
         interpretStep (ts,_) (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
+        interpretStep (ts,_) (CheckStatus i) = void $ threadStatus (ts !! i)
         interpretStep _      (Delay i)   = threadDelay (fromIntegral i)
         interpretStep (_,timer) (Timeout tstep) = do
           timerVal <- atomically $ readTVar timer
@@ -202,6 +215,7 @@ propSimulates (Tasks tasks) =
 
 propExploration :: Tasks -> Property
 propExploration (Tasks tasks) =
+  -- Debug.trace ("\nTasks:\n"++ show tasks) $
   any (not . null . (\(Task steps)->steps)) tasks ==>
     traceNoDuplicates $ \addTrace ->
     --traceCounter $ \addTrace ->

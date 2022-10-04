@@ -59,6 +59,7 @@ module Control.Monad.IOSim.Types
   , module Control.Monad.IOSim.CommonTypes
   , SimM
   , SimSTM
+  , Thrower (..)
   ) where
 
 import           Control.Applicative
@@ -74,10 +75,11 @@ import           Control.Monad.Class.MonadFork hiding (ThreadId)
 import qualified Control.Monad.Class.MonadFork as MonadFork
 import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadST
-import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
+import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
-                     TMVarDefault, TraceValue)
-import qualified Control.Monad.Class.MonadSTM as MonadSTM
+                     TArrayDefault, TChanDefault, TMVarDefault, TSemDefault,
+                     TraceValue)
+import qualified Control.Monad.Class.MonadSTM.Internal as MonadSTM
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow as MonadThrow hiding
@@ -112,6 +114,8 @@ import           Control.Monad.IOSim.CommonTypes
 import           Control.Monad.IOSim.STM
 import           Control.Monad.IOSimPOR.Types
 
+import           GHC.Conc (ThreadStatus)
+
 
 import qualified System.IO.Error as IO.Error (userError)
 
@@ -130,6 +134,8 @@ traceM x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())
 traceSTM :: Typeable a => a -> STMSim s ()
 traceSTM x = STM $ oneShot $ \k -> OutputStm (toDyn x) (k ())
 
+data Thrower = ThrowSelf | ThrowOther deriving (Ord, Eq, Show)
+
 data SimA s a where
   Return       :: a -> SimA s a
 
@@ -147,7 +153,7 @@ data SimA s a where
   UpdateTimeout:: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
   CancelTimeout:: Timeout (IOSim s) -> SimA s b -> SimA s b
 
-  Throw        :: SomeException -> SimA s a
+  Throw        :: Thrower -> SomeException -> SimA s a
   Catch        :: Exception e =>
                   SimA s a -> (e -> SimA s a) -> (a -> SimA s b) -> SimA s b
   Evaluate     :: a -> (a -> SimA s b) -> SimA s b
@@ -155,6 +161,7 @@ data SimA s a where
   Fork         :: IOSim s () -> (ThreadId -> SimA s b) -> SimA s b
   GetThreadId  :: (ThreadId -> SimA s b) -> SimA s b
   LabelThread  :: ThreadId -> String -> SimA s b -> SimA s b
+  ThreadStatus :: ThreadId -> (ThreadStatus -> SimA s b) -> SimA s b
 
   Atomically   :: STM  s a -> (a -> SimA s b) -> SimA s b
 
@@ -242,7 +249,7 @@ instance Monoid a => Monoid (IOSim s a) where
 #endif
 
 instance Fail.MonadFail (IOSim s) where
-  fail msg = IOSim $ oneShot $ \_ -> Throw (toException (IO.Error.userError msg))
+  fail msg = IOSim $ oneShot $ \_ -> Throw ThrowSelf (toException (IO.Error.userError msg))
 
 instance MonadFix (IOSim s) where
     mfix f = IOSim $ oneShot $ \k -> Fix f k
@@ -289,7 +296,7 @@ instance MonadSay (IOSim s) where
   say msg = IOSim $ oneShot $ \k -> Say msg (k ())
 
 instance MonadThrow (IOSim s) where
-  throwIO e = IOSim $ oneShot $ \_ -> Throw (toException e)
+  throwIO e = IOSim $ oneShot $ \_ -> Throw ThrowSelf (toException e)
 
 instance MonadEvaluate (IOSim s) where
   evaluate a = IOSim $ oneShot $ \k -> Evaluate a k
@@ -363,6 +370,12 @@ instance MonadMask (IOSim s) where
 
 instance MonadMaskingState (IOSim s) where
   getMaskingState = getMaskingStateImpl
+  interruptible action = do
+      b <- getMaskingStateImpl
+      case b of
+        Unmasked              -> action
+        MaskedInterruptible   -> unblock action
+        MaskedUninterruptible -> action
 
 instance Exceptions.MonadMask (IOSim s) where
   mask                = MonadThrow.mask
@@ -390,9 +403,11 @@ instance MonadThread (IOSim s) where
   type ThreadId (IOSim s) = ThreadId
   myThreadId       = IOSim $ oneShot $ \k -> GetThreadId k
   labelThread t l  = IOSim $ oneShot $ \k -> LabelThread t l (k ())
+  threadStatus t   = IOSim $ oneShot $ \k -> ThreadStatus t k
 
 instance MonadFork (IOSim s) where
   forkIO task        = IOSim $ oneShot $ \k -> Fork task k
+  forkOn _ task      = IOSim $ oneShot $ \k -> Fork task k
   forkIOWithUnmask f = forkIO (f unblock)
   throwTo tid e      = IOSim $ oneShot $ \k -> ThrowTo (toException e) tid (k ())
   yield              = IOSim $ oneShot $ \k -> YieldSim (k ())
@@ -406,7 +421,6 @@ instance MonadSay (STMSim s) where
 
 instance MonadLabelledSTM (IOSim s) where
   labelTVar tvar label = STM $ \k -> LabelTVar label tvar (k ())
-  labelTMVar   = MonadSTM.labelTMVarDefault
   labelTQueue  = labelTQueueDefault
   labelTBQueue = labelTBQueueDefault
 
@@ -416,6 +430,9 @@ instance MonadSTM (IOSim s) where
   type TMVar     (IOSim s) = TMVarDefault (IOSim s)
   type TQueue    (IOSim s) = TQueueDefault (IOSim s)
   type TBQueue   (IOSim s) = TBQueueDefault (IOSim s)
+  type TArray    (IOSim s) = TArrayDefault (IOSim s)
+  type TSem      (IOSim s) = TSemDefault (IOSim s)
+  type TChan     (IOSim s) = TChanDefault (IOSim s)
 
   atomically action = IOSim $ oneShot $ \k -> Atomically action k
 
@@ -425,24 +442,15 @@ instance MonadSTM (IOSim s) where
   retry             = STM $ oneShot $ \_ -> Retry
   orElse        a b = STM $ oneShot $ \k -> OrElse (runSTM a) (runSTM b) k
 
-  newTMVar          = MonadSTM.newTMVarDefault
-  newEmptyTMVar     = MonadSTM.newEmptyTMVarDefault
-  takeTMVar         = MonadSTM.takeTMVarDefault
-  tryTakeTMVar      = MonadSTM.tryTakeTMVarDefault
-  putTMVar          = MonadSTM.putTMVarDefault
-  tryPutTMVar       = MonadSTM.tryPutTMVarDefault
-  readTMVar         = MonadSTM.readTMVarDefault
-  tryReadTMVar      = MonadSTM.tryReadTMVarDefault
-  swapTMVar         = MonadSTM.swapTMVarDefault
-  isEmptyTMVar      = MonadSTM.isEmptyTMVarDefault
-
   newTQueue         = newTQueueDefault
   readTQueue        = readTQueueDefault
   tryReadTQueue     = tryReadTQueueDefault
   peekTQueue        = peekTQueueDefault
   tryPeekTQueue     = tryPeekTQueueDefault
+  flushTQueue       = flushTQueueDefault
   writeTQueue       = writeTQueueDefault
   isEmptyTQueue     = isEmptyTQueueDefault
+  unGetTQueue       = unGetTQueueDefault
 
   newTBQueue        = newTBQueueDefault
   readTBQueue       = readTBQueueDefault
@@ -454,9 +462,7 @@ instance MonadSTM (IOSim s) where
   lengthTBQueue     = lengthTBQueueDefault
   isEmptyTBQueue    = isEmptyTBQueueDefault
   isFullTBQueue     = isFullTBQueueDefault
-
-  newTMVarIO        = MonadSTM.newTMVarIODefault
-  newEmptyTMVarIO   = MonadSTM.newEmptyTMVarIODefault
+  unGetTBQueue      = unGetTBQueueDefault
 
 instance MonadInspectSTM (IOSim s) where
   type InspectMonad (IOSim s) = ST s
@@ -507,6 +513,9 @@ instance MonadAsync (IOSim s) where
     MonadSTM.labelTMVarIO var ("async-" ++ show tid)
     return (Async tid (MonadSTM.readTMVar var))
 
+  asyncOn _  = async
+  asyncBound = async
+
   asyncThreadId (Async tid _) = tid
 
   waitCatchSTM (Async _ w) = w
@@ -516,6 +525,7 @@ instance MonadAsync (IOSim s) where
   cancelWith a@(Async tid _) e = throwTo tid e <* waitCatch a
 
   asyncWithUnmask k = async (k unblock)
+  asyncOnWithUnmask _ k = async (k unblock)
 
 instance MonadST (IOSim s) where
   withLiftST f = f liftST
@@ -823,6 +833,7 @@ data SimEventType
   | EventPerformAction StepId
   | EventReschedule           ScheduleControl
   | EventUnblocked     [ThreadId]
+  | EventThreadStatus  ThreadId ThreadId
   deriving Show
 
 type TraceEvent = SimEventType

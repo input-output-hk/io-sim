@@ -34,9 +34,17 @@ flag asserts
 library
   hs-source-dirs:      src
 
-  exposed-modules:     Control.Monad.Class.MonadSTM.Strict
+  exposed-modules:     Control.Concurrent.Class.MonadSTM.Strict
+                       Control.Concurrent.Class.MonadSTM.Strict.TArray
+                       Control.Concurrent.Class.MonadSTM.Strict.TBQueue
+                       Control.Concurrent.Class.MonadSTM.Strict.TChan
+                       Control.Concurrent.Class.MonadSTM.Strict.TMVar
+                       Control.Concurrent.Class.MonadSTM.Strict.TQueue
+                       Control.Concurrent.Class.MonadSTM.Strict.TVar
+  reexported-modules: Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
   default-language:    Haskell2010
   build-depends:       base  >=4.9 && <4.18,
+                       array,
                        stm   >=2.5 && <2.6,
                        io-classes
   ghc-options:         -Wall

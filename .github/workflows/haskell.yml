@@ -33,7 +33,7 @@ jobs:
           mingw-w64-x86_64-jq
 
     - name: Set cache version
-      run: echo "CACHE_VERSION=pu4Aevoo" >> $GITHUB_ENV
+      run: echo "CACHE_VERSION=pu4Aevoo_v1" >> $GITHUB_ENV
 
     - name: "LINUX: Setup Haskell"
       uses: haskell/actions/setup@v1
@@ -127,7 +127,6 @@ jobs:
     - name: Set cache version
       run: |
         echo "CACHE_VERSION=hi5eTh3A" >> $GITHUB_ENV
-        echo "STYLISH_HASKELL_VERSION=0.13.0.0" >> $GITHUB_ENV
 
     - name: "Install build environment (apt-get)"
       run: |
@@ -151,22 +150,8 @@ jobs:
         path: ${{ steps.setup-haskell.outputs.cabal-store }}
         key: cache-dependencies-${{ env.CACHE_VERSION }}
 
-    - uses: actions/cache@v3
-      name: "Cache `stylish-haskell`"
-      with:
-        path: ~/.cabal/bin/stylish-haskell
-        key: cabal-path-${{ env.STYLISH_HASKELL_VERSION }}
-
-    # Install stylish-haskell unless the right version is already available
-    # from the cache
     - name: "Install `stylish-haskell`"
-      run: |
-        if [[ -x $(which stylish-haskell) && $(stylish-haskell --version) == "stylish-haskell ${{ env.STYLISH_HASKELL_VERSION }}" ]];
-        then
-          echo "Using cached `stylish-haskell`"
-        else
-          cabal install stylish-haskell-${{ env.STYLISH_HASKELL_VERSION }}
-        fi
+      run: cabal install stylish-haskell-0.13.0.0
 
     - name: "`stylish-haskell` version"
       run: |

@@ -7,14 +7,15 @@
 --
 module Control.Monad.IOSim.STM where
 
+import           Control.Concurrent.Class.MonadSTM.TVar
 import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
-                     MonadLabelledSTM (..), MonadSTM (..), MonadTraceSTM (..),
+                     MonadLabelledSTM, MonadSTM (..), MonadTraceSTM,
                      TraceValue (..))
 
 import           Numeric.Natural (Natural)
 
 --
--- Default TQueue implementation in terms of 'Seq' (used by sim)
+-- Default TQueue implementation in terms of a 'TVar' (used by sim)
 --
 
 newtype TQueueDefault m a = TQueue (TVar m ([a], [a]))
@@ -83,6 +84,14 @@ tryPeekTQueueDefault (TQueue queue) = do
     return $ case xs of
       x :_ -> Just x
       []   -> Nothing
+
+flushTQueueDefault :: MonadSTM m => TQueueDefault m a -> STM m [a]
+flushTQueueDefault (TQueue queue) = uncurry (++) <$> readTVar queue
+
+unGetTQueueDefault :: MonadSTM m => TQueueDefault m a -> a -> STM m ()
+unGetTQueueDefault (TQueue queue) a = do
+    (xs, ys) <- readTVar queue
+    writeTVar queue (a : xs, ys)
 
 --
 -- Default TBQueue implementation in terms of 'Seq' (used by sim)
@@ -190,3 +199,13 @@ flushTBQueueDefault (TBQueue queue size) = do
     else do
       writeTVar queue $! ([], 0, [], size)
       return (xs ++ reverse ys)
+
+unGetTBQueueDefault :: MonadSTM m => TBQueueDefault m a -> a -> STM m ()
+unGetTBQueueDefault (TBQueue queue _size) a = do
+  (xs, r, ys, w) <- readTVar queue
+  if (r > 0)
+     then do writeTVar queue (a : xs, r - 1, ys, w)
+     else do
+          if (w > 0)
+             then writeTVar queue (a : xs, r, ys, w - 1)
+             else retry
