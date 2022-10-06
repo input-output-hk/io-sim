@@ -24,7 +24,7 @@ module Test.STM where
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe, maybeToList)
+import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Type.Equality
@@ -68,7 +68,7 @@ data Term (t :: Type) where
 
     Return    :: Expr t -> Term t
     Throw     :: Expr a -> Term t
-    Catch     :: Term t -> Term t -> Term t
+    Catch     :: Term t -> SomeException -> Term t -> Term t
     Retry     :: Term t
 
     ReadTVar  :: Name (TyVar t) -> Term t
@@ -268,6 +268,7 @@ data ImmValue where
     ImmValVar  :: ImmValue -> ImmValue
   deriving (Eq, Show)
 
+
 -- | In the execution in real STM transactions are aborted by throwing an
 -- exception.
 --
@@ -313,7 +314,7 @@ evalTerm !env !heap !allocs term = case term of
 
     -- Exception semantics are detailed in "Appendix A Exception semantics" p 12-13 of
     -- <https://research.microsoft.com/en-us/um/people/simonpj/papers/stm/stm.pdf>
-    Catch t1 t2 ->
+    Catch t1 exc t2 ->
       let (nf1, heap', allocs') = evalTerm env heap mempty t1 in case nf1 of
 
         -- Rule XSTM1
@@ -326,7 +327,14 @@ evalTerm !env !heap !allocs term = case term of
         --                M; heap, {} => throw P; heap', allocs'
         -- --------------------------------------------------------
         -- S[catch M N]; heap, allocs => S[N P]; heap U allocs', allocs U allocs'
-        NfThrow _  -> evalTerm env (heap <> allocs') (allocs <> allocs') t2
+        NfThrow v  ->
+          -- v should be compared to exception
+          case fromException exc of
+            -- TODO: Add eqValue for value
+            Just (ImmValInt 0)  ->
+              evalTerm env (heap <> allocs') (allocs <> allocs') t2
+            -- Exception is not handled, bubble it up
+            _otherwise        -> (NfThrow v, heap, allocs)
 
         -- Rule XSTM3
         --                M; heap, {} => retry; heap', allocs'
@@ -477,7 +485,7 @@ execTerm env t =
         let e' = execExpr env e
         throwSTM =<< snapshotExecValue e'
 
-      Catch t1 t2 -> execTerm env t1 `catch` \(_ :: ImmValue) -> execTerm env t2
+      Catch t1 _ t2 -> execTerm env t1 `catch` \(_ :: ImmValue) -> execTerm env t2
 
       Retry -> retry
 
@@ -706,6 +714,7 @@ genTerm env tyrep =
     catchTerm =
       scale (`div` 2) $
         Catch <$> genTerm env tyrep
+              <*> pure (toException $ ImmValInt 0) -- TODO: 0 is treated as an exception value, generalize it later
               <*> genTerm env tyrep
 
 genSomeExpr :: GenEnv -> Gen SomeExpr
@@ -746,8 +755,8 @@ shrinkTerm t =
     case t of
       Return e      -> [Return e' | e' <- shrinkExpr e]
       Throw e       -> [Throw  e' | e' <- shrinkExpr e]
-      Catch t1 t2   -> [t1, t2]
-                    ++ [Catch t1' t2' | (t1', t2') <- liftShrink2 shrinkTerm shrinkTerm (t1, t2)]
+      Catch t1 exc t2   -> [t1, t2]
+                    ++ [Catch t1' exc t2' | (t1', t2') <- liftShrink2 shrinkTerm shrinkTerm (t1, t2)]
       Retry         -> []
       ReadTVar _    -> []
 
@@ -771,7 +780,7 @@ shrinkExpr (ExprName (Name _ (TyRepVar _))) = []
 freeNamesTerm :: Term t -> Set NameId
 freeNamesTerm (Return e)      = freeNamesExpr e
 freeNamesTerm (Throw  e)      = freeNamesExpr e
-freeNamesTerm (Catch t1 t2)   = freeNamesTerm t1 <> freeNamesTerm t2
+freeNamesTerm (Catch t1 exc t2)   = freeNamesTerm t1 <> freeNamesTerm t2
 freeNamesTerm  Retry          = Set.empty
 freeNamesTerm (ReadTVar  n)   = Set.singleton (nameId n)
 freeNamesTerm (WriteTVar n e) = Set.singleton (nameId n) <> freeNamesExpr e
@@ -802,7 +811,7 @@ prop_genSomeTerm (SomeTerm tyrep term) =
 termSize :: Term a -> Int
 termSize Return{}     = 1
 termSize Throw{}      = 1
-termSize (Catch a b)  = 1 + termSize a + termSize b
+termSize (Catch a _ b)  = 1 + termSize a + termSize b
 termSize Retry{}      = 1
 termSize ReadTVar{}   = 1
 termSize WriteTVar{}  = 1
@@ -813,7 +822,7 @@ termSize (OrElse a b) = 1 + termSize a + termSize b
 termDepth :: Term a -> Int
 termDepth Return{}     = 1
 termDepth Throw{}      = 1
-termDepth (Catch a b)  = 1 + max (termDepth a) (termDepth b)
+termDepth (Catch a _ b)  = 1 + max (termDepth a) (termDepth b)
 termDepth Retry{}      = 1
 termDepth ReadTVar{}   = 1
 termDepth WriteTVar{}  = 1
@@ -826,7 +835,7 @@ showTerm p (Return e)      = showParen (p > 10) $
                                showString "return " . showExpr 11 e
 showTerm p (Throw  e)      = showParen (p > 10) $
                                showString "throwSTM " . showExpr 11 e
-showTerm p (Catch t1 t2)   = showParen (p > 9)  $
+showTerm p (Catch t1 _ t2)   = showParen (p > 9)  $
                                showTerm 10 t1 . showString " `catch` "
                              . showTerm 10 t2
 showTerm _  Retry          = showString "retry"
