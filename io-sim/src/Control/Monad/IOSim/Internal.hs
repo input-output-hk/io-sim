@@ -952,8 +952,7 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
 
 
       Retry ->
-        {-# SCC "execAtomically.go.Retry" #-}
-        do
+        {-# SCC "execAtomically.go.Retry" #-} do
           -- Always revert all the TVar writes for the retry
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           case ctl of

@@ -881,8 +881,8 @@ data StmTxResult s a =
      | StmTxAborted  [SomeTVar s] SomeException
 
 
--- | OrElse/Catch give rise to an alternate branch. A branch of a branch is an
--- empty one.
+-- | OrElse/Catch give rise to an alternate branch.
+-- A branch of a branch is an empty one.
 data BranchStmA s a = OrElseStmA (StmA s a)
                     | CatchStmA (SomeException -> StmA s a)
                     | NoOpStmA
