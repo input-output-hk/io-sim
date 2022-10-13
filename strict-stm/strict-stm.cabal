@@ -1,5 +1,5 @@
 name:                strict-stm
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            Strict STM interface polymorphic over stm implementation.
 description:         The `strict-stm` package gives a strict interface to stm,
                      currently either one provided by `stm` package for the
