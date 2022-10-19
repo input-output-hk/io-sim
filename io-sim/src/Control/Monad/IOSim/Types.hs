@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DerivingVia                #-}
@@ -668,7 +669,7 @@ data SimResult a
     | MainException !Time SomeException ![Labelled ThreadId]
     | Deadlock      !Time               ![Labelled ThreadId]
     | Loop
-    deriving Show
+    deriving (Show, Functor)
 
 
 type SimTrace a = Trace.Trace (SimResult a) SimEvent
