@@ -1,5 +1,9 @@
 # Change Log
 
+# Circa 2022.10.19 (pre release)
+
+- Added `Functor` instance for `SimResult` type
+
 # Circa 2022.10.03 (pre release)
 
 - Added `Semigroup` and `Monoid` instances for `STM` and `WrappedSTM` monads
