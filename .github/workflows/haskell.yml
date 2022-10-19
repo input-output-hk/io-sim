@@ -151,7 +151,7 @@ jobs:
         key: cache-dependencies-${{ env.CACHE_VERSION }}
 
     - name: "Install `stylish-haskell`"
-      run: cabal install stylish-haskell-0.13.0.0
+      run: cabal install stylish-haskell-0.14.3.0
 
     - name: "`stylish-haskell` version"
       run: |
