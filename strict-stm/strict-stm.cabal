@@ -1,3 +1,4 @@
+cabal-version:       2.0
 name:                strict-stm
 version:             0.2.0.0
 synopsis:            Strict STM interface polymorphic over stm implementation.
@@ -13,7 +14,6 @@ author:              Alexander Vieth, Marcin Szamotulski, Duncan Coutts
 maintainer:
 category:            Control
 build-type:          Simple
-cabal-version:       >=1.10
 tested-with:         GHC == 8.10.7, GHC == 9.2.4
 
 source-repository head
@@ -43,10 +43,10 @@ library
                        Control.Concurrent.Class.MonadSTM.Strict.TVar
   reexported-modules: Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
   default-language:    Haskell2010
-  build-depends:       base  >=4.9 && <4.18,
+  build-depends:       base        >= 4.9 && <4.18,
                        array,
-                       stm   >=2.5 && <2.6,
-                       io-classes
+                       stm         >= 2.5 && <2.6,
+                       io-classes ^>= 0.3
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
                        -Wcompat
