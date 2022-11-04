@@ -75,7 +75,7 @@ jobs:
 
         ghc --version
         cabal --version
-        echo "::set-output name=cabal-store::$(dirname $(cabal --help | tail -1 | tr -d ' '))\\store"
+        echo "cabal-store=$(dirname $(cabal --help | tail -1 | tr -d ' '))\\store" >> $GITHUB_OUTPUT
 
     - uses: actions/checkout@v2
 
