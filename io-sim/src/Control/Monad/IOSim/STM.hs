@@ -171,10 +171,12 @@ writeTBQueueDefault (TBQueue queue _size) a = do
 
 isEmptyTBQueueDefault :: MonadSTM m => TBQueueDefault m a -> STM m Bool
 isEmptyTBQueueDefault (TBQueue queue _size) = do
-  (xs, _, _, _) <- readTVar queue
+  (xs, _, ys, _) <- readTVar queue
   case xs of
     _:_ -> return False
-    []  -> return True
+    []  -> case ys of
+             [] -> return True
+             _  -> return False
 
 isFullTBQueueDefault :: MonadSTM m => TBQueueDefault m a -> STM m Bool
 isFullTBQueueDefault (TBQueue queue _size) = do
