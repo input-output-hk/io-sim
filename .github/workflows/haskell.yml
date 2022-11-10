@@ -84,6 +84,9 @@ jobs:
         cat ./.github/workflows/cabal.project.local > ./cabal.project.local
         cat ./cabal.project.local
 
+    - name: "Cabal update"
+      run: cabal update
+
     - name: Record dependencies
       id: record-deps
       run: |
