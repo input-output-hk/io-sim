@@ -1391,32 +1391,54 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
         {-# SCC "execAtomically.go.ThrowStm" #-} do
         -- Revert all the TVar writes
         !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-        k0 $ StmTxAborted (Map.elems read) (toException e)
+        case ctl of
+          AtomicallyFrame -> do
+            k0 $ StmTxAborted (Map.elems read) (toException e)
+
+          BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+            {-# SCC "execAtomically.go.BranchFrame" #-} do
+            -- Execute the left side in a new frame with an empty written set.
+            -- but preserve ones that were set prior to it, as specified in the
+            -- [stm](https://hackage.haskell.org/package/stm/docs/Control-Monad-STM.html#v:catchSTM) package.
+            let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
+            go ctl'' read Map.empty [] [] nextVid (h e)
+
+          BranchFrame (OrElseStmA _r) _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+            {-# SCC "execAtomically.go.BranchFrame" #-} do
+            go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
+
+          BranchFrame NoOpStmA _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+            {-# SCC "execAtomically.go.BranchFrame" #-} do
+            go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
+
+      CatchStm a h k ->
+        {-# SCC "execAtomically.go.ThrowStm" #-} do
+        -- Execute the left side in a new frame with an empty written set
+        let ctl' = BranchFrame (CatchStmA h) k written writtenSeq createdSeq ctl
+        go ctl' read Map.empty [] [] nextVid a
 
       Retry ->
-        {-# SCC "execAtomically.go.Retry" #-}
-        do
-          -- Always revert all the TVar writes for the retry
-          !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-          case ctl of
-            AtomicallyFrame -> do
-              -- Return vars read, so the thread can block on them
-              k0 $! StmTxBlocked $! Map.elems read
+        {-# SCC "execAtomically.go.Retry" #-} do
+        -- Always revert all the TVar writes for the retry
+        !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
+        case ctl of
+          AtomicallyFrame -> do
+            -- Return vars read, so the thread can block on them
+            k0 $! StmTxBlocked $! Map.elems read
 
-            BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-              {-# SCC "execAtomically.go.BranchFrame.OrElseStmA" #-} do
-              !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
-              -- Execute the orElse right hand with an empty written set
-              let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
-              go ctl'' read Map.empty [] [] nextVid b
+          BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+            {-# SCC "execAtomically.go.BranchFrame.OrElseStmA" #-} do
+            -- Execute the orElse right hand with an empty written set
+            let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
+            go ctl'' read Map.empty [] [] nextVid b
 
-            BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-              {-# SCC "execAtomically.go.BranchFrame" #-} do
-              -- Retry makes sense only within a OrElse context. If it is a branch other than
-              -- OrElse left side, then bubble up the `retry` to the frame above.
-              -- Skip the continuation and propagate the retry into the outer frame
-              -- using the written set for the outer frame
-              go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
+          BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
+            {-# SCC "execAtomically.go.BranchFrame" #-} do
+            -- Retry makes sense only within a OrElse context. If it is a branch other than
+            -- OrElse left side, then bubble up the `retry` to the frame above.
+            -- Skip the continuation and propagate the retry into the outer frame
+            -- using the written set for the outer frame
+            go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
       OrElse a b k ->
         {-# SCC "execAtomically.go.OrElse" #-} do

@@ -195,6 +195,7 @@ runSTM (STM k) = k ReturnStm
 data StmA s a where
   ReturnStm    :: a -> StmA s a
   ThrowStm     :: SomeException -> StmA s a
+  CatchStm     :: StmA s a -> (SomeException -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
   NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
@@ -338,6 +339,31 @@ instance MonadThrow (STM s) where
 
 instance Exceptions.MonadThrow (STM s) where
   throwM = MonadThrow.throwIO
+
+
+instance MonadCatch (STM s) where
+
+  catch action handler = STM $ oneShot $ \k -> CatchStm (runSTM action) (runSTM . fromHandler handler) k
+    where
+      -- Get a total handler from the given handler
+      fromHandler :: Exception e => (e -> STM s a) -> SomeException -> STM s a
+      fromHandler h e = case fromException e of
+        Nothing -> throwIO e  -- Rethrow the exception if handler does not handle it.
+        Just e' -> h e'
+
+  -- Masking is not required as STM actions are always run inside
+  -- `execAtomically` and behave as if masked. Also note that the default
+  -- implementation of `generalBracket` needs mask, and is part of `MonadThrow`.
+  generalBracket acquire release use = do
+    resource <- acquire
+    b <- use resource `catch` \e -> do
+      _ <- release resource (ExitCaseException e)
+      throwIO e
+    c <- release resource (ExitCaseSuccess b)
+    return (b, c)
+
+instance Exceptions.MonadCatch (STM s) where
+  catch = MonadThrow.catch
 
 instance MonadCatch (IOSim s) where
   catch action handler =
@@ -867,9 +893,22 @@ data StmTxResult s a =
      | StmTxAborted  [SomeTVar s] SomeException
 
 
--- | OrElse/Catch give rise to an alternate right hand side branch. A right branch
--- can be a NoOp
-data BranchStmA s a = OrElseStmA (StmA s a) | NoOpStmA
+-- | A branch indicates that an alternative statement is available in the current
+-- context. For example, `OrElse` has two alternative statements, say "left"
+-- and "right". While executing the left statement, `OrElseStmA` branch indicates
+-- that the right branch is still available, in case the left statement fails.
+data BranchStmA s a =
+       -- | `OrElse` statement with its 'right' alternative.
+       OrElseStmA (StmA s a)
+       -- | `CatchStm` statement with the 'catch' handler.
+     | CatchStmA (SomeException -> StmA s a)
+       -- | Unlike the other two branches, the no-op branch is not an explicit
+       -- part of the STM syntax. It simply indicates that there are no
+       -- alternative statements left to be executed. For example, when running
+       -- right alternative of the `OrElse` statement or when running the catch
+       -- handler of a `CatchStm` statement, there are no alternative statements
+       -- available. This case is represented by the no-op branch.
+     | NoOpStmA
 
 data StmStack s b a where
   -- | Executing in the context of a top level 'atomically'.

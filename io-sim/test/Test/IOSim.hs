@@ -1249,7 +1249,7 @@ prop_stm_referenceSim t =
 -- | Compare the behaviour of the STM reference operational semantics with
 -- the behaviour of any 'MonadSTM' STM implementation.
 --
-prop_stm_referenceM :: (MonadSTM m, MonadThrow (STM m), MonadCatch m)
+prop_stm_referenceM :: (MonadSTM m, MonadCatch (STM m), MonadCatch m)
                     => SomeTerm -> m Property
 prop_stm_referenceM (SomeTerm _tyrep t) = do
     let (r1, _heap) = evalAtomically t
