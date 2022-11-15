@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.4"]
+        ghc: ["8.10.7", "9.2.4", "9.4.3"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     defaults:
@@ -68,7 +68,7 @@ jobs:
         echo "# Original cabal config extra-lib-dirs"
         grep extra-lib-dirs /c/cabal/config
 
-        sed -i 's/C:\\msys64\\mingw64\\lib/C:\\ghcup\\ghc\\8.10.7\\mingw\\x86_64-w64-mingw32\\lib, C:\\msys64\\mingw64\\lib/g' /c/cabal/config
+        sed -i 's/C:\\msys64\\mingw64\\lib/C:\\ghcup\\ghc\\${{matrix.ghc}}\\mingw\\x86_64-w64-mingw32\\lib, C:\\msys64\\mingw64\\lib/g' /c/cabal/config
 
         echo "# Modified cabal config extra-lib-dirs"
         grep extra-lib-dirs /c/cabal/config
