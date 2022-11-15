@@ -12,7 +12,7 @@ author:              Duncan Coutts, Marcin Szamotulski, Alexander Vieth
 maintainer:
 category:            Testing
 build-type:          Simple
-tested-with:         GHC == 8.10.7, GHC == 9.2.4
+tested-with:         GHC == 8.10.7, GHC == 9.2.4, GHC == 9.4.3
 
 flag asserts
   description: Enable assertions
@@ -110,7 +110,7 @@ benchmark bench
                        contra-tracer,
                        io-classes,
                        io-sim,
-                       typed-protocols,
+                       typed-protocols >= 0.1.0.2,
                        typed-protocols-cborg,
                        typed-protocols-examples
   ghc-options:         -Wall
