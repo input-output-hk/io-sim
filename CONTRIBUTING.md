@@ -62,6 +62,20 @@ Please include your changes in `CHANGELOG.md` files (per package).
 If you are adding a new functionality to `MonadSTM`, don't forget to support it
 in `strict-stm` package.
 
+# Releases
+
+The major version of `io-sim`, `io-classes` and `strict-stm` packages are kept
+in sync.  This means that if any of the packages introduces a breaking change
+all major version SHOULD be bumped.  The minor versions are kept independent.
+
+The drawback is that if you declare `io-classes ^>= 0.x` then you will need to
+bump it when new version of `io-sim` is published (even if there are no changes
+in `io-classes`).  The con is that you just need to declare version of
+`io-classes` to have a consistent ecosystem of the three packages.
+
+
 [CHaP]: https://github.com/input-output-hk/cardano-haskell-packages/
 [gh-link-issue]: https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue
 [gh-signing-commits]: https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits
+
+
