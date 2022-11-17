@@ -109,4 +109,4 @@ of issues opened in the `ouroboros-network` repository:
 [io-classes-issues]: https://github.com/input-output-hk/ouroboros-network/issues?q=is%3Aopen+is%3Aissue+label%3Aio-classes
 [contra-tracer]: https://hackage.haskell.org/package/contra-tracer
 [io-sim-por]: https://github.com/input-output-hk/io-sim/blob/main/io-sim/how-to-use-IOSimPOR.md
-[bob-conf]: https://www.youtube.com/watch?v=e74TE0b4xEM&t=13662s
+[bob-conf]: https://youtu.be/uedUGeWN4ZM
