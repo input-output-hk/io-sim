@@ -51,6 +51,7 @@ a complex, highly-concurrent, distributed system
 ### Supporting material
 
 * [Philipp Kant (@kantp) at Bobconf 2022][bob-conf]
+* [Armando Santos (@bolt12) at ZuriHac 2022][zuriHac-2022]
 
 
 ## Packages
@@ -110,3 +111,4 @@ of issues opened in the `ouroboros-network` repository:
 [contra-tracer]: https://hackage.haskell.org/package/contra-tracer
 [io-sim-por]: https://github.com/input-output-hk/io-sim/blob/main/io-sim/how-to-use-IOSimPOR.md
 [bob-conf]: https://youtu.be/uedUGeWN4ZM
+[zuriHac-2022]: https://youtu.be/tKIYQgJnGkA
