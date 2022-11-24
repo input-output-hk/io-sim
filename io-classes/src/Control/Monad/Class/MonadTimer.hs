@@ -117,6 +117,10 @@ class (MonadSTM m, MonadDelay m) => MonadTimer m where
 
   timeout :: DiffTime -> m a -> m (Maybe a)
 
+{-# DEPRECATED newTimeout "it will be removed in version 0.6.0.0" #-}
+{-# DEPRECATED readTimeout "it will be removed in version 0.6.0.0" #-}
+{-# DEPRECATED updateTimeout "it will be removed in version 0.6.0.0" #-}
+{-# DEPRECATED cancelTimeout "it will be removed in version 0.6.0.0" #-}
 
 defaultRegisterDelay :: ( MonadTimer m
                         , MonadFork  m
