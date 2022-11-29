@@ -33,6 +33,7 @@ import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.IOSim
 
 import           GHC.Generics
