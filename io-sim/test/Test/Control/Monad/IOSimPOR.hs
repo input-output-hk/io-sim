@@ -25,7 +25,7 @@ import           System.IO.Unsafe
 import           Control.Exception (SomeException, evaluate, try)
 import           Control.Parallel
 import           Data.IORef
-import           Data.List
+import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Test.QuickCheck
@@ -88,7 +88,7 @@ instance Arbitrary Task where
 
 normalize :: [Step] -> [Step]
 normalize steps = plug steps wsSteps 1000000
-  where wsSteps = reverse $ sort [s | s@(WhenSet _ _) <- steps]
+  where wsSteps = reverse $ List.sort [s | s@(WhenSet _ _) <- steps]
         plug []              []               _ = []
         plug (WhenSet _ _:s) (WhenSet a b:ws) m = WhenSet (min a m) (min b m):plug s ws (min b m)
         plug (step:s)        ws               m = step:plug s ws m
@@ -120,7 +120,7 @@ shrinkDelays tasks
   | null times = []
   | otherwise  = [map (Task . removeTime d) [steps | Task steps <- tasks]
                  | d <- times]
-  where times = foldr union [] [scanl1 (+) [d | Delay d <- t] | Task t <- tasks]
+  where times = foldr List.union [] [scanl1 (+) [d | Delay d <- t] | Task t <- tasks]
         removeTime 0 steps = steps
         removeTime _ []    = []
         removeTime d (Delay d':steps)

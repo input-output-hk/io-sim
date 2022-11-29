@@ -1,3 +1,4 @@
+cabal-version:       3.4
 name:                io-classes
 version:             0.4.0.0
 synopsis:            Type classes for concurrency with STM, ST and timing
@@ -11,7 +12,6 @@ author:              Alexander Vieth, Marcin Szamotulski, Duncan Coutts
 maintainer:
 category:            Control
 build-type:          Simple
-cabal-version:       >=1.10
 tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.3
 
 source-repository head
@@ -24,7 +24,19 @@ flag asserts
   manual:      False
   default:     False
 
+common warnings
+    ghc-options: -Wall
+                 -Wcompat
+                 -Wincomplete-uni-patterns
+                 -Wincomplete-record-updates
+                 -Wpartial-fields
+                 -Widentities
+                 -Wunused-packages
+                 -Wno-redundant-constraints
+                 -Wno-unticked-promoted-constructors
+
 library
+  import:              warnings
   hs-source-dirs:      src
 
   -- At this experiment/prototype stage everything is exposed.
@@ -68,18 +80,12 @@ library
                        mtl   >=2.2 && <2.4,
                        stm   >=2.5 && <2.6,
                        time  >=1.9.1 && <1.13
-  ghc-options:         -Wall
-                       -Wno-unticked-promoted-constructors
-                       -Wcompat
-                       -Wincomplete-uni-patterns
-                       -Wincomplete-record-updates
-                       -Wpartial-fields
-                       -Widentities
 
   if flag(asserts)
     ghc-options: -fno-ignore-asserts
 
 test-suite test
+  import:              warnings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Main.hs

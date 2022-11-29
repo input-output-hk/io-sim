@@ -178,8 +178,7 @@ newMVarDefault :: MonadSTM m => a -> m (MVarDefault m a)
 newMVarDefault a = MVar <$> newTVarIO (MVarFull a mempty)
 
 
-putMVarDefault :: ( MonadCatch m
-                  , MonadMask  m
+putMVarDefault :: ( MonadMask  m
                   , MonadSTM   m
                   , forall x tvar. tvar ~ TVar m x => Eq tvar
                   )
@@ -357,7 +356,6 @@ newtype WrappedMVar r (m :: Type -> Type) a = WrappedMVar { unwrapMVar :: MVar m
 
 instance ( MonadMask m
          , MonadMVar m
-         , MonadEvaluate m
          ) => MonadMVar (ReaderT r m) where
     type MVar (ReaderT r m) = WrappedMVar r m
     newEmptyMVar = WrappedMVar <$> lift newEmptyMVar
