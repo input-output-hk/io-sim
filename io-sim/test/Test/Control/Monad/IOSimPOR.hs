@@ -11,9 +11,10 @@
 module Test.Control.Monad.IOSimPOR (tests) where
 
 import           Data.Fixed (Micro)
+import           Data.Foldable (foldl')
 import           Data.Functor (($>))
 import           Data.IORef
-import           Data.List
+import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -186,7 +187,7 @@ instance Arbitrary Task where
 
 normalize :: [Step] -> [Step]
 normalize steps = plug steps wsSteps 1000000
-  where wsSteps = reverse $ sort [s | s@(WhenSet _ _) <- steps]
+  where wsSteps = reverse $ List.sort [s | s@(WhenSet _ _) <- steps]
         plug []              []               _ = []
         plug (WhenSet _ _:s) (WhenSet a b:ws) m = WhenSet (min a m) (min b m):plug s ws (min b m)
         plug (step:s)        ws               m = step:plug s ws m
@@ -218,7 +219,7 @@ shrinkDelays tasks
   | null times = []
   | otherwise  = [map (Task . removeTime d) [steps | Task steps <- tasks]
                  | d <- times]
-  where times = foldr union [] [scanl1 (+) [d | Delay d <- t] | Task t <- tasks]
+  where times = foldr List.union [] [scanl1 (+) [d | Delay d <- t] | Task t <- tasks]
         removeTime 0 steps = steps
         removeTime _ []    = []
         removeTime d (Delay d':steps)
@@ -516,14 +517,7 @@ prop_mfix_lazy (NonEmpty env) =
       samples :: Int
       samples = 10
 
-      replicateHeadM ::
-                        (
-
-                          MonadFail m,
-                          MonadFail (STM m),
-
-                          MonadSTM  m
-                        )
+      replicateHeadM :: MonadFail m
                      => m Char
                      -> String -> m String
       replicateHeadM getChar_ as = do
@@ -568,7 +562,7 @@ unit_catch_0, unit_catch_1, unit_catch_2, unit_catch_3, unit_catch_4,
 -- unhandled top level exception
 unit_catch_0 =
   exploreSimTrace id example $ \_ trace ->
-    counterexample (intercalate "\n" $ map show $ traceEvents trace) $
+    counterexample (List.intercalate "\n" $ map show $ traceEvents trace) $
     counterexample (show $ selectTraceSay trace) $
     selectTraceSay trace === ["before"]
     .&&.

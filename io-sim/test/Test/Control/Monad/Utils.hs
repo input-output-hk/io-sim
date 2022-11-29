@@ -124,7 +124,6 @@ instance Arbitrary TestMicro where
 
 test_timers :: forall m.
                ( MonadFork m
-               , MonadSTM m
                , MonadTimer m
                )
             => [DiffTime]
@@ -176,7 +175,6 @@ test_timers xs =
 
 test_fork_order :: forall m.
                    ( MonadFork m
-                   , MonadSTM m
                    , MonadTimer m
                    )
                 => Positive Int
@@ -201,7 +199,6 @@ test_fork_order = \(Positive n) -> isValid n <$> withProbe (experiment n)
 
 test_threadId_order :: forall m.
                    ( MonadFork m
-                   , MonadSTM m
                    , MonadTimer m
                    )
                 => Positive Int
@@ -230,7 +227,6 @@ test_threadId_order = \(Positive n) -> do
 --prop_wakeup_order_IO = ioProperty test_wakeup_order
 
 test_wakeup_order :: ( MonadFork m
-                     , MonadSTM m
                      , MonadTimer m
                      )
                 => m Property
@@ -280,7 +276,10 @@ probeOutput probe x = atomically (modifyTVar probe (x:))
 -- | Compare the behaviour of the STM reference operational semantics with
 -- the behaviour of any 'MonadSTM' STM implementation.
 --
-prop_stm_referenceM :: (MonadSTM m, MonadThrow (STM m), MonadCatch (STM m), MonadCatch m)
+prop_stm_referenceM :: ( MonadSTM m
+                       , MonadCatch (STM m)
+                       , MonadCatch m
+                       )
                     => SomeTerm -> m Property
 prop_stm_referenceM (SomeTerm _tyrep t) = do
     let (r1, _heap) = evalAtomically t
@@ -290,7 +289,11 @@ prop_stm_referenceM (SomeTerm _tyrep t) = do
 -- | Check that 'timeout' does not deadlock when executed with asynchronous
 -- exceptions uninterruptibly masked.
 --
-prop_timeout_no_deadlockM :: forall m. ( MonadFork m, MonadSTM m, MonadTimer m, MonadMask m )
+prop_timeout_no_deadlockM :: forall m.
+                             ( MonadFork m
+                             , MonadTimer m
+                             , MonadMask m
+                             )
                           => m Bool
 prop_timeout_no_deadlockM = do
     v <- registerDelay' 0.01

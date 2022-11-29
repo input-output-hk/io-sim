@@ -142,7 +142,6 @@ newtype WrappedMVar r (m :: Type -> Type) a = WrappedMVar { unwrapMVar :: MVar m
 
 instance ( MonadMask m
          , MonadMVar m
-         , MonadEvaluate m
          ) => MonadMVar (ReaderT r m) where
     type MVar (ReaderT r m) = WrappedMVar r m
     newEmptyMVar = WrappedMVar <$> lift newEmptyMVar
