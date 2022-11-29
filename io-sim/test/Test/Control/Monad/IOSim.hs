@@ -225,7 +225,7 @@ tests =
 -- threadStatus
 --
 
-prop_two_threads_expect :: (MonadFork m, MonadThread m)
+prop_two_threads_expect :: MonadFork m
                         => m ()
                         -> (ThreadId m -> m ())
                         -> (ThreadStatus -> Property)
@@ -236,7 +236,7 @@ prop_two_threads_expect target main prop = do
   status <- threadStatus tid
   return $ prop status
 
-prop_two_threads_expect_ :: (MonadFork m, MonadThread m)
+prop_two_threads_expect_ :: MonadFork m
                          => m ()
                          -> (ThreadStatus -> Property)
                          -> m Property
@@ -245,21 +245,19 @@ prop_two_threads_expect_ target prop =
                           (const $ yield)
                           prop
 
-prop_thread_status_finished :: (MonadFork m, MonadDelay m, MonadThread m)
+prop_thread_status_finished :: MonadFork m
                             => m Property
 prop_thread_status_finished =
   prop_two_threads_expect_ (pure ())
                            (ThreadFinished ===)
 
-prop_thread_status_running :: (MonadFork m, MonadDelay m, MonadThread m)
+prop_thread_status_running :: MonadFork m
                            => m Property
 prop_thread_status_running =
   prop_two_threads_expect_ (forever yield)
                            (ThreadRunning ===)
 
 prop_thread_status_blocked :: ( MonadFork m
-                              , MonadDelay m
-                              , MonadThread m
                               , MonadSTM m
                               )
                            => m Property
@@ -273,7 +271,7 @@ prop_thread_status_blocked = do
         counterexample (show status ++ " /= ThreadBlocked _")
                        False
 
-prop_thread_status_blocked_delay :: (MonadFork m, MonadDelay m, MonadThread m)
+prop_thread_status_blocked_delay :: (MonadFork m, MonadDelay m)
                                  => m Property
 prop_thread_status_blocked_delay =
   prop_two_threads_expect_
@@ -284,11 +282,7 @@ prop_thread_status_blocked_delay =
         counterexample (show status ++ " /= ThreadBlocked _")
         False
 
-prop_thread_status_died :: ( MonadFork m
-                           , MonadThrow m
-                           , MonadDelay m
-                           , MonadThread m
-                           )
+prop_thread_status_died :: MonadFork m
                         => m Property
 prop_thread_status_died =
   prop_two_threads_expect (forever yield)
@@ -297,8 +291,6 @@ prop_thread_status_died =
 
 prop_thread_status_died_own :: ( MonadFork m
                                , MonadThrow m
-                               , MonadDelay m
-                               , MonadThread m
                                )
                             => m Property
 prop_thread_status_died_own = do
@@ -306,9 +298,6 @@ prop_thread_status_died_own = do
                            (ThreadFinished ===)
 
 prop_thread_status_yield :: ( MonadFork m
-                            , MonadThrow m
-                            , MonadDelay m
-                            , MonadThread m
                             , MonadSTM m
                             )
                          => m Property
@@ -320,9 +309,6 @@ prop_thread_status_yield = do
     (ThreadRunning ===)
 
 prop_thread_status_mask :: ( MonadFork m
-                           , MonadThrow m
-                           , MonadDelay m
-                           , MonadThread m
                            , MonadSTM m
                            , MonadMask m
                            )
@@ -337,8 +323,6 @@ prop_thread_status_mask = do
     (ThreadFinished ===)
 
 prop_thread_status_mask_blocked :: ( MonadFork m
-                                   , MonadThrow m
-                                   , MonadThread m
                                    , MonadMask m
                                    )
                                 => m Property
@@ -508,10 +492,8 @@ prop_mfix_lazy (NonEmpty env) =
       replicateHeadM ::
                         (
 #if MIN_VERSION_base(4,13,0)
-                          MonadFail m,
-                          MonadFail (STM m),
+                          MonadFail m
 #endif
-                          MonadSTM  m
                         )
                      => m Char
                      -> [Char] -> m [Char]
@@ -1475,7 +1457,6 @@ prop_registerDelayCancellable (DelayWithCancel delay mbCancel) =
         Right  r -> counterexample (ppTrace trace) r
     where
       sim :: ( MonadFork  m
-             , MonadMonotonicTime m
              , MonadTime  m
              , MonadTimer m
              )

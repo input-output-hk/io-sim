@@ -3,12 +3,10 @@
 
 module Test.MonadTimer (tests) where
 
-import           Control.Monad.Class.MonadTime (DiffTime)
 import           Control.Monad.Class.MonadTimer
 import           GHC.Real
 
 import           Test.QuickCheck
-import           Test.QuickCheck.Gen
 import           Test.Tasty
 import           Test.Tasty.QuickCheck (testProperty)
 

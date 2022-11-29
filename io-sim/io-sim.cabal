@@ -1,4 +1,4 @@
-cabal-version:       2.4
+cabal-version:       3.4
 name:                io-sim
 version:             0.6.0.0
 synopsis:            A pure simulator for monadic concurrency with STM
@@ -24,7 +24,22 @@ source-repository head
   location: https://github.com/input-output-hk/io-sim
   subdir:   io-sim
 
+common test-warnings
+    ghc-options: -Wall
+                 -Wcompat
+                 -Wincomplete-uni-patterns
+                 -Widentities
+                 -Wunused-packages
+                 -Wredundant-constraints
+                 -Wno-unticked-promoted-constructors
+
+common warnings
+    import:       test-warnings
+    ghc-options: -Wincomplete-record-updates
+                 -Wpartial-fields
+
 library
+  import:              warnings
   hs-source-dirs:      src
   exposed-modules:     Data.List.Trace,
                        Control.Monad.IOSim,
@@ -55,26 +70,17 @@ library
                        containers,
                        deque,
                        parallel,
-                       pretty-simple,
                        psqueues          >=0.2 && <0.3,
-                       text,
                        time              >=1.9.1 && <1.13,
                        quiet,
                        QuickCheck,
-                       syb
 
-  ghc-options:         -Wall
-                       -Wcompat
-                       -Wincomplete-uni-patterns
-                       -Wincomplete-record-updates
-                       -Wpartial-fields
-                       -Widentities
-                       -Wredundant-constraints
 
   if flag(asserts)
      ghc-options:      -fno-ignore-asserts
 
 test-suite test
+  import:              test-warnings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Main.hs
@@ -96,11 +102,10 @@ test-suite test
                        tasty-quickcheck,
                        tasty-hunit,
                        time
-
-  ghc-options:         -Wall
-                       -fno-ignore-asserts
+  ghc-options:         -fno-ignore-asserts
 
 benchmark bench
+  import:              warnings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      bench
   main-is:             Main.hs
@@ -108,7 +113,6 @@ benchmark bench
   build-depends:       base,
                        criterion,
 
-                       contra-tracer,
                        io-classes,
                        io-sim,
   ghc-options:         -Wall
