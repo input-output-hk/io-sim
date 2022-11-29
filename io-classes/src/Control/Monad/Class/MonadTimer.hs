@@ -1,11 +1,13 @@
-{-# LANGUAGE DefaultSignatures  #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE DefaultSignatures   #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module Control.Monad.Class.MonadTimer
   ( MonadDelay (..)
   , MonadTimer (..)
+  , registerDelayCancellable
   , TimeoutState (..)
   , DiffTime
   , diffTimeToMicrosecondsAsInt
@@ -13,9 +15,10 @@ module Control.Monad.Class.MonadTimer
   ) where
 
 import qualified Control.Concurrent as IO
-import           Control.Concurrent.Class.MonadSTM.TVar
+import           Control.Concurrent.Class.MonadSTM
 import qualified Control.Concurrent.STM.TVar as STM
 
+import           Control.Monad (when)
 import           Control.Monad.Cont (ContT (..))
 import           Control.Monad.Except (ExceptT (..))
 import           Control.Monad.RWS (RWST (..))
@@ -25,10 +28,10 @@ import           Control.Monad.Trans (lift)
 import           Control.Monad.Writer (WriterT (..))
 
 import           Data.Functor (void)
-import           Data.Time.Clock (DiffTime)
+import           Data.Foldable (traverse_)
 
 import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadSTM
+import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer.NonStandard
 
 import qualified System.Timeout as IO
@@ -59,6 +62,79 @@ defaultRegisterDelay d = do
     t <- newTimeout d
     _ <- forkIO $ atomically (awaitTimeout t >>= writeTVar v)
     return v
+
+--
+-- Cancellable Timers
+--
+
+
+registerDelayCancellable :: forall m.
+                            ( MonadFork  m
+                            , MonadTime  m
+                            , MonadTimer m
+                            )
+                         => DiffTime
+                         -> m (STM m TimeoutState, m ())
+
+registerDelayCancellable d | d <= maxDelay = do
+    t <- newTimeout d
+    return (readTimeout t, cancelTimeout t)
+  where
+    maxDelay :: DiffTime
+    maxDelay = microsecondsAsIntToDiffTime maxBound
+
+registerDelayCancellable d = do
+    -- current time
+    c <- getMonotonicTime
+    -- timeout state
+    v <- newTVarIO TimeoutPending
+    -- current timer
+    m <- newTVarIO Nothing
+    tid <- forkIO $ go m v c (d `addTime` c)
+    let cancel = do
+          t <- atomically $ do
+            a <- readTVar v
+            case a of
+              TimeoutCancelled -> return Nothing
+              TimeoutFired     -> return Nothing
+              TimeoutPending   -> do
+                writeTVar v TimeoutCancelled
+                mt  <- readTVar m
+                case mt of
+                  Nothing -> retry
+                  Just t  -> return (Just t)
+          traverse_ cancelTimeout t
+          killThread tid
+    return (readTVar v, cancel)
+  where
+    maxDelay :: DiffTime
+    maxDelay = microsecondsAsIntToDiffTime maxBound
+
+    -- The timeout thread, it might be killed by an async exception. In this
+    -- case the `cancel` action is responsible for updating state state of the
+    -- timeout (held in `v`).
+    go :: TVar m (Maybe (Timeout m))
+       -> TVar m TimeoutState
+       -> Time
+       -> Time
+       -> m ()
+    go tv v c u | u `diffTime` c >= maxDelay = do
+      t <- newTimeout maxDelay
+      _ <- atomically $ swapTVar tv $! Just t
+      fired <- atomically $ awaitTimeout t
+      when fired $ do
+        c' <- getMonotonicTime
+        go tv v c' u
+
+    go tv v c u = do
+      t <- newTimeout (u `diffTime` c)
+      _ <- atomically $ swapTVar tv $! Just t
+      atomically $ do
+        fired <- awaitTimeout t
+        ts <- readTVar v
+        when (fired && ts == TimeoutPending) $
+          writeTVar v TimeoutFired
+
 
 --
 -- Instances for IO

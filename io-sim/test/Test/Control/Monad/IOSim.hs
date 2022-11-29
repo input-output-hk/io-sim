@@ -216,6 +216,9 @@ tests =
     , testProperty "thread status mask blocked (IO)"
     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask_blocked
     ]
+  , testGroup "MonadTimerCancellable"
+    [ testProperty "registerDelayCancellable" prop_registerDelayCancellable
+    ]
   ]
 
 --
@@ -1422,6 +1425,84 @@ unit_catch_throwTo_masking_state_async_mayblock_IO =
 unit_catch_throwTo_masking_state_async_mayblock_ST :: MaskingState -> Property
 unit_catch_throwTo_masking_state_async_mayblock_ST ms =
     runSimOrThrow (prop_catch_throwTo_masking_state_async_mayblock ms)
+
+--
+-- MonadTimerCancellable
+--
+
+data DelayWithCancel = DelayWithCancel DiffTime (Maybe DiffTime)
+  deriving Show
+
+instance Arbitrary DelayWithCancel where
+  arbitrary =
+      oneof
+        [ -- small delay
+          (\delay -> DelayWithCancel
+                         (microsecondsAsIntToDiffTime delay)
+                         Nothing)
+              <$> arbitrary
+          -- cancelled delay after small delay
+        , (\delay -> DelayWithCancel
+                         (microsecondsAsIntToDiffTime delay + maxDelay)
+                         Nothing)
+              <$> arbitrary
+
+        , -- large delay
+          do delay <- arbitrary
+             cancel_ <- arbitrary `suchThat` (<= delay)
+             return (DelayWithCancel (microsecondsAsIntToDiffTime delay)
+                               (Just (microsecondsAsIntToDiffTime cancel_)))
+        , -- cancelled delay after large delay
+          do delay <- arbitrary
+             cancel_ <- arbitrary `suchThat` (<= delay)
+             return (DelayWithCancel (microsecondsAsIntToDiffTime delay + maxDelay)
+                               (Just (microsecondsAsIntToDiffTime cancel_ + maxDelay)))
+        ]
+    where
+      maxDelay :: DiffTime
+      maxDelay = microsecondsAsIntToDiffTime maxBound
+
+
+prop_registerDelayCancellable :: DelayWithCancel
+                              -> Property
+prop_registerDelayCancellable (DelayWithCancel delay mbCancel) =
+      -- 'within' covers the case where `registerDelayCancellable` would not
+      -- make progress awaiting for the timeout (a live lock).
+      within 1000 $
+      let trace = runSimTrace sim
+      in case traceResult True trace of
+        Left  {} -> counterexample (ppTrace trace) False
+        Right  r -> counterexample (ppTrace trace) r
+    where
+      sim :: ( MonadFork  m
+             , MonadMonotonicTime m
+             , MonadTime  m
+             , MonadTimer m
+             )
+          => m Bool
+      sim = do
+        (readTimeout, cancelTimeout) <- registerDelayCancellable delay
+        case mbCancel of
+
+          Nothing -> do
+            atomically $ do
+              tv <- readTimeout
+              case tv of
+                TimeoutFired     -> return ()
+                TimeoutPending   -> retry
+                TimeoutCancelled -> return ()
+            t <- getMonotonicTime
+            return (t == Time (delay `max` 0))
+
+          Just cancelDelay -> do
+            threadDelay cancelDelay
+            cancelTimeout
+            tv <- atomically readTimeout
+            return $ case () of
+              _ | delay < cancelDelay  -> tv == TimeoutFired
+                | delay == cancelDelay -> tv == TimeoutFired
+                                       || tv == TimeoutCancelled
+                | otherwise            -> tv == TimeoutCancelled
 
 --
 -- Utils

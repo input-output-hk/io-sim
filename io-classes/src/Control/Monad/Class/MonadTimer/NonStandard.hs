@@ -13,7 +13,8 @@
 -- This module also provides a polyfill which allows to use timer api also on
 -- non-threaded RTS regardless of the architecture \/ OS.
 --
--- We use it to provide 'MonadTimer IO' instance.
+-- We use it to provide 'MonadTimer IO' instance and to implement a cancellable
+-- timer, see 'registerDelayCancellable' below.
 --
 -- You can expect we will deprecate it at some point (e.g. once GHC gets
 -- a better support for timers especially across different OSes).
