@@ -2,6 +2,12 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE TypeFamilies       #-}
 
+#if  defined(__GLASGOW_HASKELL__) && \
+    !defined(mingw32_HOST_OS) && \
+    !defined(__GHCJS__)
+#define GHC_TIMERS_API
+#endif
+
 -- | A non-standard interface for timer api.
 --
 -- This module also provides a polyfill which allows to use timer api also on
@@ -21,7 +27,7 @@ module Control.Monad.Class.MonadTimer.NonStandard
 
 import qualified Control.Concurrent.STM.TVar as STM
 import           Control.Exception (assert)
-#if defined(mingw32_HOST_OS)
+#ifndef GHC_TIMERS_API
 import           Control.Monad (when)
 #endif
 import           Control.Monad.Class.MonadSTM
@@ -33,7 +39,7 @@ import           Control.Monad.State (StateT (..))
 import           Control.Monad.Trans (lift)
 import           Control.Monad.Writer (WriterT (..))
 
-#if defined(__GLASGOW_HASKELL__) && !defined(mingw32_HOST_OS) && !defined(__GHCJS__)
+#ifdef GHC_TIMERS_API
 import qualified GHC.Event as GHC (TimeoutKey, getSystemTimerManager,
                      registerTimeout, unregisterTimeout, updateTimeout)
 #endif
@@ -102,7 +108,7 @@ class MonadSTM m => MonadTimeout m where
                          TimeoutFired     -> return True
                          TimeoutCancelled -> return False
 
-#if defined(__GLASGOW_HASKELL__) && !defined(mingw32_HOST_OS) && !defined(__GHCJS__)
+#ifdef GHC_TIMERS_API
 instance MonadTimeout IO where
   data Timeout IO = TimeoutIO !(STM.TVar TimeoutState) !GHC.TimeoutKey
 
