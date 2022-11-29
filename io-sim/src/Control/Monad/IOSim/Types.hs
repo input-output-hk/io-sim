@@ -86,6 +86,7 @@ import           Control.Monad.Class.MonadThrow as MonadThrow hiding
 import qualified Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.ST.Lazy
 import qualified Control.Monad.ST.Strict as StrictST
 
@@ -575,7 +576,7 @@ instance MonadDelay (IOSim s) where
   -- Use optimized IOSim primitive
   threadDelay d = IOSim $ oneShot $ \k -> ThreadDelay d (k ())
 
-instance MonadTimer (IOSim s) where
+instance MonadTimeout (IOSim s) where
   data Timeout (IOSim s) = Timeout !(TVar s TimeoutState) !TimeoutId
                          -- ^ a timeout
                          | NegativeTimeout !TimeoutId
@@ -588,6 +589,7 @@ instance MonadTimer (IOSim s) where
   updateTimeout t d = IOSim $ oneShot $ \k -> UpdateTimeout t d (k ())
   cancelTimeout t   = IOSim $ oneShot $ \k -> CancelTimeout t   (k ())
 
+instance MonadTimer (IOSim s) where
   timeout d action
     | d <  0 = Just <$> action
     | d == 0 = return Nothing

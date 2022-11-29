@@ -14,6 +14,7 @@ import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSTM
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.IOSim
 
 import           GHC.Generics
