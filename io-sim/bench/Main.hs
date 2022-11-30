@@ -8,10 +8,8 @@ import           Control.Monad (replicateM, forever)
 import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSay
-import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTimer
 import           Control.Monad.IOSim
-import           Control.Tracer (Tracer (..), emit, nullTracer)
 
 import           Criterion
 import           Criterion.Main
@@ -19,37 +17,6 @@ import           Criterion.Main
 import           Control.Exception (AsyncException (..))
 import           Data.Foldable (traverse_)
 
-import           Network.TypedProtocol.Channel
-import           Network.TypedProtocol.Driver.Simple
-
-import           Network.TypedProtocol.PingPong.Client
-import           Network.TypedProtocol.PingPong.Codec
--- import qualified Network.TypedProtocol.PingPong.Codec.CBOR as CBOR
-import           Network.TypedProtocol.PingPong.Examples
-import           Network.TypedProtocol.PingPong.Server
-import           Network.TypedProtocol.PingPong.Type
-
-
-prop_channel :: forall m. (MonadAsync m, MonadCatch m, MonadTimer m)
-             => Maybe (DiffTime, DiffTime)
-             -> Int
-             -> Tracer m (Role, TraceSendRecv PingPong)
-             -> m Bool
-prop_channel delay n tr = do
-    ((), n') <- runConnectedPeers createChannel
-                                  tr
-                                  codecPingPongId client server
-    return (n' == n)
-  where
-    createChannel :: forall a. m (Channel m a, Channel m a)
-    createChannel =
-      case delay of
-        Nothing       -> createConnectedChannels
-        Just (d1, d2) -> (\(a, b) -> (delayChannel d1 a, delayChannel d2 b))
-                     <$> createConnectedChannels
-
-    client = pingPongClientPeer (pingPongClientCount n)
-    server = pingPongServerPeer  pingPongServerCount
 
 --
 -- timers, delays, timeouts
@@ -101,22 +68,7 @@ prop_threadDelay_bottleneck =
 
 main :: IO ()
 main = defaultMain
-    [ env (let !n  = 10000
-               !d1 = 1
-               !d2 = 2
-           in pure (n, d1, d2))
-           $ \ ~(n, d1, d2) ->
-      bgroup "ping-pong"
-      [ bench "stm channel without delay" $
-        whnf id (runSimOrThrow (prop_channel Nothing n nullTracer))
-      , bench "stm channel with delay" $
-        whnf id (runSimOrThrow (prop_channel (Just (d1, d2)) n nullTracer))
-      , bench "events" $
-        nf id ( selectTraceEventsSay
-              $ runSimTrace
-              $ prop_channel Nothing n (Tracer $ emit $ say . show))
-      ]
-    , env (pure ()) $ \_ ->
+    [ env (pure ()) $ \_ ->
       bgroup "delays"
       [ bench "threadDelay" $
         whnf id (runSimOrThrow prop_threadDelay)

@@ -110,9 +110,6 @@ benchmark bench
                        contra-tracer,
                        io-classes,
                        io-sim,
-                       typed-protocols >= 0.1.0.2,
-                       typed-protocols-cborg,
-                       typed-protocols-examples
   ghc-options:         -Wall
                        -Wcompat
                        -Wincomplete-uni-patterns
