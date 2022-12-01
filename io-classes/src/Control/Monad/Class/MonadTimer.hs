@@ -46,22 +46,41 @@ class (MonadDelay m, MonadTimeout m) => MonadTimer m where
 
   registerDelay :: DiffTime -> m (TVar m Bool)
 
-  default registerDelay :: MonadFork m => DiffTime -> m (TVar m Bool)
-  registerDelay = defaultRegisterDelay
-
   timeout :: DiffTime -> m a -> m (Maybe a)
 
 
-defaultRegisterDelay :: ( MonadTimer m
+
+-- | A default implementation of `registerDelay` which supports delays longer
+-- then `Int`; this is especially important on 32-bit architectures where
+-- maximum delay expressed in microseconds is around 35 minutes.
+--
+defaultRegisterDelay :: forall m.
+                        ( MonadTimer m
+                        , MonadTime  m
                         , MonadFork  m
                         )
                      => DiffTime
                      -> m (TVar m Bool)
 defaultRegisterDelay d = do
+    c <- getMonotonicTime
     v <- atomically $ newTVar False
-    t <- newTimeout d
-    _ <- forkIO $ atomically (awaitTimeout t >>= writeTVar v)
+    _ <- forkIO $ go v c (d `addTime` c)
     return v
+  where
+    maxDelay :: DiffTime
+    maxDelay = microsecondsAsIntToDiffTime maxBound
+
+    go :: TVar m Bool -> Time -> Time -> m ()
+    go v c u | u `diffTime` c >= maxDelay = do
+      _ <- newTimeout maxDelay >>= atomically . awaitTimeout
+      c' <- getMonotonicTime
+      go v c' u
+
+    go v c u = do
+      t <- newTimeout (u `diffTime` c)
+      atomically $ do
+        _ <- awaitTimeout t
+        writeTVar v True
 
 --
 -- Cancellable Timers
@@ -161,10 +180,6 @@ instance MonadTimer IO where
   -- | For delays less (or equal) than @maxBound :: Int@ this is exactly the same as
   -- 'STM.registerDaley'; for larger delays it will start a monitoring thread
   -- which will update the 'TVar'.
-  --
-  -- TODO: issue #2184 'registerDelay' relies on 'newTimeout', through
-  -- 'defaultRegisterDelay'.  'newTimeout' can overflow an 'Int' (this is
-  -- especially easy on 32-bit architectures).
   registerDelay d
       | d <= maxDelay =
         STM.registerDelay (diffTimeToMicrosecondsAsInt d)
