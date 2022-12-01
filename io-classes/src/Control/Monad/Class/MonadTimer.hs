@@ -163,17 +163,32 @@ registerDelayCancellable d = do
 -- advantage over 'IO.threadDelay'.
 --
 instance MonadDelay IO where
-  threadDelay = go
+  threadDelay d | d <= maxDelay =
+      IO.threadDelay (diffTimeToMicrosecondsAsInt d)
     where
-      go :: DiffTime -> IO ()
-      go d | d > maxDelay = do
-        IO.threadDelay maxBound
-        go (d - maxDelay)
-      go d = do
-        IO.threadDelay (diffTimeToMicrosecondsAsInt d)
-
       maxDelay :: DiffTime
       maxDelay = microsecondsAsIntToDiffTime maxBound
+
+  threadDelay d = do
+      c <- getMonotonicTime
+      let u = d `addTime` c
+      go c u
+    where
+      maxDelay :: DiffTime
+      maxDelay = microsecondsAsIntToDiffTime maxBound
+
+      go :: Time -> Time -> IO ()
+      go c u = do
+        if d' >= maxDelay
+          then do
+            IO.threadDelay maxBound
+            c' <- getMonotonicTime
+            go  c' u
+          else
+            IO.threadDelay (diffTimeToMicrosecondsAsInt d')
+        where
+          d' = u `diffTime` c
+
 
 instance MonadTimer IO where
 
