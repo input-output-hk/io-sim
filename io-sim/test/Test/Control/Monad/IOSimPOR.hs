@@ -33,7 +33,7 @@ import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.IOSim
 
@@ -283,9 +283,9 @@ interpret r t (Task steps) = forkIO $ do
         interpretStep (_,timer) (Timeout tstep) = do
           timerVal <- atomically $ readTVar timer
           case (timerVal,tstep) of
-            (_,NewTimeout n)            -> do tout <- newTimeout (fromIntegral n)
+            (_,NewTimeout n)            -> do tout <- newTimeout n
                                               atomically $ writeTVar timer (Just tout)
-            (Just tout,UpdateTimeout n) -> updateTimeout tout (fromIntegral n)
+            (Just tout,UpdateTimeout n) -> updateTimeout tout n
             (Just tout,CancelTimeout)   -> cancelTimeout tout
             (Just tout,AwaitTimeout)    -> atomically $ awaitTimeout tout >> return ()
             (Nothing,_)                 -> return ()

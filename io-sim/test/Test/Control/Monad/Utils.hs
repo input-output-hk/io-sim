@@ -17,7 +17,7 @@ import           Control.Monad.Class.MonadFork
 import           Control.Concurrent.Class.MonadSTM.Strict
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.IOSim
 
 import           Test.Control.Monad.STM
@@ -125,6 +125,7 @@ instance Arbitrary TestMicro where
 test_timers :: forall m.
                ( MonadFork m
                , MonadTimer m
+               , MonadMonotonicTime m
                )
             => [DiffTime]
             -> m Property
@@ -228,6 +229,7 @@ test_threadId_order = \(Positive n) -> do
 
 test_wakeup_order :: ( MonadFork m
                      , MonadTimer m
+                     , MonadMonotonicTime m
                      )
                 => m Property
 test_wakeup_order = do
@@ -293,6 +295,7 @@ prop_timeout_no_deadlockM :: forall m.
                              ( MonadFork m
                              , MonadTimer m
                              , MonadMask m
+                             , MonadMonotonicTime m
                              )
                           => m Bool
 prop_timeout_no_deadlockM = do
@@ -428,6 +431,7 @@ prop_catch_throwTo_masking_state_async :: forall m.
                                           , MonadFork  m
                                           , MonadSTM   m
                                           , MonadDelay m
+                                          , MonadMonotonicTime m
                                           )
                                        => MaskingState -> m Property
 prop_catch_throwTo_masking_state_async ms = do
@@ -457,6 +461,7 @@ prop_catch_throwTo_masking_state_async_mayblock :: forall m.
                                                 , MonadFork  m
                                                 , MonadSTM   m
                                                 , MonadDelay m
+                                                , MonadMonotonicTime m
                                                 )
                                              => MaskingState -> m Property
 prop_catch_throwTo_masking_state_async_mayblock ms = do

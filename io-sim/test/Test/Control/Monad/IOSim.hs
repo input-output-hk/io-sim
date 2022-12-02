@@ -40,7 +40,7 @@ import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.IOSim
 
 import           Test.Control.Monad.Utils
@@ -271,7 +271,10 @@ prop_thread_status_blocked = do
         counterexample (show status ++ " /= ThreadBlocked _")
                        False
 
-prop_thread_status_blocked_delay :: (MonadFork m, MonadDelay m)
+prop_thread_status_blocked_delay :: ( MonadFork m
+                                    , MonadDelay m
+                                    , MonadMonotonicTime m
+                                    )
                                  => m Property
 prop_thread_status_blocked_delay =
   prop_two_threads_expect_

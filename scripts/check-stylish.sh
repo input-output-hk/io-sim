@@ -9,3 +9,4 @@ $FD -E Setup.hs -g '*.hsc?$' io-sim -X stylish-haskell -c .stylish-haskell.yaml 
 $FD -E Setup.hs -E src/Control/Concurrent/Class/MonadSTM.hs -g '*.hsc?$' io-classes -X stylish-haskell -c .stylish-haskell.yaml -i
 $FD -E Setup.hs -g '*.hsc?$' strict-mvar -X stylish-haskell -c .stylish-haskell.yaml -i
 $FD -E Setup.hs -g '*.hsc?$' strict-stm -X stylish-haskell -c .stylish-haskell.yaml -i
+$FD -E Setup.hs -g '*.hsc?$' si-timers -X stylish-haskell -c .stylish-haskell.yaml -i

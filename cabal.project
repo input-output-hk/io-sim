@@ -18,6 +18,7 @@ packages: ./io-sim
           ./io-classes
           ./strict-mvar
           ./strict-stm
+          ./si-timers
 
 package io-sim
   flags: +asserts

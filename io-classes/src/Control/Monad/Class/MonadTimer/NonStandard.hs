@@ -22,12 +22,9 @@
 module Control.Monad.Class.MonadTimer.NonStandard
   ( MonadTimeout (..)
   , TimeoutState (..)
-  , diffTimeToMicrosecondsAsInt
-  , microsecondsAsIntToDiffTime
   ) where
 
 import qualified Control.Concurrent.STM.TVar as STM
-import           Control.Exception (assert)
 #ifndef GHC_TIMERS_API
 import           Control.Monad (when)
 #endif
@@ -46,7 +43,6 @@ import qualified GHC.Event as GHC (TimeoutKey, getSystemTimerManager,
 #endif
 
 import           Data.Kind (Type)
-import           Data.Time.Clock (DiffTime, diffTimeToPicoseconds)
 
 
 data TimeoutState = TimeoutPending | TimeoutFired | TimeoutCancelled
@@ -70,7 +66,7 @@ class MonadSTM m => MonadTimeout m where
   -- (as this would be very racy). You should create a new timeout if you need
   -- this functionality.
   --
-  newTimeout     :: DiffTime -> m (Timeout m)
+  newTimeout     :: Int -> m (Timeout m)
 
   -- | Read the current state of a timeout. This does not block, but returns
   -- the current state. It is your responsibility to use 'retry' to wait.
@@ -90,7 +86,7 @@ class MonadSTM m => MonadTimeout m where
   -- The new time can be before or after the original expiry time, though
   -- arguably it is an application design flaw to move timeouts sooner.
   --
-  updateTimeout  :: Timeout m -> DiffTime -> m ()
+  updateTimeout  :: Timeout m -> Int -> m ()
 
   -- | Cancel a timeout (unless it has already fired), putting it into the
   -- 'TimeoutCancelled' state. Code reading and acting on the timeout state
@@ -118,8 +114,7 @@ instance MonadTimeout IO where
   newTimeout = \d -> do
       var <- STM.newTVarIO TimeoutPending
       mgr <- GHC.getSystemTimerManager
-      key <- GHC.registerTimeout mgr (diffTimeToMicrosecondsAsInt d)
-                                     (STM.atomically (timeoutAction var))
+      key <- GHC.registerTimeout mgr d (STM.atomically (timeoutAction var))
       return (TimeoutIO var key)
     where
       timeoutAction var = do
@@ -133,7 +128,7 @@ instance MonadTimeout IO where
   -- It is safe to race against the timer firing.
   updateTimeout (TimeoutIO _var key) d = do
       mgr <- GHC.getSystemTimerManager
-      GHC.updateTimeout mgr key (diffTimeToMicrosecondsAsInt d)
+      GHC.updateTimeout mgr key d
 
   cancelTimeout (TimeoutIO var key) = do
       STM.atomically $ do
@@ -157,13 +152,13 @@ instance MonadTimeout IO where
       (_, True)  -> return TimeoutFired
 
   newTimeout d = do
-    timeoutvar    <- STM.registerDelay (diffTimeToMicrosecondsAsInt d)
+    timeoutvar    <- STM.registerDelay d
     timeoutvarvar <- STM.newTVarIO timeoutvar
     cancelvar     <- STM.newTVarIO False
     return (TimeoutIO timeoutvarvar cancelvar)
 
   updateTimeout (TimeoutIO timeoutvarvar _cancelvar) d = do
-    timeoutvar' <- STM.registerDelay (diffTimeToMicrosecondsAsInt d)
+    timeoutvar' <- STM.registerDelay d
     STM.atomically $ STM.writeTVar timeoutvarvar timeoutvar'
 
   cancelTimeout (TimeoutIO timeoutvarvar cancelvar) =
@@ -171,19 +166,6 @@ instance MonadTimeout IO where
       fired <- STM.readTVar =<< STM.readTVar timeoutvarvar
       when (not fired) $ STM.writeTVar cancelvar True
 #endif
-
-
-diffTimeToMicrosecondsAsInt :: DiffTime -> Int
-diffTimeToMicrosecondsAsInt d =
-    let usec :: Integer
-        usec = diffTimeToPicoseconds d `div` 1_000_000 in
-    -- Can only represent usec times that fit within an Int, which on 32bit
-    -- systems means 2^31 usec, which is only ~35 minutes.
-    assert (usec <= fromIntegral (maxBound :: Int)) $
-    fromIntegral usec
-
-microsecondsAsIntToDiffTime :: Int -> DiffTime
-microsecondsAsIntToDiffTime = (/ 1_000_000) . fromIntegral
 
 --
 -- Transformer's instances

@@ -9,7 +9,7 @@ import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI
 import           Data.Bifoldable (bifoldMap)
 import           Data.Foldable (traverse_)
 import           Data.Functor (void, ($>))
@@ -79,6 +79,7 @@ putMVar_fairness_property
      ( MonadAsync m
      , MonadDelay m
      , MonadMVar  m
+     , MonadMonotonicTime m
      )
   => Int -- ^ number of threads
   -> m Bool
@@ -140,6 +141,7 @@ takeMVar_fairness_property
      ( MonadAsync m
      , MonadDelay m
      , MonadMVar  m
+     , MonadMonotonicTime m
      , Eq (Async m Int)
      )
   => Int -- ^ number of threads
