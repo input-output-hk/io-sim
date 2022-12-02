@@ -75,6 +75,7 @@ import           Control.Monad.Class.MonadSTM hiding (STM)
 import           Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI (microsecondsAsIntToDiffTime)
 
 import           Control.Monad.IOSim.InternalTypes
 import           Control.Monad.IOSim.Types hiding (SimEvent (SimEvent),
@@ -483,7 +484,7 @@ schedule thread@Thread{
     -- from `GHC.Event` behaviour.
     NewTimeout d k | d < 0 -> do
       let t       = NegativeTimeout nextTmid
-          expiry  = d `addTime` time
+          expiry  = microsecondsAsIntToDiffTime d `addTime` time
           thread' = thread { threadControl = ThreadControl (k t) ctl }
       trace <- schedule thread' simstate { nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) $
@@ -495,7 +496,7 @@ schedule thread@Thread{
                            (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
-      let expiry  = d `addTime` time
+      let expiry  = microsecondsAsIntToDiffTime d `addTime` time
           t       = Timeout tvar nextTmid
           timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
           thread' = thread { threadControl = ThreadControl (k t) ctl }
@@ -510,7 +511,7 @@ schedule thread@Thread{
 
     StartTimeout d action' k -> do
       isLockedRef <- newSTRef NotLocked
-      let expiry    = d `addTime` time
+      let expiry    = microsecondsAsIntToDiffTime d `addTime` time
           timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid isLockedRef) timers
           thread'   = thread { threadControl =
                                  ThreadControl action'
@@ -525,7 +526,7 @@ schedule thread@Thread{
                           (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           True
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
-      let !expiry  = d `addTime` time
+      let !expiry  = microsecondsAsIntToDiffTime d `addTime` time
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
       trace <- schedule thread' simstate { nextVid = succ nextVid }
       return (SimPORTrace time tid tstep tlbl (EventRegisterDelayCreated nextTmid nextVid expiry) $
@@ -537,7 +538,7 @@ schedule thread@Thread{
                           (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
-      let !expiry  = d `addTime` time
+      let !expiry  = microsecondsAsIntToDiffTime d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
       trace <- schedule thread' simstate { timers   = timers'
@@ -547,7 +548,7 @@ schedule thread@Thread{
                 (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
 
     ThreadDelay d k | d < 0 -> do
-      let expiry  = d `addTime` time
+      let expiry  = microsecondsAsIntToDiffTime d `addTime` time
           thread' = thread { threadControl = ThreadControl k ctl }
       trace <- schedule thread' simstate
       return (SimPORTrace time tid tstep tlbl (EventThreadDelay expiry) $
@@ -555,7 +556,7 @@ schedule thread@Thread{
               trace)
 
     ThreadDelay d k -> do
-      let expiry  = d `addTime` time
+      let expiry  = microsecondsAsIntToDiffTime d `addTime` time
           timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid) timers
           thread' = thread { threadControl = ThreadControl k ctl }
       trace <- deschedule Blocked thread' simstate { timers   = timers'
@@ -575,7 +576,7 @@ schedule thread@Thread{
           -- to race using a timeout with updating or cancelling it
       let updateTimeout_  Nothing       = ((), Nothing)
           updateTimeout_ (Just (_p, v)) = ((), Just (expiry, v))
-          expiry  = d `addTime` time
+          expiry  = microsecondsAsIntToDiffTime d `addTime` time
           timers' = snd (PSQ.alter updateTimeout_ tmid timers)
           thread' = thread { threadControl = ThreadControl k ctl }
       trace <- schedule thread' simstate { timers = timers' }

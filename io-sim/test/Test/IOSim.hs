@@ -30,7 +30,7 @@ import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.IOSim
 
 import           Test.STM
@@ -253,7 +253,10 @@ prop_thread_status_blocked = do
         counterexample (show status ++ " /= ThreadBlocked _")
                        False
 
-prop_thread_status_blocked_delay :: (MonadFork m, MonadDelay m)
+prop_thread_status_blocked_delay :: ( MonadFork m
+                                    , MonadDelay m
+                                    , MonadMonotonicTime m
+                                    )
                                  => m Property
 prop_thread_status_blocked_delay =
   prop_two_threads_expect_
@@ -426,6 +429,7 @@ instance Arbitrary TestMicro where
 test_timers :: forall m.
                ( MonadFork m
                , MonadTimer m
+               , MonadMonotonicTime m
                )
             => [DiffTime]
             -> m Property
@@ -556,6 +560,7 @@ prop_wakeup_order_ST = runSimOrThrow $ test_wakeup_order
 
 test_wakeup_order :: ( MonadFork m
                      , MonadTimer m
+                     , MonadMonotonicTime m
                      )
                   => m Property
 test_wakeup_order = do
@@ -1245,6 +1250,7 @@ prop_timeout_no_deadlockM :: forall m.
                              ( MonadFork m
                              , MonadTimer m
                              , MonadMask m
+                             , MonadMonotonicTime m
                              )
                           => m Bool
 prop_timeout_no_deadlockM = do
@@ -1443,10 +1449,11 @@ unit_catch_throwTo_masking_state_ST ms =
 -- thread which is in a non-blocking mode.
 --
 prop_catch_throwTo_masking_state_async :: forall m.
-                                          ( MonadMaskingState m
+                                          ( MonadDelay m
                                           , MonadFork  m
+                                          , MonadMaskingState m
+                                          , MonadMonotonicTime m
                                           , MonadSTM   m
-                                          , MonadDelay m
                                           )
                                        => MaskingState -> m Property
 prop_catch_throwTo_masking_state_async ms = do
@@ -1482,10 +1489,11 @@ unit_catch_throwTo_masking_state_async_ST ms =
 -- 'willBlock' branch of 'ThrowTo' in 'schedule' is covered.
 --
 prop_catch_throwTo_masking_state_async_mayblock :: forall m.
-                                                ( MonadMaskingState m
+                                                ( MonadDelay m
                                                 , MonadFork  m
+                                                , MonadMaskingState m
+                                                , MonadMonotonicTime m
                                                 , MonadSTM   m
-                                                , MonadDelay m
                                                 )
                                              => MaskingState -> m Property
 prop_catch_throwTo_masking_state_async_mayblock ms = do

@@ -180,13 +180,13 @@ interpret r t (Task steps) = forkIO $ do
           writeTVar r n
         interpretStep (ts,_) (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
         interpretStep (ts,_) (CheckStatus i) = void $ threadStatus (ts !! i)
-        interpretStep _      (Delay i)   = threadDelay (fromIntegral i)
+        interpretStep _      (Delay i)   = threadDelay i
         interpretStep (_,timer) (Timeout tstep) = do
           timerVal <- atomically $ readTVar timer
           case (timerVal,tstep) of
-            (_,NewTimeout n)            -> do tout <- newTimeout (fromIntegral n)
+            (_,NewTimeout n)            -> do tout <- newTimeout n
                                               atomically $ writeTVar timer (Just tout)
-            (Just tout,UpdateTimeout n) -> updateTimeout tout (fromIntegral n)
+            (Just tout,UpdateTimeout n) -> updateTimeout tout n
             (Just tout,CancelTimeout)   -> cancelTimeout tout
             (Just tout,AwaitTimeout)    -> atomically $ awaitTimeout tout >> return ()
             (Nothing,_)                 -> return ()

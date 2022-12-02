@@ -16,6 +16,7 @@ index-state: cardano-haskell-packages 2022-11-15T17:30:00Z
 packages: ./io-sim
           ./io-classes
           ./strict-stm
+          ./si-timers
 
 package io-sim
   flags: +asserts

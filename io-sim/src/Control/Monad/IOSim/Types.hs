@@ -149,14 +149,13 @@ data SimA s a where
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
 
-  StartTimeout :: DiffTime -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
+  StartTimeout  :: Int -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
+  RegisterDelay :: Int -> (TVar s Bool -> SimA s b) -> SimA s b
+  ThreadDelay   :: Int -> SimA s b -> SimA s b
 
-  RegisterDelay :: DiffTime -> (TVar s Bool -> SimA s b) -> SimA s b
-
-  ThreadDelay :: DiffTime -> SimA s b -> SimA s b
-
-  NewTimeout    :: DiffTime -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
-  UpdateTimeout :: Timeout (IOSim s) -> DiffTime -> SimA s b -> SimA s b
+  -- 'MonadTimerFancy' support
+  NewTimeout    :: Int -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
+  UpdateTimeout :: Timeout (IOSim s) -> Int -> SimA s b -> SimA s b
   CancelTimeout :: Timeout (IOSim s) -> SimA s b -> SimA s b
 
   Throw        :: Thrower -> SomeException -> SimA s a

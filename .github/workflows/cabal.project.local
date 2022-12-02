@@ -13,3 +13,7 @@ package strict-stm
 package io-sim
   ghc-options: -Werror
   flags: +asserts
+
+package si-timers
+  ghc-options: -Werror
+  flags: +asserts
