@@ -120,11 +120,11 @@ jobs:
     - name: Build projects [build]
       run: cabal build all
 
-    - name: io-classes [test]
-      run: cabal run io-classes:test
-
     - name: io-sim [test]
       run: cabal run io-sim:test
+
+    - name: si-timers [test]
+      run: cabal run si-timers:test
 
   stylish-haskell:
     runs-on: ubuntu-22.04

@@ -3,7 +3,7 @@
 
 module Test.MonadTimer (tests) where
 
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.SI
 import           GHC.Real
 
 import           Test.QuickCheck
