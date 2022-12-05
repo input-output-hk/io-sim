@@ -1575,7 +1575,7 @@ prop_registerDelayCancellable (DelayWithCancel delay mbCancel) =
         Right  r -> counterexample (ppTrace trace) r
     where
       sim :: ( MonadFork  m
-             , MonadTime  m
+             , MonadMonotonicTime m
              , MonadTimer m
              )
           => m Bool

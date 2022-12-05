@@ -1,9 +1,10 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DefaultSignatures  #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module Control.Monad.Class.MonadTime.SI
   ( MonadTime (..)
-  , MonadMonotonicTime
-  , getMonotonicTime
+  , MonadMonotonicTime (..)
   , Time (..)
   , diffTime
   , addTime
@@ -15,7 +16,7 @@ module Control.Monad.Class.MonadTime.SI
   , NominalDiffTime
   ) where
 
-import           Control.Monad.Class.MonadTime ( MonadMonotonicTime,
+import           Control.Monad.Class.MonadTime ( MonadMonotonicTimeNSec,
                      MonadTime (..), NominalDiffTime, UTCTime, diffUTCTime,
                      addUTCTime)
 import qualified Control.Monad.Class.MonadTime as MonadTime
@@ -45,10 +46,14 @@ addTime d (Time t) = Time (d + t)
 
 infixr 9 `addTime`
 
+class MonadMonotonicTimeNSec m => MonadMonotonicTime m where
+  getMonotonicTime :: m Time
 
-getMonotonicTime :: MonadMonotonicTime m => m Time
-getMonotonicTime =
-      conv <$> MonadTime.getMonotonicTimeNSec
-    where
-      conv :: Word64 -> Time
-      conv = Time . Time.picosecondsToDiffTime . (* 1000) . toInteger
+  default getMonotonicTime :: m Time
+  getMonotonicTime =
+        conv <$> MonadTime.getMonotonicTimeNSec
+      where
+        conv :: Word64 -> Time
+        conv = Time . Time.picosecondsToDiffTime . (* 1_000) . toInteger
+
+instance MonadMonotonicTime IO where
