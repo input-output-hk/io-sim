@@ -82,7 +82,7 @@ threadDelay d = do
 
 
 registerDelay :: ( MonadFork m
-                 , MonadTime m
+                 , MonadMonotonicTime m
                  , MonadTimer m
                  )
               => DiffTime -> m (TVar m Bool)
@@ -132,7 +132,7 @@ defaultRegisterDelay d = do
 
 registerDelayCancellable :: forall m.
                             ( MonadFork  m
-                            , MonadTime  m
+                            , MonadMonotonicTime m
                             , MonadTimer m
                             )
                          => DiffTime
