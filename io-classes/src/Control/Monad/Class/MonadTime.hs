@@ -10,7 +10,12 @@ module Control.Monad.Class.MonadTime
   , NominalDiffTime
   ) where
 
+import           Control.Monad.Cont
+import           Control.Monad.RWS
 import           Control.Monad.Reader
+import           Control.Monad.State
+import           Control.Monad.Writer
+
 import           Data.Time.Clock (NominalDiffTime, UTCTime,
                      addUTCTime, diffUTCTime)
 import qualified Data.Time.Clock as Time
@@ -49,5 +54,29 @@ instance MonadTime IO where
 instance MonadMonotonicTime m => MonadMonotonicTime (ReaderT r m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
+instance MonadMonotonicTime m => MonadMonotonicTime (StateT s m) where
+  getMonotonicTimeNSec = lift getMonotonicTimeNSec
+
+instance (Monoid w, MonadMonotonicTime m) => MonadMonotonicTime (WriterT w m) where
+  getMonotonicTimeNSec = lift getMonotonicTimeNSec
+
+instance (Monoid w, MonadMonotonicTime m) => MonadMonotonicTime (RWST r w s m) where
+  getMonotonicTimeNSec = lift getMonotonicTimeNSec
+
+instance MonadMonotonicTime m => MonadMonotonicTime (ContT r m) where
+  getMonotonicTimeNSec = lift getMonotonicTimeNSec
+
 instance MonadTime m => MonadTime (ReaderT r m) where
+  getCurrentTime   = lift getCurrentTime
+
+instance MonadTime m => MonadTime (StateT s m) where
+  getCurrentTime = lift getCurrentTime
+
+instance (Monoid w, MonadTime m) => MonadTime (WriterT w m) where
+  getCurrentTime = lift getCurrentTime
+
+instance (Monoid w, MonadTime m) => MonadTime (RWST r w s m) where
+  getCurrentTime = lift getCurrentTime
+
+instance MonadTime m => MonadTime (ContT r m) where
   getCurrentTime   = lift getCurrentTime
