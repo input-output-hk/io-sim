@@ -2,6 +2,9 @@
 
 ## next version
 
+* Support refactored `MonadTimer`, and new `MonadTimerFancy`, `MonadTimeNSec`
+  monad classes.
+
 ## 0.4.0.0
 
 * support `ghc-9.4` (except on Windows input-output-hk/io-sim#51)

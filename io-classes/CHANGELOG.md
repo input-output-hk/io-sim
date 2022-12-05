@@ -2,6 +2,17 @@
 
 ## next version
 
+* `MonadMonotonicTime` morphed into `MonadMonotonicTimeNSec` which supports
+  `getMonotonicTimeNSec` from "base".  `MonadMonotonicTime` can be found in new
+  package `si-timers`.
+* A simplified `MonadTimer` which is using time in microseconds encoded as
+  `Int` rather than `DiffTime`.  The previous interface can be found in the
+  package `si-timers`.
+* Added `registerDelayCancellable` to `Control.Monad.Class.MonadTimer` module.
+* The non standard timer API is moved from `MonadTimer` to a `MonadTimerFancy`
+  type class which can be imported from
+  `Control.Monad.Class.MonadTimer.NonStandard` module.
+
 ## 0.4.0.0
 
 * support `ghc-9.4` (except on Windows input-output-hk/io-sim#51)
