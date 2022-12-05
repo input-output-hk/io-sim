@@ -90,7 +90,6 @@ import           Control.Exception (throw)
 import           Control.Monad.ST.Lazy
 
 import           Control.Monad.Class.MonadThrow as MonadThrow
-import           Control.Monad.Class.MonadTime
 
 import           Control.Monad.IOSim.Internal
 import           Control.Monad.IOSim.Types

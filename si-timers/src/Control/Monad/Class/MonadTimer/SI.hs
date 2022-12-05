@@ -24,7 +24,7 @@ import           Control.Concurrent.Class.MonadSTM
 import           Control.Exception (assert)
 import           Control.Monad (when)
 import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadTime
+import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer)
 import qualified Control.Monad.Class.MonadTimer as MonadTimer
 import           Control.Monad.Class.MonadTimer.NonStandard

@@ -8,7 +8,7 @@ module Test.Control.Monad.Class.MonadMVar where
 import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadMVar
-import           Control.Monad.Class.MonadTime
+import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
 import           Data.Bifoldable (bifoldMap)
 import           Data.Foldable (traverse_)

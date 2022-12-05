@@ -7,6 +7,7 @@
 {-# LANGUAGE GADTSyntax                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE NumericUnderscores         #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -59,6 +60,9 @@ module Control.Monad.IOSim.Types
   , SimM
   , SimSTM
   , Thrower (..)
+  , Time (..)
+  , addTime
+  , diffTime
   ) where
 
 import           Control.Applicative
@@ -102,7 +106,9 @@ import           Data.Maybe (fromMaybe)
 import           Data.Monoid (Endo (..))
 import           Data.STRef.Lazy
 import           Data.Semigroup (Max (..))
+import           Data.Time.Clock (DiffTime, diffTimeToPicoseconds)
 import           Data.Typeable
+import           Data.Word (Word64)
 import qualified Debug.Trace as Debug
 import           Text.Printf
 
@@ -133,6 +139,22 @@ traceM x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())
 
 traceSTM :: Typeable a => a -> STMSim s ()
 traceSTM x = STM $ oneShot $ \k -> OutputStm (toDyn x) (k ())
+
+-- 'IOSim' time is measured in nanoseconds.
+--
+-- TODO: `IOSim` ought to measure time in `DiffTime`.  For that we need to turn
+-- `Control.Monad.Class.MonadTime.SI.getMonotonicTime` into a type class: so that
+-- we can have its custom implementation for `IOSim`.
+newtype Time = Time { getTimeNSec :: Word64 }
+  deriving (Eq, Ord, Show)
+
+addTime :: DiffTime -> Time -> Time
+-- `IOSim`'s `Time` is measured in nanoseconds.
+addTime d (Time t) = Time $ fromIntegral (diffTimeToPicoseconds d `div` 1_000) + t
+
+diffTime :: Time -> Time -> DiffTime
+-- `IOSim`'s `Time` is measured in nanoseconds.
+diffTime (Time a) (Time b) = (fromIntegral a - fromIntegral b) / 1_000_000_000
 
 data Thrower = ThrowSelf | ThrowOther deriving (Ord, Eq, Show)
 
@@ -553,7 +575,7 @@ liftST :: StrictST.ST s a -> IOSim s a
 liftST action = IOSim $ oneShot $ \k -> LiftST action k
 
 instance MonadMonotonicTime (IOSim s) where
-  getMonotonicTime = IOSim $ oneShot $ \k -> GetMonoTime k
+  getMonotonicTimeNSec = IOSim $ oneShot $ \k -> GetMonoTime (k . getTimeNSec)
 
 instance MonadTime (IOSim s) where
   getCurrentTime   = IOSim $ oneShot $ \k -> GetWallTime k
