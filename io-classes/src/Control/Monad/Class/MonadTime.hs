@@ -2,7 +2,7 @@
 
 module Control.Monad.Class.MonadTime
   ( MonadTime (..)
-  , MonadMonotonicTime (..)
+  , MonadMonotonicTimeNSec (..)
     -- * 'NominalTime' and its action on 'UTCTime'
   , UTCTime
   , diffUTCTime
@@ -24,7 +24,7 @@ import           Data.Word (Word64)
 import qualified GHC.Clock as IO (getMonotonicTimeNSec)
 
 
-class Monad m => MonadMonotonicTime m where
+class Monad m => MonadMonotonicTimeNSec m where
   -- | Time in a monotonic clock, with high precision. The epoch for this
   -- clock is arbitrary and does not correspond to any wall clock or calendar.
   --
@@ -33,7 +33,7 @@ class Monad m => MonadMonotonicTime m where
   --
   getMonotonicTimeNSec :: m Word64
 
-class MonadMonotonicTime m => MonadTime m where
+class MonadMonotonicTimeNSec m => MonadTime m where
   -- | Wall clock time.
   --
   getCurrentTime   :: m UTCTime
@@ -42,7 +42,7 @@ class MonadMonotonicTime m => MonadTime m where
 -- Instances for IO
 --
 
-instance MonadMonotonicTime IO where
+instance MonadMonotonicTimeNSec IO where
   getMonotonicTimeNSec = IO.getMonotonicTimeNSec
 
 instance MonadTime IO where
@@ -52,22 +52,22 @@ instance MonadTime IO where
 -- MTL instances
 --
 
-instance MonadMonotonicTime m => MonadMonotonicTime (ExceptT e m) where
+instance MonadMonotonicTimeNSec m => MonadMonotonicTimeNSec (ExceptT e m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
-instance MonadMonotonicTime m => MonadMonotonicTime (ReaderT r m) where
+instance MonadMonotonicTimeNSec m => MonadMonotonicTimeNSec (ReaderT r m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
-instance MonadMonotonicTime m => MonadMonotonicTime (StateT s m) where
+instance MonadMonotonicTimeNSec m => MonadMonotonicTimeNSec (StateT s m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
-instance (Monoid w, MonadMonotonicTime m) => MonadMonotonicTime (WriterT w m) where
+instance (Monoid w, MonadMonotonicTimeNSec m) => MonadMonotonicTimeNSec (WriterT w m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
-instance (Monoid w, MonadMonotonicTime m) => MonadMonotonicTime (RWST r w s m) where
+instance (Monoid w, MonadMonotonicTimeNSec m) => MonadMonotonicTimeNSec (RWST r w s m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
-instance MonadMonotonicTime m => MonadMonotonicTime (ContT r m) where
+instance MonadMonotonicTimeNSec m => MonadMonotonicTimeNSec (ContT r m) where
   getMonotonicTimeNSec = lift getMonotonicTimeNSec
 
 instance MonadTime m => MonadTime (ExceptT e m) where

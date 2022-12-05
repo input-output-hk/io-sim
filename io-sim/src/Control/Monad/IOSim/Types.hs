@@ -89,6 +89,7 @@ import           Control.Monad.Class.MonadThrow as MonadThrow hiding
                      (getMaskingState)
 import qualified Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadTime
+import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer
 import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.ST.Lazy
@@ -106,7 +107,7 @@ import           Data.Maybe (fromMaybe)
 import           Data.Monoid (Endo (..))
 import           Data.STRef.Lazy
 import           Data.Semigroup (Max (..))
-import           Data.Time.Clock (DiffTime, diffTimeToPicoseconds)
+import           Data.Time.Clock (diffTimeToPicoseconds)
 import           Data.Typeable
 import           Data.Word (Word64)
 import qualified Debug.Trace as Debug
@@ -139,22 +140,6 @@ traceM x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())
 
 traceSTM :: Typeable a => a -> STMSim s ()
 traceSTM x = STM $ oneShot $ \k -> OutputStm (toDyn x) (k ())
-
--- 'IOSim' time is measured in nanoseconds.
---
--- TODO: `IOSim` ought to measure time in `DiffTime`.  For that we need to turn
--- `Control.Monad.Class.MonadTime.SI.getMonotonicTime` into a type class: so that
--- we can have its custom implementation for `IOSim`.
-newtype Time = Time { getTimeNSec :: Word64 }
-  deriving (Eq, Ord, Show)
-
-addTime :: DiffTime -> Time -> Time
--- `IOSim`'s `Time` is measured in nanoseconds.
-addTime d (Time t) = Time $ fromIntegral (diffTimeToPicoseconds d `div` 1_000) + t
-
-diffTime :: Time -> Time -> DiffTime
--- `IOSim`'s `Time` is measured in nanoseconds.
-diffTime (Time a) (Time b) = (fromIntegral a - fromIntegral b) / 1_000_000_000
 
 data Thrower = ThrowSelf | ThrowOther deriving (Ord, Eq, Show)
 
@@ -577,8 +562,15 @@ instance MonadST (IOSim s) where
 liftST :: StrictST.ST s a -> IOSim s a
 liftST action = IOSim $ oneShot $ \k -> LiftST action k
 
+instance MonadMonotonicTimeNSec (IOSim s) where
+  getMonotonicTimeNSec = IOSim $ oneShot $ \k -> GetMonoTime (k . conv)
+    where
+      -- convert time in picoseconds to nanoseconds
+      conv :: Time -> Word64
+      conv (Time d) = fromIntegral (diffTimeToPicoseconds d `div` 1_000)
+
 instance MonadMonotonicTime (IOSim s) where
-  getMonotonicTimeNSec = IOSim $ oneShot $ \k -> GetMonoTime (k . getTimeNSec)
+  getMonotonicTime = IOSim $ oneShot $ \k -> GetMonoTime k
 
 instance MonadTime (IOSim s) where
   getCurrentTime   = IOSim $ oneShot $ \k -> GetWallTime k
