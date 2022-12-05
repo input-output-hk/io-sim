@@ -2,6 +2,22 @@
 
 ## next version
 
+### Breaking changes
+
+* `MonadMonotonicTime` morphed into `MonadMonotonicTimeNSec` which supports
+  `getMonotonicTimeNSec` from "base".  `MonadMonotonicTime` can be found in new
+  package `si-timers`.
+* A simplified `MonadTimer` which is using time in microseconds encoded as
+  `Int` rather than `DiffTime`.  The previous interface can be found in the
+  package `si-timers`.
+* The non standard timer API is moved from `MonadTimer` to a `MonadTimerFancy`
+  type class which can be imported from
+  `Control.Monad.Class.MonadTimer.NonStandard` module.
+
+### Non breaking changes
+
+* Added `registerDelayCancellable` to `Control.Monad.Class.MonadTimer` module.
+
 ## 0.6.0.0
 
 ## 0.5.0.0
