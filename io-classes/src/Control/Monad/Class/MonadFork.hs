@@ -5,8 +5,8 @@
 
 module Control.Monad.Class.MonadFork
   ( MonadThread (..)
-  , MonadFork (..)
   , labelThisThread
+  , MonadFork (..)
   ) where
 
 import qualified Control.Concurrent as IO
@@ -24,6 +24,10 @@ class (Monad m, Eq   (ThreadId m),
 
   myThreadId     :: m (ThreadId m)
   labelThread    :: ThreadId m -> String -> m ()
+
+-- | Apply the label to the current thread
+labelThisThread :: MonadThread m => String -> m ()
+labelThisThread label = myThreadId >>= \tid -> labelThread tid label
 
 
 class MonadThread m => MonadFork m where
@@ -66,7 +70,3 @@ instance MonadFork m => MonadFork (ReaderT e m) where
                          in runReaderT (k restore') e
   throwTo e t = lift (throwTo e t)
   yield       = lift yield
-
--- | Apply the label to the current thread
-labelThisThread :: MonadThread m => String -> m ()
-labelThisThread label = myThreadId >>= \tid -> labelThread tid label

@@ -13,13 +13,16 @@
 -- | A non-standard interface for timer api.
 --
 -- This module also provides a polyfill which allows to use timer api also on
--- non-threaded RTS regardless of the architecture \/ OS.
+-- non-threaded RTS regardless of the architecture \/ OS.  Currently we support
+-- `*nix`, `macOS`, `Windows` (and, unofficially `GHCJS`).
 --
--- We use it to provide 'MonadTimer IO' instance and to implement a cancellable
--- timer, see 'registerDelayCancellable' below.
+-- We use it to provide @'Control.Monad.Class.MonadTimer.MonadTimer' 'IO'@
+-- instance and to implement a cancellable timers, see
+-- 'Control.Monad.Class.MonadTimer.SI.registerDelayCancellable'.
 --
 -- You can expect we will deprecate it at some point (e.g. once GHC gets
--- a better support for timers especially across different OSes).
+-- a better support for timers especially across different execution
+-- environments).
 --
 module Control.Monad.Class.MonadTimer.NonStandard
   ( TimeoutState (..)
@@ -73,6 +76,9 @@ data Timeout = TimeoutIO !(STM.TVar (STM.TVar Bool)) !(STM.TVar Bool)
 -- Timeouts /cannot/ be reset to the pending state once fired or cancelled
 -- (as this would be very racy). You should create a new timeout if you need
 -- this functionality.
+--
+-- When native timer manager is supported (on `*nix` systems), it only holds
+-- a `TVar` with `TimeoutState` and `GHC.TimeoutKey`.
 --
 newTimeout :: NewTimeout IO Timeout
 type NewTimeout m timeout = Int -> m timeout
