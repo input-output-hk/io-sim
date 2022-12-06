@@ -21,7 +21,7 @@ import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Functor.Classes
 
--- | A 'cons' list with polymorphic 'nil', thus an octopus.
+-- | A 'cons' list with polymorphic 'nil'.
 --
 -- * @'Trace' Void a@ is an infinite stream
 -- * @'Trace' () a@ is isomorphic to @[a]@
@@ -58,7 +58,7 @@ toList = bifoldr (\_ bs -> bs) (:) []
 fromList :: a -> [b] -> Trace a b
 fromList a = foldr Cons (Nil a)
 
--- | Pretty print an 'Trace'.
+-- | Pretty print a 'Trace'.
 --
 ppTrace :: (a -> String) -> (b -> String) -> Trace a b -> String
 ppTrace sa  sb (Cons b bs) = sb b ++ "\n" ++ ppTrace sa sb bs

@@ -227,8 +227,8 @@ unGetTBQueueDefault (TBQueue queue _size) a = do
 -- Default MVar implementation in terms of STM (used by sim)
 --
 
--- | A default 'MVar' implementation based on `TVar`'s.  An 'MVar' provides
--- fairness guarantees.
+-- | A default 'MonadMVar' implementation is based on `TVar`'s.  An @MVar@
+-- guarantees fairness.
 --
 -- /Implementation details:/
 --

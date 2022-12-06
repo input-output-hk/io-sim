@@ -14,14 +14,23 @@ module Control.Monad.IOSim
   , runSimStrictShutdown
   , Failure (..)
   , runSimTrace
-  , controlSimTrace
+  , runSimTraceST
+    -- ** Explore races using /IOSimPOR/
+    -- $iosimpor
   , exploreSimTrace
+  , controlSimTrace
   , ScheduleMod (..)
   , ScheduleControl (..)
-  , runSimTraceST
+    -- *** Exploration options
+  , ExplorationSpec
+  , ExplorationOptions (..)
+  , stdExplorationOptions
+  , withScheduleBound
+  , withBranching
+  , withStepTimelimit
+  , withReplay
+    -- * Lift ST computations
   , liftST
-  , traceM
-  , traceSTM
     -- * Simulation time
   , setCurrentTime
   , unshareClock
@@ -33,6 +42,9 @@ module Control.Monad.IOSim
   , SimEventType (..)
   , ThreadLabel
   , Labelled (..)
+    -- ** Dynamic Tracing
+  , traceM
+  , traceSTM
     -- ** Pretty printers
   , ppTrace
   , ppTrace_
@@ -56,14 +68,6 @@ module Control.Monad.IOSim
   , traceSelectTraceEventsSay
     -- ** IO printer
   , printTraceEventsSay
-    -- * Exploration options
-  , ExplorationSpec
-  , ExplorationOptions (..)
-  , stdExplorationOptions
-  , withScheduleBound
-  , withBranching
-  , withStepTimelimit
-  , withReplay
     -- * Eventlog
   , EventlogEvent (..)
   , EventlogMarker (..)
@@ -80,6 +84,7 @@ import           Prelude
 import           Data.Bifoldable
 import           Data.Dynamic (fromDynamic)
 import           Data.List (intercalate)
+import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Typeable (Typeable)
 
@@ -163,7 +168,7 @@ detachTraceRaces trace = unsafePerformIO $ do
       go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e $ go trace
       go (TraceRacesFound r trace)     = saveRaces r $ go trace
       go t                             = t
-  return (readRaces,go trace)
+  return (readRaces, go trace)
 
 -- | Select all the traced values matching the expected type. This relies on
 -- the sim's dynamic trace facility.
@@ -257,18 +262,18 @@ traceSelectTraceEventsSay = traceSelectTraceEvents fn
     fn (EventSay s) = Just s
     fn _            = Nothing
 
--- | Simulation termination with failure
+-- | Simulation terminated a failure.
 --
 data Failure =
-       -- | The main thread terminated with an exception
+       -- | The main thread terminated with an exception.
        FailureException SomeException
 
-       -- | The threads all deadlocked
+       -- | The threads all deadlocked.
      | FailureDeadlock ![Labelled ThreadId]
 
        -- | The main thread terminated normally but other threads were still
        -- alive, and strict shutdown checking was requested.
-       -- See 'runSimStrictShutdown'
+       -- See 'runSimStrictShutdown'.
      | FailureSloppyShutdown [Labelled ThreadId]
 
        -- | An exception was thrown while evaluation the trace.
@@ -306,14 +311,22 @@ runSimOrThrow mainAction =
       Left  e -> throw e
       Right x -> x
 
--- | Like 'runSim' but also fail if when the main thread terminates, there
--- are other threads still running or blocked. If one is trying to follow
--- a strict thread cleanup policy then this helps testing for that.
+-- | Like 'runSim' but fail when the main thread terminates if there are other
+-- threads still running or blocked. If one is trying to follow a strict thread
+-- cleanup policy then this helps testing for that.
 --
 runSimStrictShutdown :: forall a. (forall s. IOSim s a) -> Either Failure a
 runSimStrictShutdown mainAction = traceResult True (runSimTrace mainAction)
 
-traceResult :: Bool -> SimTrace a -> Either Failure a
+-- | Fold through the trace and return either a 'Failure' or the simulation
+-- result, i.e. the return value of the main thread.
+--
+traceResult :: Bool
+            -- ^ if True the simulation will fail if there are any threads which
+            -- didn't terminated when the main thread terminated.
+            -> SimTrace a
+            -- ^ simulation trace
+            -> Either Failure a
 traceResult strict = unsafePerformIO . eval
   where
     eval :: SimTrace a -> IO (Either Failure a)
@@ -334,6 +347,8 @@ traceResult strict = unsafePerformIO . eval
     go (TraceDeadlock   _   threads)    = pure $ Left (FailureDeadlock threads)
     go TraceLoop{}                      = error "Impossible: traceResult TraceLoop{}"
 
+-- | Turn 'SimTrace' into a list of timestamped events.
+--
 traceEvents :: SimTrace a -> [(Time, ThreadId, Maybe ThreadLabel, SimEventType)]
 traceEvents (SimTrace time tid tlbl event t)      = (time, tid, tlbl, event)
                                                   : traceEvents t
@@ -342,6 +357,8 @@ traceEvents (SimPORTrace time tid _ tlbl event t) = (time, tid, tlbl, event)
 traceEvents _                                     = []
 
 
+-- | Pretty print a timestamped event.
+--
 ppEvents :: [(Time, ThreadId, Maybe ThreadLabel, SimEventType)]
          -> String
 ppEvents events =
@@ -370,20 +387,42 @@ ppEvents events =
 runSimTrace :: forall a. (forall s. IOSim s a) -> SimTrace a
 runSimTrace mainAction = runST (runSimTraceST mainAction)
 
-controlSimTrace :: forall a.
-                   Maybe Int
-                -> ScheduleControl
-                -- ^ note: must be either `ControlDefault` or `ControlAwait`.
-                -> (forall s. IOSim s a)
-                -> SimTrace a
-controlSimTrace limit control mainAction =
-    runST (controlSimTraceST limit control mainAction)
+--
+-- IOSimPOR
+--
+--
+-- $iosimpor
+--
+-- /IOSimPOR/ is a different interpreter of 'IOSim' which has the ability to
+-- discover race conditions and replay the simulation using a schedule which
+-- reverts them.  For extended documentation how to use it see
+-- [here](https://github.com/input-output-hk/io-sim/blob/main/io-sim/how-to-use-IOSimPOR.md).
+--
+-- /IOSimPOR/ only discovers races between events which happen in the same time
+-- slot.  In /IOSim/ and /IOSimPOR/ time only moves explicitly through timer
+-- events, e.g. things like `Control.Monad.Class.MonadTimer.SI.threadDelay`,
+-- `Control.Monad.Class.MonadTimer.SI.registerDelay` or the
+-- `Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` api.  The usual
+-- quickcheck techniques can help explore different schedules of
+-- threads too.
 
+-- | Execute a simulation, discover & revert races.  Note that this will execute
+-- the simulation multiple times with different schedules, and thus it's much
+-- more costly than a simple `runSimTrace` (also the simulation environments has
+-- much more state to track and hence is slower).
+--
+-- On property failure it will show the failing schedule (`ScheduleControl`)
+-- which can be plugged to `controlSimTrace`.
+--
 exploreSimTrace
   :: forall a test. Testable test
   => (ExplorationOptions -> ExplorationOptions)
+  -- ^ modify default exploration options
   -> (forall s. IOSim s a)
+  -- ^ a simulation to run
   -> (Maybe (SimTrace a) -> SimTrace a -> test)
+  -- ^ a callback which receives the previous trace (e.g. before reverting
+  -- a race condition) and current trace
   -> Property
 exploreSimTrace optsf mainAction k =
   case explorationReplay opts of
@@ -392,42 +431,49 @@ exploreSimTrace optsf mainAction k =
       let size = cacheSize() in size `seq`
       tabulate "Modified schedules explored" [bucket size] True
     Just control ->
-      replaySimTrace opts mainAction control k
+      replaySimTrace opts mainAction control (k Nothing)
   where
     opts = optsf stdExplorationOptions
 
+    explore :: Int -> Int -> ScheduleControl -> Maybe (SimTrace a) -> Property
     explore n m control passingTrace =
 
       -- ALERT!!! Impure code: readRaces must be called *after* we have
       -- finished with trace.
-      let (readRaces,trace0) = detachTraceRaces $
-                                 controlSimTrace (explorationStepTimelimit opts) control mainAction
+      let (readRaces, trace0) = detachTraceRaces $
+                                controlSimTrace
+                                  (explorationStepTimelimit opts) control mainAction
           (sleeper,trace) = compareTraces passingTrace trace0
-      in (counterexample ("Schedule control: " ++ show control) $
-          counterexample (case sleeper of Nothing -> "No thread delayed"
-                                          Just ((t,tid,lab),racing) ->
-                                            showThread (tid,lab) ++
-                                            " delayed at time "++
-                                            show t ++
-                                            "\n  until after:\n" ++
-                                            unlines (map (("    "++).showThread) $ Set.toList racing)
-                                            ) $
-          k passingTrace trace) .&&|
-         let limit     = (n+m-1) `div` m
-             -- To ensure the set of schedules explored is deterministic, we filter out
-             -- cached ones *after* selecting the children of this node.
-             races     = filter (not . cached) . take limit $ readRaces()
-             branching = length races
-         in -- tabulate "Races explored" (map show races) $
-            tabulate "Branching factor" [bucket branching] $
-            tabulate "Race reversals per schedule" [bucket (raceReversals control)] $
-            conjoinPar
-              [ --Debug.trace "New schedule:" $
-                --Debug.trace ("  "++show r) $
-                --counterexample ("Schedule control: " ++ show r) $
-                explore n' ((m-1) `max` 1) r (Just trace0)
-              | (r,n') <- zip races (divide (n-branching) branching) ]
+      in ( counterexample ("Schedule control: " ++ show control)
+         $ counterexample
+            (case sleeper of
+              Nothing -> "No thread delayed"
+              Just ((t,tid,lab),racing) ->
+                showThread (tid,lab) ++
+                " delayed at time "++
+                show t ++
+                "\n  until after:\n" ++
+                unlines (map (("    "++).showThread) $ Set.toList racing)
+             )
+         $ k passingTrace trace
+         )
+      .&&| let limit     = (n+m-1) `div` m
+               -- To ensure the set of schedules explored is deterministic, we
+               -- filter out cached ones *after* selecting the children of this
+               -- node.
+               races     = filter (not . cached) . take limit $ readRaces ()
+               branching = length races
+           in -- tabulate "Races explored" (map show races) $
+              tabulate "Branching factor" [bucket branching] $
+              tabulate "Race reversals per schedule" [bucket (raceReversals control)] $
+              conjoinPar
+                [ --Debug.trace "New schedule:" $
+                  --Debug.trace ("  "++show r) $
+                  --counterexample ("Schedule control: " ++ show r) $
+                  explore n' ((m-1) `max` 1) r (Just trace0)
+                | (r,n') <- zip races (divide (n-branching) branching) ]
 
+    bucket :: Int -> String
     bucket n | n<10  = show n
              | n>=10 = buck n 1
              | otherwise = error "Ord Int is not a total order!"  -- GHC made me do it!
@@ -435,6 +481,7 @@ exploreSimTrace optsf mainAction k =
              | n>=10     = buck (n `div` 10) (t*10)
              | otherwise = error "Ord Int is not a total order!"  -- GHC made me do it!
 
+    divide :: Int -> Int -> [Int]
     divide n k =
       [ n `div` k + if i<n `mod` k then 1 else 0
       | i <- [0..k-1] ]
@@ -444,28 +491,77 @@ exploreSimTrace optsf mainAction k =
       show tid ++ (case lab of Nothing -> ""
                                Just l  -> " ("++l++")")
 
+    -- cache of explored schedules
+    cache :: IORef (Set ScheduleControl)
+    cache = unsafePerformIO cacheIO
+
+    -- insert a schedule into the cache
+    cached :: ScheduleControl -> Bool
+    cached = unsafePerformIO . cachedIO
+
+    -- compute cache size; it's a function to make sure that `GHC` does not
+    -- inline it (and share the same thunk).
+    cacheSize :: () -> Int
+    cacheSize = unsafePerformIO . cacheSizeIO
+
+    --
+    -- Caching in IO monad
+    --
+
     -- It is possible for the same control to be generated several times.
     -- To avoid exploring them twice, we keep a cache of explored schedules.
-    cache = unsafePerformIO $ newIORef $
+    cacheIO :: IO (IORef (Set ScheduleControl))
+    cacheIO = newIORef $
               -- we use opts here just to be sure the reference cannot be
               -- lifted out of exploreSimTrace
-              if explorationScheduleBound opts>=0
+              if explorationScheduleBound opts >=0
                 then Set.empty
                 else error "exploreSimTrace: negative schedule bound"
-    cached m = unsafePerformIO $ atomicModifyIORef' cache $ \set ->
-      (Set.insert m set, Set.member m set)
-    cacheSize () = unsafePerformIO $ Set.size <$> readIORef cache
 
+    cachedIO :: ScheduleControl -> IO Bool
+    cachedIO m = atomicModifyIORef' cache $ \set ->
+      (Set.insert m set, Set.member m set)
+
+
+    cacheSizeIO :: () -> IO Int
+    cacheSizeIO () = Set.size <$> readIORef cache
+
+
+-- | A specialised version of `controlSimTrace'.
+--
+-- An internal function.
+--
 replaySimTrace :: forall a test. (Testable test)
                => ExplorationOptions
+               -- ^ race exploration options
                -> (forall s. IOSim s a)
                -> ScheduleControl
-               -> (Maybe (SimTrace a) -> SimTrace a -> test)
+               -- ^ a schedule control to reproduce
+               -> (SimTrace a -> test)
+               -- ^ a callback which receives the simulation trace. The trace
+               -- will not contain any race events
                -> Property
 replaySimTrace opts mainAction control k =
   let (_,trace) = detachTraceRaces $
-                            controlSimTrace (explorationStepTimelimit opts) control mainAction
-      in property (k Nothing trace)
+                  controlSimTrace (explorationStepTimelimit opts) control mainAction
+  in property (k trace)
+
+-- | Run a simulation using a given schedule.  This is useful to reproduce
+-- failing cases without exploring the races.
+--
+controlSimTrace :: forall a.
+                   Maybe Int
+                -- ^ limit on the computation time allowed per scheduling step, for
+                -- catching infinite loops etc.
+                -> ScheduleControl
+                -- ^ a schedule to replay
+                --
+                -- /note/: must be either `ControlDefault` or `ControlAwait`.
+                -> (forall s. IOSim s a)
+                -- ^ a simulation to run
+                -> SimTrace a
+controlSimTrace limit control mainAction =
+    runST (controlSimTraceST limit control mainAction)
 
 raceReversals :: ScheduleControl -> Int
 raceReversals ControlDefault      = 0

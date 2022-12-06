@@ -160,7 +160,8 @@ labelledThreads threadMap =
 
 
 -- | Timers mutable variables.  First one supports 'newTimeout' api, the second
--- one 'registerDelay', the third one 'threadDelay'.
+-- one 'Control.Monad.Class.MonadTimer.SI.registerDelay', the third one
+-- 'Control.Monad.Class.MonadTimer.SI.threadDelay'.
 --
 data TimerCompletionInfo s =
        Timer !(TVar s TimeoutState)
