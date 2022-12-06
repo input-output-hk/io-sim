@@ -19,8 +19,6 @@ module Control.Monad.Class.MonadThrow
   , ExitCase (..)
   , Handler (..)
   , catches
-    -- * Deprecated interfaces
-  , throwM
   ) where
 
 import           Control.Exception (Exception (..), MaskingState, SomeException)
@@ -57,10 +55,6 @@ class Monad m => MonadThrow m where
 
   a `finally` sequel =
     bracket_ (return ()) sequel a
-
-throwM :: (MonadThrow m, Exception e) => e -> m a
-throwM = throwIO
-{-# DEPRECATED throwM "Use throwIO" #-}
 
 -- | Catching exceptions.
 --

@@ -27,7 +27,7 @@ module Control.Monad.IOSim
   , unshareClock
     -- * Simulation trace
   , type SimTrace
-  , Trace (Cons, Nil, Trace, SimTrace, SimPORTrace, TraceDeadlock, TraceLoop, TraceMainReturn, TraceMainException, TraceRacesFound)
+  , Trace (Cons, Nil, SimTrace, SimPORTrace, TraceDeadlock, TraceLoop, TraceMainReturn, TraceMainException, TraceRacesFound)
   , SimResult (..)
   , SimEvent (..)
   , SimEventType (..)
@@ -73,10 +73,6 @@ module Control.Monad.IOSim
   , readTimeout
   , cancelTimeout
   , awaitTimeout
-    -- * Deprecated interfaces
-  , SimM
-  , SimSTM
-  , TraceEvent
   ) where
 
 import           Prelude

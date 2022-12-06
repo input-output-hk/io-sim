@@ -18,14 +18,12 @@
 
 module Control.Monad.IOSimPOR.Internal
   ( IOSim (..)
-  , SimM
   , runIOSim
   , runSimTraceST
   , traceM
   , traceSTM
   , STM
   , STMSim
-  , SimSTM
   , setCurrentTime
   , unshareClock
   , TimeoutException (..)
@@ -35,11 +33,10 @@ module Control.Monad.IOSimPOR.Internal
   , ThreadLabel
   , Labelled (..)
   , SimTrace
-  , Trace.Trace (SimPORTrace, Trace, TraceMainReturn, TraceMainException, TraceDeadlock)
+  , Trace.Trace (SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock)
   , SimEvent (..)
   , SimResult (..)
   , SimEventType (..)
-  , TraceEvent
   , liftST
   , execReadTVar
   , controlSimTraceST
