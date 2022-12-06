@@ -35,20 +35,29 @@ import           Data.Time.Clock (diffTimeToPicoseconds)
 
 
 
+-- | Convert 'DiffTime' in seconds to microseconds represented by an 'Int'.
+--
+-- Note that on 32bit systems it can only represent 2^31 seconds, which is only
+-- ~35 minutes.
 diffTimeToMicrosecondsAsInt :: DiffTime -> Int
 diffTimeToMicrosecondsAsInt d =
     let usec :: Integer
         usec = diffTimeToPicoseconds d `div` 1_000_000 in
-    -- Can only represent usec times that fit within an Int, which on 32bit
-    -- systems means 2^31 usec, which is only ~35 minutes.
     assert (usec <= fromIntegral (maxBound :: Int)) $
     fromIntegral usec
 
 
+-- | Convert time in microseconds in 'DiffTime' (measured in seconds).
+--
 microsecondsAsIntToDiffTime :: Int -> DiffTime
 microsecondsAsIntToDiffTime = (/ 1_000_000) . fromIntegral
 
 
+-- | Thread delay.  When the delay is smaller than what `Int` can represent it
+-- will use the `Control.Monad.Class.MonadTimer.threadDelay` (e.g. for the `IO`
+-- monad it will use `Control.Concurrent.threadDelay`); otherwise it will
+-- recursively call `Control.Monad.Class.MonadTimer.threadDelay`.
+--
 threadDelay :: forall m.
                ( MonadDelay m
                , MonadMonotonicTime m
@@ -81,6 +90,12 @@ threadDelay d = do
         d' = u `diffTime` c
 
 
+-- | Like 'GHC.Conc.registerDelay' but safe on 32-bit systems.  When the delay
+-- is larger than what `Int` can represent it will fork a thread which will
+-- write to the returned 'TVar' once the delay has passed.  When the delay is
+-- small enough it will use the `MonadTimer`'s `registerDelay` (e.g. for `IO`
+-- monad it will use the `GHC`'s `GHC.Conc.registerDelay`).
+--
 registerDelay :: ( MonadFork m
                  , MonadMonotonicTime m
                  , MonadTimer m
@@ -97,8 +112,8 @@ registerDelay d
 
 
 -- | A default implementation of `registerDelay` which supports delays longer
--- then `Int`; this is especially important on 32-bit architectures where
--- maximum delay expressed in microseconds is around 35 minutes.
+-- then `Int`; this is especially important on 32-bit systems where maximum
+-- delay expressed in microseconds is around 35 minutes.
 --
 defaultRegisterDelay :: forall m.
                         ( MonadFork  m
@@ -129,6 +144,10 @@ defaultRegisterDelay d = do
         writeTVar v True
 
 
+-- | A cancellable register delay which is safe on 32-bit systems and efficient
+-- for delays smaller than what `Int` can represent (especially on systems which
+-- support native timer manager).
+--
 registerDelayCancellable :: forall m.
                             ( MonadFork  m
                             , MonadMonotonicTime m
