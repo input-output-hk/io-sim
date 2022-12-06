@@ -44,6 +44,8 @@ import qualified GHC.Event as GHC (TimeoutKey, getSystemTimerManager,
 import           Data.Kind (Type)
 
 
+-- | State of a timeout: pending, fired or cancelled.
+--
 data TimeoutState = TimeoutPending | TimeoutFired | TimeoutCancelled
   deriving (Eq, Ord, Show)
 
