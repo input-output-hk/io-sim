@@ -13,6 +13,13 @@ import           Data.Map (Map)
 import           Data.STRef.Lazy
 import           Data.Set (Set)
 
+-- | A thread id.
+--
+-- /IOSimPOR/: 'RacyThreadId' indicates that this thread is taken into account
+-- when discovering races.  A thread is marked as racy iff
+-- `Control.Monad.Class.MonadTest.exploreRaces` was
+-- executed in it or it's a thread forked by a racy thread.
+--
 data ThreadId = RacyThreadId [Int]
               | ThreadId     [Int]    -- non racy threads have higher priority
   deriving (Eq, Ord, Show)

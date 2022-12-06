@@ -611,7 +611,11 @@ schedule !thread@Thread{
                          | otherwise       = ThreadRunning
 
           thread' = thread { threadControl = ThreadControl (k result) ctl }
-      schedule thread' simstate
+
+      trace <- schedule thread' simstate
+      return $ SimTrace time tid tlbl (EventThreadStatus tid tid')
+             $ trace
+
 
     GetMaskState k ->
       {-# SCC "schedule.GetMaskState" #-} do

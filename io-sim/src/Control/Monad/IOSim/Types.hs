@@ -825,55 +825,112 @@ pattern TraceLoop = Trace.Nil Loop
 -- | Events recorded by the simulation.
 --
 data SimEventType
-  = EventSimStart      ScheduleControl
-  | EventSay  String
+  = EventSay  String
+  -- ^ hold value of `say`
   | EventLog  Dynamic
+  -- ^ hold a dynamic value of `Control.Monad.IOSim.traceM`
   | EventMask MaskingState
+  -- ^ masking state changed
 
   | EventThrow          SomeException
-  | EventThrowTo        SomeException ThreadId -- This thread used ThrowTo
-  | EventThrowToBlocked                        -- The ThrowTo blocked
-  | EventThrowToWakeup                         -- The ThrowTo resumed
-  | EventThrowToUnmasked (Labelled ThreadId)   -- A pending ThrowTo was activated
+  -- ^ throw exception
+  | EventThrowTo        SomeException ThreadId
+  -- ^ throw asynchronous exception (`throwTo`)
+  | EventThrowToBlocked
+  -- ^ the thread which executed `throwTo` is blocked
+  | EventThrowToWakeup
+  -- ^ the thread which executed `throwTo` is woken up
+  | EventThrowToUnmasked (Labelled ThreadId)
+  -- ^ a target thread of `throwTo` unmasked its exceptions, this is paired
+  -- with `EventThrowToWakeup` for threads which were blocked on `throwTo`
 
   | EventThreadForked    ThreadId
-  | EventThreadFinished                  -- terminated normally
-  | EventThreadUnhandled SomeException   -- terminated due to unhandled exception
+  -- ^ forked a thread
+  | EventThreadFinished
+  -- ^ thread terminated normally
+  | EventThreadUnhandled SomeException
+  -- ^ thread terminated by an unhandled exception
 
-  | EventTxCommitted   [Labelled TVarId] -- tx wrote to these
-                       [Labelled TVarId] -- and created these
-                       (Maybe Effect)    -- effect performed (only for `IOSimPOR`)
-  | EventTxAborted     (Maybe Effect)    -- effect performed (only for `IOSimPOR`)
-  | EventTxBlocked     [Labelled TVarId] -- tx blocked reading these
-                       (Maybe Effect)    -- effect performed (only for `IOSimPOR`)
-  | EventTxWakeup      [Labelled TVarId] -- changed vars causing retry
+  --
+  -- STM events
+  --
+
+  -- | committed STM transaction
+  | EventTxCommitted   [Labelled TVarId] -- ^ stm tx wrote to these
+                       [Labelled TVarId] -- ^ and created these
+                       (Maybe Effect)    -- ^ effect performed (only for `IOSimPOR`)
+  -- | aborted an STM transaction (by an exception)
+  -- 
+  -- For /IOSimPOR/ it also holds performed effect.
+  | EventTxAborted     (Maybe Effect)
+  -- | STM transaction blocked (due to `retry`)
+  | EventTxBlocked     [Labelled TVarId] -- stm tx blocked reading these
+                       (Maybe Effect)    -- ^ effect performed (only for `IOSimPOR`)
+  | EventTxWakeup      [Labelled TVarId] -- ^ changed vars causing retry
+
+  | EventUnblocked     [ThreadId]
+  -- ^ unblocked threads by a committed STM transaction
+
+  --
+  -- Timeouts, Timers & Delays
+  --
 
   | EventThreadDelay        Time
+  -- ^ thread delayed
   | EventThreadDelayFired
+  -- ^ thread woken up after a delay
 
   | EventTimeoutCreated        TimeoutId ThreadId Time
+  -- ^ new timeout created (via `timeout`)
   | EventTimeoutFired          TimeoutId
+  -- ^ timeout fired
 
   | EventRegisterDelayCreated TimeoutId TVarId Time
+  -- ^ registered delay (via `registerDelay`)
   | EventRegisterDelayFired TimeoutId
+  -- ^ registered delay fired
 
   | EventTimerCreated         TimeoutId TVarId Time
+  -- ^ a new 'Timeout' created (via `newTimeout`)
   | EventTimerUpdated         TimeoutId        Time
+  -- ^ a 'Timeout' was updated (via `updateTimeout`)
   | EventTimerCancelled       TimeoutId
+  -- ^ a 'Timeout' was cancelled (via `cancelTimeout`)
   | EventTimerFired           TimeoutId
+  -- ^ a 'Timeout` fired
 
-  -- the following events are inserted to mark the difference between
-  -- a failed trace and a similar passing trace of the same action
-  | EventThreadSleep                      -- the labelling thread was runnable,
-                                          -- but its execution was delayed
-  | EventThreadWake                       -- until this point
+  --
+  -- threadStatus
+  --
+  
+  -- | event traced when `threadStatus` is executed
+  | EventThreadStatus  ThreadId -- ^ current thread
+                       ThreadId -- ^ queried thread
+
+  --
+  -- /IOSimPOR/ events
+  --
+
+  | EventSimStart      ScheduleControl
+  -- ^ /IOSimPOR/ event: new execution started exploring the given schedule.
+  | EventThreadSleep
+  -- ^ /IOSimPOR/ event: the labelling thread was runnable, but its execution
+  -- was delayed, until 'EventThreadWake'.
+  --
+  -- Event inserted to mark a difference between a failed trace and a similar
+  -- passing trace.
+  | EventThreadWake
+  -- ^ /IOSimPOR/ event: marks when the thread was rescheduled by /IOSimPOR/
   | EventDeschedule    Deschedule
+  -- ^ /IOSim/ and /IOSimPOR/ event: a thread was descheduled
   | EventFollowControl        ScheduleControl
+  -- ^ /IOSimPOR/ event: following given schedule
   | EventAwaitControl  StepId ScheduleControl
+  -- ^ /IOSimPOR/ event: thread delayed to follow the given schedule
   | EventPerformAction StepId
+  -- ^ /IOSimPOR/ event: perform action of the given step
   | EventReschedule           ScheduleControl
-  | EventUnblocked     [ThreadId]
-  | EventThreadStatus  ThreadId ThreadId
+  -- ^ /IOSimPOR/ event: thread rescheduled
   deriving Show
 
 -- | A labelled value.

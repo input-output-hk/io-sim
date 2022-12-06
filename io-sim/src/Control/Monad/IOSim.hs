@@ -300,9 +300,9 @@ runSimOrThrow mainAction =
       Left  e -> throw e
       Right x -> x
 
--- | Like 'runSim' but also fail if when the main thread terminates, there
--- are other threads still running or blocked. If one is trying to follow
--- a strict thread cleanup policy then this helps testing for that.
+-- | Like 'runSim' but fail when the main thread terminates if there are other
+-- threads still running or blocked. If one is trying to follow a strict thread
+-- cleanup policy then this helps testing for that.
 --
 runSimStrictShutdown :: forall a. (forall s. IOSim s a) -> Either Failure a
 runSimStrictShutdown mainAction = traceResult True (runSimTrace mainAction)
