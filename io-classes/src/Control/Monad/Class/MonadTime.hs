@@ -32,7 +32,7 @@ class Monad m => MonadMonotonicTimeNSec m where
   --
   getMonotonicTimeNSec :: m Word64
 
-class MonadMonotonicTimeNSec m => MonadTime m where
+class Monad m => MonadTime m where
   -- | Wall clock time.
   --
   getCurrentTime :: m UTCTime
