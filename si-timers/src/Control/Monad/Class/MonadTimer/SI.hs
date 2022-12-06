@@ -2,12 +2,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Control.Monad.Class.MonadTimer.SI
-  ( -- * Timers API
+  ( -- * SI Timers API
     threadDelay
   , registerDelay
   , registerDelayCancellable
   , timeout
-    -- * re-exports
+    -- * Auxiliary functions
+  , diffTimeToMicrosecondsAsInt
+  , microsecondsAsIntToDiffTime
+    -- * Re-exports
   , DiffTime
   , MonadDelay
   , MonadFork
@@ -15,9 +18,6 @@ module Control.Monad.Class.MonadTimer.SI
   , MonadTime
   , MonadTimer
   , TimeoutState (..)
-    -- * auxiliary functions
-  , diffTimeToMicrosecondsAsInt
-  , microsecondsAsIntToDiffTime
   ) where
 
 import           Control.Concurrent.Class.MonadSTM
@@ -220,6 +220,6 @@ registerDelayCancellable d = do
 
 -- | Run IO action within a timeout.
 --
--- TODO: not 32-bit safe
+-- TODO: not safe on 32-bit systems.
 timeout :: MonadTimer m => DiffTime -> m a -> m (Maybe a)
 timeout = MonadTimer.timeout . diffTimeToMicrosecondsAsInt

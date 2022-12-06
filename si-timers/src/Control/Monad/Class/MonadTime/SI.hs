@@ -5,6 +5,7 @@
 module Control.Monad.Class.MonadTime.SI
   ( MonadTime (..)
   , MonadMonotonicTime (..)
+    -- * 'DiffTime' and its action on 'Time'
   , Time (..)
   , diffTime
   , addTime
