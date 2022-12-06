@@ -28,8 +28,6 @@ module Control.Monad.Class.MonadSTM.Internal
   , MonadInspectSTM (..)
   , TraceValue (TraceValue, TraceDynamic, TraceString, DontTrace, traceDynamic, traceString)
   , MonadTraceSTM (..)
-  , LazyTVar
-  , LazyTMVar
     -- * Default 'TMVar' implementation
   , TMVarDefault (..)
     -- * Default 'TBQueue' implementation
@@ -45,12 +43,6 @@ module Control.Monad.Class.MonadSTM.Internal
     -- * MonadThrow aliases
   , throwSTM
   , catchSTM
-    -- * Deprecated API
-  , newTVarM
-  , newTMVarM
-  , newTMVarMDefault
-  , newEmptyTMVarM
-  , newEmptyTMVarMDefault
     -- * Utils
   , WrappedSTM (..)
   ) where
@@ -92,11 +84,6 @@ import           Data.Typeable (Typeable)
 import           GHC.Stack
 import           Numeric.Natural (Natural)
 
-
-{-# DEPRECATED LazyTVar  "Renamed back to 'TVar'" #-}
-{-# DEPRECATED LazyTMVar "Renamed back to 'TMVar'" #-}
-type LazyTVar  m = TVar m
-type LazyTMVar m = TMVar m
 
 -- The STM primitives
 class ( Monad m
@@ -407,19 +394,6 @@ swapTVarDefault var new = do
     old <- readTVar var
     writeTVar var new
     return old
-
-
-newTVarM :: MonadSTM m => a -> m (TVar  m a)
-newTVarM = newTVarIO
-{-# DEPRECATED newTVarM "Use newTVarIO" #-}
-
-newTMVarM :: MonadSTM m => a -> m (TMVar m a)
-newTMVarM = newTMVarIO
-{-# DEPRECATED newTMVarM "Use newTMVarIO" #-}
-
-newEmptyTMVarM  :: MonadSTM m => m (TMVar m a)
-newEmptyTMVarM = newEmptyTMVarIO
-{-# DEPRECATED newEmptyTMVarM "Use newEmptyTMVarIO" #-}
 
 
 -- | Labelled 'TVar's, 'TMVar's, 'TQueue's and 'TBQueue's.
@@ -812,30 +786,10 @@ newTMVarDefault a = do
   t <- newTVar (Just a)
   return (TMVar t)
 
-newTMVarIODefault :: MonadSTM m => a -> m (TMVarDefault m a)
-newTMVarIODefault a = do
-  t <- newTVarM (Just a)
-  return (TMVar t)
-{-# DEPRECATED newTMVarIODefault "MonadSTM provides a default implementation" #-}
-
-newTMVarMDefault :: MonadSTM m => a -> m (TMVarDefault m a)
-newTMVarMDefault = newTMVarIODefault
-{-# DEPRECATED newTMVarMDefault "Use newTMVarIODefault" #-}
-
 newEmptyTMVarDefault :: MonadSTM m => STM m (TMVarDefault m a)
 newEmptyTMVarDefault = do
   t <- newTVar Nothing
   return (TMVar t)
-
-newEmptyTMVarIODefault :: MonadSTM m => m (TMVarDefault m a)
-newEmptyTMVarIODefault = do
-  t <- newTVarIO Nothing
-  return (TMVar t)
-{-# DEPRECATED newEmptyTMVarIODefault "MonadSTM provides a default implementation" #-}
-
-newEmptyTMVarMDefault :: MonadSTM m => m (TMVarDefault m a)
-newEmptyTMVarMDefault = newEmptyTMVarIODefault
-{-# DEPRECATED newEmptyTMVarMDefault "Use newEmptyTMVarIODefault" #-}
 
 takeTMVarDefault :: MonadSTM m => TMVarDefault m a -> STM m a
 takeTMVarDefault (TMVar t) = do

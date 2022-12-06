@@ -1,8 +1,5 @@
 module Control.Monad.Class.MonadEventlog
   ( MonadEventlog (..)
-    -- * Deprecated API
-  , traceEventM
-  , traceMarkerM
   ) where
 
 import           Control.Monad.Reader
@@ -20,17 +17,6 @@ class Monad m => MonadEventlog m where
   -- The 'String' is the name of the marker. The name is just used in the
   -- profiling tools to help you keep clear which marker is which.
   traceMarkerIO :: String -> m ()
-
-
-traceEventM :: MonadEventlog m => String -> m ()
-traceEventM = traceEventIO
-{-# DEPRECATED traceEventM "Use traceEventIO" #-}
-
-
-traceMarkerM :: MonadEventlog m => String -> m ()
-traceMarkerM = traceMarkerIO
-{-# DEPRECATED traceMarkerM "Use traceEventIO" #-}
-
 
 --
 -- Instances for IO

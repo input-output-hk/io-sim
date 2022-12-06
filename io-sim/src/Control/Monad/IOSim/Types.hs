@@ -49,16 +49,13 @@ module Control.Monad.IOSim.Types
   , SimEvent (..)
   , SimResult (..)
   , SimTrace
-  , Trace.Trace (Trace, SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop)
+  , Trace.Trace (SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop)
   , ppTrace
   , ppTrace_
   , ppSimEvent
   , ppDebug
-  , TraceEvent
   , Labelled (..)
   , module Control.Monad.IOSim.CommonTypes
-  , SimM
-  , SimSTM
   , Thrower (..)
   , Time (..)
   , addTime
@@ -128,9 +125,6 @@ import qualified System.IO.Error as IO.Error (userError)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
 newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }
-
-type SimM s = IOSim s
-{-# DEPRECATED SimM "Use IOSim" #-}
 
 runIOSim :: IOSim s a -> SimA s a
 runIOSim (IOSim k) = k Return
@@ -230,9 +224,6 @@ data StmA s a where
 
 -- Exported type
 type STMSim = STM
-
-type SimSTM = STM
-{-# DEPRECATED SimSTM "Use STMSim" #-}
 
 --
 -- Monad class instances
@@ -794,13 +785,6 @@ ppDebug = appEndo
         . foldMap (Endo . Debug.trace . show)
         . Trace.toList
 
-pattern Trace :: Time -> ThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
-              -> SimTrace a
-pattern Trace time threadId threadLabel traceEvent trace =
-    Trace.Cons (SimEvent time threadId threadLabel traceEvent)
-               trace
-
-{-# DEPRECATED Trace "Use 'SimTrace' instead." #-}
 
 pattern SimTrace :: Time -> ThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                  -> SimTrace a
@@ -836,7 +820,6 @@ pattern TraceLoop :: SimTrace a
 pattern TraceLoop = Trace.Nil Loop
 
 {-# COMPLETE SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceLoop #-}
-{-# COMPLETE Trace,                 TraceMainReturn, TraceMainException, TraceDeadlock, TraceLoop #-}
 
 
 -- | Events recorded by the simulation.
@@ -892,9 +875,6 @@ data SimEventType
   | EventUnblocked     [ThreadId]
   | EventThreadStatus  ThreadId ThreadId
   deriving Show
-
-type TraceEvent = SimEventType
-{-# DEPRECATED TraceEvent "Use 'SimEventType' instead." #-}
 
 -- | A labelled value.
 --

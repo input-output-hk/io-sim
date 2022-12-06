@@ -7,9 +7,6 @@ module Control.Monad.Class.MonadFork
   ( MonadThread (..)
   , MonadFork (..)
   , labelThisThread
-    -- * Deprecated API
-  , fork
-  , forkWithUnmask
   ) where
 
 import qualified Control.Concurrent as IO
@@ -42,14 +39,6 @@ class MonadThread m => MonadFork m where
   killThread tid = throwTo tid ThreadKilled
 
   yield            :: m ()
-
-fork :: MonadFork m => m () -> m (ThreadId m)
-fork = forkIO
-{-# DEPRECATED fork "use forkIO" #-}
-
-forkWithUnmask :: MonadFork m => ((forall a. m a -> m a) ->  m ()) -> m (ThreadId m)
-forkWithUnmask = forkIOWithUnmask
-{-# DEPRECATED forkWithUnmask "use forkIO" #-}
 
 
 instance MonadThread IO where
