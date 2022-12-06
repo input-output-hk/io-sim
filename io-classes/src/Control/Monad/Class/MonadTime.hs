@@ -36,7 +36,7 @@ class Monad m => MonadMonotonicTimeNSec m where
 class MonadMonotonicTimeNSec m => MonadTime m where
   -- | Wall clock time.
   --
-  getCurrentTime   :: m UTCTime
+  getCurrentTime :: m UTCTime
 
 --
 -- Instances for IO
