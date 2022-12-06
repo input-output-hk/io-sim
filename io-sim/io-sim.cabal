@@ -42,9 +42,9 @@ library
   import:              warnings
   hs-source-dirs:      src
   exposed-modules:     Data.List.Trace,
-                       Control.Monad.IOSim,
-                       Control.Monad.IOSim.Types
+                       Control.Monad.IOSim
   other-modules:       Control.Monad.IOSim.CommonTypes,
+                       Control.Monad.IOSim.Types,
                        Control.Monad.IOSim.Internal,
                        Control.Monad.IOSim.InternalTypes,
                        Control.Monad.IOSim.STM,
