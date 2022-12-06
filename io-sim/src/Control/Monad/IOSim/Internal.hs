@@ -79,7 +79,7 @@ import           Control.Monad.Class.MonadSTM hiding (STM)
 import           Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
 import           Control.Monad.Class.MonadThrow hiding (getMaskingState)
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer
+import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.Class.MonadTimer.SI (microsecondsAsIntToDiffTime)
 
 import           Control.Monad.IOSim.InternalTypes
