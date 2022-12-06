@@ -41,6 +41,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Class.MonadTime.SI
                        Control.Monad.Class.MonadTimer.SI
+                       Control.Monad.Class.MonadTimer.NonStandard
   default-language:    Haskell2010
   other-extensions:    BangPatterns,
                        CPP,
@@ -54,6 +55,7 @@ library
                        ScopedTypeVariables,
                        TypeFamilies
   build-depends:       base              >=4.9 && <4.18,
+                       mtl,
                        time              >=1.9.1 && <1.13,
 
                        io-classes       ^>=0.6

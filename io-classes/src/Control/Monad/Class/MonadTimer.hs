@@ -7,8 +7,6 @@
 module Control.Monad.Class.MonadTimer
   ( MonadDelay (..)
   , MonadTimer (..)
-  , registerDelayCancellable
-  , TimeoutState (..)
   ) where
 
 import qualified Control.Concurrent as IO
@@ -23,35 +21,16 @@ import           Control.Monad.State (StateT (..))
 import           Control.Monad.Trans (lift)
 import           Control.Monad.Writer (WriterT (..))
 
-import           Data.Functor (void)
-
-import           Control.Monad.Class.MonadTimer.NonStandard
-
 import qualified System.Timeout as IO
 
 class Monad m => MonadDelay m where
   threadDelay :: Int -> m ()
 
-  default threadDelay :: MonadTimer m => Int -> m ()
-  threadDelay d = void . atomically . awaitTimeout =<< newTimeout d
-
-class (MonadDelay m, MonadTimeout m) => MonadTimer m where
+class (MonadDelay m, MonadSTM m) => MonadTimer m where
 
   registerDelay :: Int -> m (TVar m Bool)
 
   timeout :: Int -> m a -> m (Maybe a)
-
---
--- Cancellable Timers
---
-
-registerDelayCancellable :: forall m.  MonadTimer m
-                         => Int
-                         -> m (STM m TimeoutState, m ())
-
-registerDelayCancellable d = do
-    t <- newTimeout d
-    return (readTimeout t, cancelTimeout t)
 
 --
 -- Instances for IO
