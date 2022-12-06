@@ -31,6 +31,7 @@ import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
+import           Control.Monad.Class.MonadTimer.NonStandard (MonadTimeout)
 import           Control.Monad.IOSim
 
 import           Test.STM
@@ -1574,9 +1575,10 @@ prop_registerDelayCancellable (DelayWithCancel delay mbCancel) =
         Left  {} -> counterexample (ppTrace trace) False
         Right  r -> counterexample (ppTrace trace) r
     where
-      sim :: ( MonadFork  m
+      sim :: ( MonadFork    m
              , MonadMonotonicTime m
-             , MonadTimer m
+             , MonadTimeout m
+             , MonadTimer   m
              )
           => m Bool
       sim = do

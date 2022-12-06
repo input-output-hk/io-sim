@@ -96,9 +96,10 @@ threadDelay d = do
 -- small enough it will use the `MonadTimer`'s `registerDelay` (e.g. for `IO`
 -- monad it will use the `GHC`'s `GHC.Conc.registerDelay`).
 --
-registerDelay :: ( MonadFork m
+registerDelay :: ( MonadFork    m
                  , MonadMonotonicTime m
-                 , MonadTimer m
+                 , MonadTimeout m
+                 , MonadTimer   m
                  )
               => DiffTime -> m (TVar m Bool)
 registerDelay d
@@ -116,9 +117,9 @@ registerDelay d
 -- delay expressed in microseconds is around 35 minutes.
 --
 defaultRegisterDelay :: forall m.
-                        ( MonadFork  m
+                        ( MonadFork    m
                         , MonadMonotonicTime m
-                        , MonadTimer m
+                        , MonadTimeout m
                         )
                      => DiffTime
                      -> m (TVar m Bool)
@@ -149,9 +150,9 @@ defaultRegisterDelay d = do
 -- support native timer manager).
 --
 registerDelayCancellable :: forall m.
-                            ( MonadFork  m
+                            ( MonadFork    m
                             , MonadMonotonicTime m
-                            , MonadTimer m
+                            , MonadTimeout m
                             )
                          => DiffTime
                          -> m (STM m TimeoutState, m ())
