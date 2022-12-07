@@ -1,4 +1,4 @@
-cabal-version:       2.0
+cabal-version:       3.0
 name:                strict-stm
 version:             0.6.0.0
 synopsis:            Strict STM interface polymorphic over stm implementation.
@@ -14,7 +14,7 @@ author:              Alexander Vieth, Duncan Coutts, Marcin Szamotulski, Thomas 
 maintainer:          Duncan Coutts dunca@well-typed.com, Marcin Szamotulski coot@coot.me
 category:            Control
 build-type:          Simple
-tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.4
+tested-with:         GHC == { 8.10, 9.2, 9.4 }
 
 source-repository head
   type:     git
