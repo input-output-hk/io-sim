@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -7,17 +8,18 @@ module Control.Monad.Class.MonadTimer.SI
   , registerDelay
   , registerDelayCancellable
   , timeout
+    -- * Type classes
+  , MonadDelay
+  , MonadTimer
     -- * Auxiliary functions
   , diffTimeToMicrosecondsAsInt
   , microsecondsAsIntToDiffTime
     -- * Re-exports
   , DiffTime
-  , MonadDelay
   , MonadFork
   , MonadMonotonicTime
   , MonadTime
   , MonadTimeout
-  , MonadTimer
   , TimeoutState (..)
   ) where
 
@@ -26,7 +28,6 @@ import           Control.Exception (assert)
 import           Control.Monad (when)
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadTime.SI
-import           Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer)
 import qualified Control.Monad.Class.MonadTimer as MonadTimer
 import           Control.Monad.Class.MonadTimer.NonStandard
 
@@ -53,6 +54,12 @@ diffTimeToMicrosecondsAsInt d =
 microsecondsAsIntToDiffTime :: Int -> DiffTime
 microsecondsAsIntToDiffTime = (/ 1_000_000) . fromIntegral
 
+-- | This is a convenient type alias which captures constraints of
+-- `threadDelay`.
+--
+type MonadDelay m = ( MonadTimer.MonadDelay m
+                    , MonadMonotonicTime m
+                    )
 
 -- | Thread delay.  When the delay is smaller than what `Int` can represent it
 -- will use the `Control.Monad.Class.MonadTimer.threadDelay` (e.g. for the `IO`
@@ -60,9 +67,7 @@ microsecondsAsIntToDiffTime = (/ 1_000_000) . fromIntegral
 -- recursively call `Control.Monad.Class.MonadTimer.threadDelay`.
 --
 threadDelay :: forall m.
-               ( MonadDelay m
-               , MonadMonotonicTime m
-               )
+               MonadDelay m
             => DiffTime -> m ()
 threadDelay d | d <= maxDelay =
     MonadTimer.threadDelay (diffTimeToMicrosecondsAsInt d)
@@ -91,17 +96,22 @@ threadDelay d = do
         d' = u `diffTime` c
 
 
+-- | This is a convenient type alias which captures constraints of
+-- `registerDelay` and `registerDelayCancellable`.
+--
+type MonadTimer m = ( MonadFork m
+                    , MonadMonotonicTime m
+                    , MonadTimer.MonadTimer m
+                    , MonadTimeout m
+                    )
+
 -- | Like 'GHC.Conc.registerDelay' but safe on 32-bit systems.  When the delay
 -- is larger than what `Int` can represent it will fork a thread which will
 -- write to the returned 'TVar' once the delay has passed.  When the delay is
 -- small enough it will use the `MonadTimer`'s `registerDelay` (e.g. for `IO`
 -- monad it will use the `GHC`'s `GHC.Conc.registerDelay`).
 --
-registerDelay :: ( MonadFork    m
-                 , MonadMonotonicTime m
-                 , MonadTimeout m
-                 , MonadTimer   m
-                 )
+registerDelay :: MonadTimer m
               => DiffTime -> m (TVar m Bool)
 registerDelay d
     | d <= maxDelay =
@@ -152,10 +162,7 @@ defaultRegisterDelay d = do
 -- support native timer manager).
 --
 registerDelayCancellable :: forall m.
-                            ( MonadFork    m
-                            , MonadMonotonicTime m
-                            , MonadTimeout m
-                            )
+                            MonadTimer m
                          => DiffTime
                          -> m (STM m TimeoutState, m ())
 
@@ -222,5 +229,5 @@ registerDelayCancellable d = do
 -- | Run IO action within a timeout.
 --
 -- TODO: not safe on 32-bit systems.
-timeout :: MonadTimer m => DiffTime -> m a -> m (Maybe a)
+timeout :: MonadTimer.MonadTimer m => DiffTime -> m a -> m (Maybe a)
 timeout = MonadTimer.timeout . diffTimeToMicrosecondsAsInt

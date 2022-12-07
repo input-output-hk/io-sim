@@ -273,7 +273,6 @@ prop_thread_status_blocked = do
 
 prop_thread_status_blocked_delay :: ( MonadFork m
                                     , MonadDelay m
-                                    , MonadMonotonicTime m
                                     )
                                  => m Property
 prop_thread_status_blocked_delay =
@@ -419,9 +418,7 @@ prop_mfix_purity_2 as =
     as' = getPositive `map` as
 
     -- recursive sum using 'threadDelay'
-    recDelay :: ( MonadMonotonicTime m
-                , MonadDelay m
-                )
+    recDelay :: MonadDelay m
              => ([Int] -> m Time)
              ->  [Int] -> m Time
     recDelay = \rec_ bs ->
@@ -1459,9 +1456,7 @@ prop_registerDelayCancellable (DelayWithCancel delay mbCancel) =
         Left  {} -> counterexample (ppTrace trace) False
         Right  r -> counterexample (ppTrace trace) r
     where
-      sim :: ( MonadFork    m
-             , MonadMonotonicTime m
-             , MonadTimeout m
+      sim :: ( MonadDelay   m
              , MonadTimer   m
              )
           => m Bool

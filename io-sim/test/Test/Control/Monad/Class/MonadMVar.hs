@@ -79,7 +79,6 @@ putMVar_fairness_property
      ( MonadAsync m
      , MonadDelay m
      , MonadMVar  m
-     , MonadMonotonicTime m
      )
   => Int -- ^ number of threads
   -> m Bool
@@ -106,7 +105,6 @@ unit_putMVar_blocks_on_full
   :: ( MonadFork  m
      , MonadDelay m
      , MonadMVar  m
-     , MonadMonotonicTime m
      )
   => m Bool
 unit_putMVar_blocks_on_full = do
@@ -141,7 +139,6 @@ takeMVar_fairness_property
      ( MonadAsync m
      , MonadDelay m
      , MonadMVar  m
-     , MonadMonotonicTime m
      , Eq (Async m Int)
      )
   => Int -- ^ number of threads
@@ -164,7 +161,6 @@ unit_takeMVar_blocks_on_empty
   :: ( MonadFork  m
      , MonadDelay m
      , MonadMVar  m
-     , MonadMonotonicTime m
      )
   => m Bool
 unit_takeMVar_blocks_on_empty = do

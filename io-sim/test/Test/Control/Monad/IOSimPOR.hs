@@ -32,7 +32,7 @@ import           Control.Concurrent.Class.MonadSTM
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
-import           Control.Monad.Class.MonadTime
+import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.IOSim
@@ -463,9 +463,7 @@ prop_mfix_purity_2 as =
     as' = getPositive `map` as
 
     -- recursive sum using 'threadDelay'
-    recDelay :: ( MonadMonotonicTime m
-                , MonadDelay m
-                )
+    recDelay :: MonadDelay m
              => ([Int] -> m Time)
              ->  [Int] -> m Time
     recDelay = \rec_ bs ->
