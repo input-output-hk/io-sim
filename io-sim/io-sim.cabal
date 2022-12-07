@@ -8,8 +8,8 @@ license-files:
   LICENSE
   NOTICE
 copyright:           2019-2022 Input Output (Hong Kong) Ltd.
-author:              Duncan Coutts, Marcin Szamotulski, Alexander Vieth
-maintainer:
+author:              Alexander Vieth, Armando Santos, Duncan Coutts, John Hughes, Marcin Szamotulski
+maintainer:          Armando Santos, Duncan Coutts, Marcin Szamotulski
 category:            Testing
 build-type:          Simple
 tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.3
@@ -21,7 +21,7 @@ flag asserts
 
 source-repository head
   type:     git
-  location: https://github.com/input-output-hk/ouroboros-network
+  location: https://github.com/input-output-hk/io-sim
   subdir:   io-sim
 
 common test-warnings

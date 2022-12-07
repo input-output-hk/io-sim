@@ -10,15 +10,15 @@ license-files:
   LICENSE
   NOTICE
 copyright:           2019-2021 Input Output (Hong Kong) Ltd.
-author:              Alexander Vieth, Marcin Szamotulski, Duncan Coutts
-maintainer:
+author:              Alexander Vieth, Duncan Coutts, Marcin Szamotulski
+maintainer:          Duncan Coutts, Marcin Szamotulski
 category:            Control
 build-type:          Simple
 tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.3
 
 source-repository head
   type:     git
-  location: https://github.com/input-output-hk/ouroboros-network
+  location: https://github.com/input-output-hk/io-sim
   subdir:   strict-stm
 
 flag checktvarinvariant
