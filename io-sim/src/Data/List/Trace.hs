@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP           #-}
 {-# LANGUAGE DeriveFunctor #-}
 
 module Data.List.Trace
@@ -106,8 +107,10 @@ instance Monoid a => Monad (Trace a) where
     -- @bifoldMap Nil id@ is the @join@ of @Trace a@
     o >>= f = bifoldMap Nil id $ fmap f o
 
+#if MIN_VERSION_base(4,13,0)
 instance Monoid a => MonadFail (Trace a) where
     fail _ = mzero
+#endif
 
 instance Monoid a => Alternative (Trace a) where
     empty = mempty

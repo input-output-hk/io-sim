@@ -339,6 +339,8 @@ prop_mfix_lazy (NonEmpty env) =
                         (
 #if MIN_VERSION_base(4,13,0)
                           MonadFail m
+#else
+                          Monad m
 #endif
                         )
                      => m Char
