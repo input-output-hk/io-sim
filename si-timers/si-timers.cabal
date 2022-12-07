@@ -13,7 +13,7 @@ author:              Duncan Coutts, Neil Davis, Marcin Szamotulski
 maintainer:          Duncan Coutts duncan@well-typed.com, Marcin Szamotulski coot@coot.me
 category:            Control
 build-type:          Simple
-tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.3
+tested-with:         GHC == { 8.10, 9.2, 9.4 }
 
 flag asserts
   description: Enable assertions
