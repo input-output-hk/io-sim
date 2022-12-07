@@ -45,6 +45,7 @@ library
   default-language:    Haskell2010
   other-extensions:    BangPatterns,
                        CPP,
+                       ConstraintKinds,
                        ExistentialQuantification,
                        FlexibleInstances,
                        GADTSyntax,

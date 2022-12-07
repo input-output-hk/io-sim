@@ -16,7 +16,6 @@ import           Control.Monad
 import           Control.Monad.Class.MonadFork
 import           Control.Concurrent.Class.MonadSTM.Strict
 import           Control.Monad.Class.MonadThrow
-import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.IOSim
 
@@ -123,10 +122,7 @@ instance Arbitrary TestMicro where
   shrink (TestMicro rs) = [ TestMicro rs' | rs' <- shrinkList (const []) rs ]
 
 test_timers :: forall m.
-               ( MonadFork m
-               , MonadTimer m
-               , MonadMonotonicTime m
-               )
+               MonadTimer m
             => [DiffTime]
             -> m Property
 test_timers xs =
@@ -175,9 +171,7 @@ test_timers xs =
 --
 
 test_fork_order :: forall m.
-                   ( MonadFork m
-                   , MonadTimer m
-                   )
+                   MonadTimer m
                 => Positive Int
                 -> m Property
 test_fork_order = \(Positive n) -> isValid n <$> withProbe (experiment n)
@@ -199,9 +193,7 @@ test_fork_order = \(Positive n) -> isValid n <$> withProbe (experiment n)
     isValid n tr = tr === [n,n-1..1]
 
 test_threadId_order :: forall m.
-                   ( MonadFork m
-                   , MonadTimer m
-                   )
+                   MonadTimer m
                 => Positive Int
                 -> m Property
 test_threadId_order = \(Positive n) -> do
@@ -227,10 +219,7 @@ test_threadId_order = \(Positive n) -> do
 
 --prop_wakeup_order_IO = ioProperty test_wakeup_order
 
-test_wakeup_order :: ( MonadFork m
-                     , MonadTimer m
-                     , MonadMonotonicTime m
-                     )
+test_wakeup_order :: MonadTimer m
                 => m Property
 test_wakeup_order = do
     v          <- newTVarIO False
@@ -292,10 +281,8 @@ prop_stm_referenceM (SomeTerm _tyrep t) = do
 -- exceptions uninterruptibly masked.
 --
 prop_timeout_no_deadlockM :: forall m.
-                             ( MonadFork m
-                             , MonadTimer m
+                             ( MonadTimer m
                              , MonadMask m
-                             , MonadMonotonicTime m
                              )
                           => m Bool
 prop_timeout_no_deadlockM = do
@@ -431,7 +418,6 @@ prop_catch_throwTo_masking_state_async :: forall m.
                                           , MonadFork  m
                                           , MonadSTM   m
                                           , MonadDelay m
-                                          , MonadMonotonicTime m
                                           )
                                        => MaskingState -> m Property
 prop_catch_throwTo_masking_state_async ms = do
@@ -461,7 +447,6 @@ prop_catch_throwTo_masking_state_async_mayblock :: forall m.
                                                 , MonadFork  m
                                                 , MonadSTM   m
                                                 , MonadDelay m
-                                                , MonadMonotonicTime m
                                                 )
                                              => MaskingState -> m Property
 prop_catch_throwTo_masking_state_async_mayblock ms = do
