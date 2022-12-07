@@ -63,14 +63,28 @@ library
                        Control.Monad.Class.MonadTest
   default-language:    Haskell2010
   other-extensions:    CPP
+                       DataKinds
+                       DefaultSignatures
+                       DeriveFunctor
+                       DeriveGeneric
+                       DerivingStrategies
+                       ExistentialQuantification
+                       ExplicitNamespaces
+                       FlexibleContexts
+                       FlexibleInstances
+                       FunctionalDependencies
+                       GADTs
+                       GeneralisedNewtypeDeriving
+                       MultiParamTypeClasses
+                       NamedFieldPuns
+                       QuantifiedConstraints
+                       RankNTypes
+                       ScopedTypeVariables
+                       StandaloneDeriving
                        TypeFamilies
                        TypeFamilyDependencies
-                       MultiParamTypeClasses
-                       FunctionalDependencies
-                       FlexibleInstances
-                       FlexibleContexts
-                       ScopedTypeVariables
-                       RankNTypes
+                       TypeOperators
+                       UndecidableInstances
   build-depends:       base  >=4.9 && <4.18,
                        array,
                        async >=2.1,
