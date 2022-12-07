@@ -12,8 +12,8 @@
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TypeFamilies               #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-partial-fields          #-}
+-- Needed for `SimEvent` type.
+{-# OPTIONS_GHC -Wno-partial-fields     #-}
 
 module Control.Monad.IOSim.Types
   ( IOSim (..)
