@@ -41,7 +41,6 @@ import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
-import           Control.Monad.Class.MonadTimer.NonStandard (MonadTimeout)
 import           Control.Monad.IOSim
 
 import           Test.Control.Monad.Utils
