@@ -1277,9 +1277,8 @@ execNewTVar nextVid !mbLabel x = do
                  tvarCurrent, tvarUndo, tvarBlocked, tvarVClock,
                  tvarTrace}
 
-execReadTVar :: TVar s a -> ST s a
-execReadTVar TVar{tvarCurrent} = readSTRef tvarCurrent
-{-# INLINE execReadTVar #-}
+
+-- 'execReadTVar' is defined in `Control.Monad.IOSim.Type` and shared with /IOSimPOR/
 
 execWriteTVar :: TVar s a -> a -> ST s ()
 execWriteTVar TVar{tvarCurrent} = writeSTRef tvarCurrent

@@ -96,7 +96,7 @@ import           Control.Monad.ST.Lazy
 
 import           Control.Monad.Class.MonadThrow as MonadThrow
 
-import           Control.Monad.IOSim.Internal
+import           Control.Monad.IOSim.Internal (runSimTraceST)
 import           Control.Monad.IOSim.Types
 import           Control.Monad.IOSimPOR.Internal (controlSimTraceST)
 import           Control.Monad.IOSimPOR.QuickCheckUtils
