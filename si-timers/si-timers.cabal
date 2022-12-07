@@ -45,13 +45,9 @@ library
   default-language:    Haskell2010
   other-extensions:    BangPatterns,
                        CPP,
-                       ExistentialQuantification,
-                       FlexibleInstances,
-                       GADTSyntax,
-                       GeneralizedNewtypeDeriving,
-                       MultiParamTypeClasses,
-                       NamedFieldPuns,
-                       RankNTypes,
+                       DefaultSignatures,
+                       DeriveGeneric,
+                       NumericUnderscores,
                        ScopedTypeVariables,
                        TypeFamilies
   build-depends:       base              >=4.9 && <4.18,

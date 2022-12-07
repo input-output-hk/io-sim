@@ -55,12 +55,18 @@ library
   default-language:    Haskell2010
   other-extensions:    BangPatterns,
                        CPP,
+                       DeriveFunctor,
+                       DeriveGeneric,
+                       DerivingVia,
                        ExistentialQuantification,
+                       ExplicitNamespaces,
+                       FlexibleContexts,
                        FlexibleInstances,
                        GADTSyntax,
                        GeneralizedNewtypeDeriving,
                        MultiParamTypeClasses,
                        NamedFieldPuns,
+                       NumericUnderscores,
                        RankNTypes,
                        ScopedTypeVariables,
                        TypeFamilies
