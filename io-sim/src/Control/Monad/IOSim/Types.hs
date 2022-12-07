@@ -65,6 +65,8 @@ module Control.Monad.IOSim.Types
   , readTimeout
   , cancelTimeout
   , awaitTimeout
+    -- * Low-level API
+  , execReadTVar
   ) where
 
 import           Control.Applicative
@@ -73,6 +75,8 @@ import           Control.Exception (ErrorCall (..), asyncExceptionFromException,
 import           Control.Monad
 import           Control.Monad.Fix (MonadFix (..))
 
+import           Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
+import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar as StrictTVar
 import           Control.Monad.Class.MonadAsync hiding (Async)
 import qualified Control.Monad.Class.MonadAsync as MonadAsync
 import           Control.Monad.Class.MonadEventlog
@@ -97,6 +101,7 @@ import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 import qualified Control.Monad.Class.MonadTimer.SI as SI
 import           Control.Monad.ST.Lazy
 import qualified Control.Monad.ST.Strict as StrictST
+import           Control.Monad.ST.Unsafe (unsafeSTToIO)
 
 import qualified Control.Monad.Catch as Exceptions
 import qualified Control.Monad.Fail as Fail
@@ -114,6 +119,7 @@ import           Data.Time.Clock (diffTimeToPicoseconds)
 import           Data.Typeable
 import           Data.Word (Word64)
 import qualified Debug.Trace as Debug
+import           NoThunks.Class (NoThunks (..))
 import           Text.Printf
 
 import           GHC.Exts (oneShot)
@@ -325,6 +331,11 @@ instance MonadThrow (IOSim s) where
 instance MonadEvaluate (IOSim s) where
   evaluate a = IOSim $ oneShot $ \k -> Evaluate a k
 
+-- | Just like the IO instance, we don't actually check anything here
+instance NoThunks (IOSim s a) where
+  showTypeOf _ = "IOSim"
+  wNoThunks _ctxt _act = return Nothing
+
 instance Exceptions.MonadThrow (IOSim s) where
   throwM = MonadThrow.throwIO
 
@@ -416,6 +427,16 @@ instance Exceptions.MonadMask (IOSim s) where
       c <- release resource (Exceptions.ExitCaseSuccess b)
       return (b, c)
 
+instance NoThunks a => NoThunks (StrictTVar (IOSim s) a) where
+  showTypeOf _ = "StrictTVar IOSim"
+  wNoThunks ctxt tvar = do
+      a <- unsafeSTToIO . lazyToStrictST . execReadTVar . StrictTVar.toLazyTVar
+                        $ tvar
+      noThunks ctxt a
+
+execReadTVar :: TVar s a -> ST s a
+execReadTVar TVar{tvarCurrent} = readSTRef tvarCurrent
+{-# INLINE execReadTVar #-}
 
 getMaskingStateImpl :: IOSim s MaskingState
 unblock, block, blockUninterruptible :: IOSim s a -> IOSim s a
