@@ -16,6 +16,7 @@ module Control.Monad.Class.MonadTimer.SI
   , MonadFork
   , MonadMonotonicTime
   , MonadTime
+  , MonadTimeout
   , MonadTimer
   , TimeoutState (..)
   ) where
