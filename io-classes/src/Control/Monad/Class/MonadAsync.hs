@@ -56,43 +56,72 @@ class ( MonadSTM m
               asyncWithUnmask, asyncOnWithUnmask, waitCatchSTM, pollSTM #-}
 
   -- | An asynchronous action
+  --
+  -- See 'Async.Async'.
   type Async m          = (async :: Type -> Type) | async -> m
 
+  -- | See 'Async.async'.
   async                 :: m a -> m (Async m a)
+  -- | See 'Async.asyncBound'.
   asyncBound            :: m a -> m (Async m a)
+  -- | See 'Async.asyncOn'.
   asyncOn               :: Int -> m a -> m (Async m a)
+  -- | See 'Async.asyncThreadId'.
   asyncThreadId         :: Async m a -> ThreadId m
+  -- | See 'Async.withAsync'.
   withAsync             :: m a -> (Async m a -> m b) -> m b
+  -- | See 'Async.withAsyncBound'.
   withAsyncBound        :: m a -> (Async m a -> m b) -> m b
+  -- | See 'Async.withAsyncOn'.
   withAsyncOn           :: Int -> m a -> (Async m a -> m b) -> m b
 
+  -- | See 'Async.waitSTM'.
   waitSTM               :: Async m a -> STM m a
+  -- | See 'Async.pollSTM'.
   pollSTM               :: Async m a -> STM m (Maybe (Either SomeException a))
+  -- | See 'Async.waitCatchSTM'.
   waitCatchSTM          :: Async m a -> STM m (Either SomeException a)
 
   default waitSTM :: MonadThrow (STM m) => Async m a -> STM m a
   waitSTM action = waitCatchSTM action >>= either throwSTM return
 
+  -- | See 'Async.waitAnySTM'.
   waitAnySTM            :: [Async m a] -> STM m (Async m a, a)
+  -- | See 'Async.waitAnyCatchSTM'.
   waitAnyCatchSTM       :: [Async m a] -> STM m (Async m a, Either SomeException a)
+  -- | See 'Async.waitEitherSTM'.
   waitEitherSTM         :: Async m a -> Async m b -> STM m (Either a b)
+  -- | See 'Async.waitEitherSTM_'.
   waitEitherSTM_        :: Async m a -> Async m b -> STM m ()
+  -- | See 'Async.waitEitherCatchSTM'.
   waitEitherCatchSTM    :: Async m a -> Async m b
                         -> STM m (Either (Either SomeException a)
                                          (Either SomeException b))
+  -- | See 'Async.waitBothSTM'.
   waitBothSTM           :: Async m a -> Async m b -> STM m (a, b)
 
+  -- | See 'Async.wait'.
   wait                  :: Async m a -> m a
+  -- | See 'Async.poll'.
   poll                  :: Async m a -> m (Maybe (Either SomeException a))
+  -- | See 'Async.waitCatch'.
   waitCatch             :: Async m a -> m (Either SomeException a)
+  -- | See 'Async.cancel'.
   cancel                :: Async m a -> m ()
+  -- | See 'Async.cancelWith'.
   cancelWith            :: Exception e => Async m a -> e -> m ()
+  -- | See 'Async.uninterruptibleCancel'.
   uninterruptibleCancel :: Async m a -> m ()
 
+  -- | See 'Async.waitAny'.
   waitAny               :: [Async m a] -> m (Async m a, a)
+  -- | See 'Async.waitAnyCatch'.
   waitAnyCatch          :: [Async m a] -> m (Async m a, Either SomeException a)
+  -- | See 'Async.waitAnyCancel'.
   waitAnyCancel         :: [Async m a] -> m (Async m a, a)
+  -- | See 'Async.waitAnyCatchCancel'.
   waitAnyCatchCancel    :: [Async m a] -> m (Async m a, Either SomeException a)
+  -- | See 'Async.waitEither'.
   waitEither            :: Async m a -> Async m b -> m (Either a b)
 
   default waitAnySTM     :: MonadThrow (STM m) => [Async m a] -> STM m (Async m a, a)
@@ -133,24 +162,39 @@ class ( MonadSTM m
   -- | Note, IO-based implementations should override the default
   -- implementation. See the @async@ package implementation and comments.
   -- <http://hackage.haskell.org/package/async-2.2.1/docs/src/Control.Concurrent.Async.html#waitEitherCatch>
+  --
+  -- See 'Async.waitEitherCatch'.
   waitEitherCatch       :: Async m a -> Async m b -> m (Either (Either SomeException a)
                                                                (Either SomeException b))
+  -- | See 'Async.waitEitherCancel'.
   waitEitherCancel      :: Async m a -> Async m b -> m (Either a b)
+  -- | See 'Async.waitEitherCatchCancel'.
   waitEitherCatchCancel :: Async m a -> Async m b -> m (Either (Either SomeException a)
                                                                (Either SomeException b))
+  -- | See 'Async.waitEither_'.
   waitEither_           :: Async m a -> Async m b -> m ()
+  -- | See 'Async.waitBoth'.
   waitBoth              :: Async m a -> Async m b -> m (a, b)
 
+  -- | See 'Async.race'.
   race                  :: m a -> m b -> m (Either a b)
+  -- | See 'Async.race_'.
   race_                 :: m a -> m b -> m ()
+  -- | See 'Async.concurrently'.
   concurrently          :: m a -> m b -> m (a,b)
+  -- | See 'Async.concurrently_'.
   concurrently_         :: m a -> m b -> m ()
 
+  -- | See 'Async.concurrently_'.
   asyncWithUnmask       :: ((forall b . m b -> m b) ->  m a) -> m (Async m a)
+  -- | See 'Async.asyncOnWithUnmask'.
   asyncOnWithUnmask     :: Int -> ((forall b . m b -> m b) ->  m a) -> m (Async m a)
+  -- | See 'Async.withAsyncWithUnmask'.
   withAsyncWithUnmask   :: ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
+  -- | See 'Async.withAsyncOnWithUnmask'.
   withAsyncOnWithUnmask :: Int -> ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
 
+  -- | See 'Async.compareAsyncs'.
   compareAsyncs         :: Async m a -> Async m b -> Ordering
 
   -- default implementations
@@ -279,21 +323,27 @@ instance ( Monoid a
     mempty = pure mempty
 
 
+-- | See 'Async.mapConcurrently'.
 mapConcurrently :: (Traversable t, MonadAsync m) => (a -> m b) -> t a -> m (t b)
 mapConcurrently f = runConcurrently . traverse (Concurrently . f)
 
+-- | See 'Async.forConcurrently'.
 forConcurrently :: (Traversable t, MonadAsync m) => t a -> (a -> m b) -> m (t b)
 forConcurrently = flip mapConcurrently
 
+-- | See 'Async.mapConcurrently_'.
 mapConcurrently_ :: (Foldable f, MonadAsync m) => (a -> m b) -> f a -> m ()
 mapConcurrently_ f = runConcurrently . foldMap (Concurrently . void . f)
 
+-- | See 'Async.forConcurrently_'.
 forConcurrently_ :: (Foldable f, MonadAsync m) => f a -> (a -> m b) -> m ()
 forConcurrently_ = flip mapConcurrently_
 
+-- | See 'Async.replicateConcurrently'.
 replicateConcurrently :: MonadAsync m => Int -> m a -> m [a]
 replicateConcurrently cnt = runConcurrently . sequenceA . replicate cnt . Concurrently
 
+-- | See 'Async.replicateConcurrently_'.
 replicateConcurrently_ :: MonadAsync m => Int -> m a -> m ()
 replicateConcurrently_ cnt = runConcurrently . fold . replicate cnt . Concurrently . void
 
@@ -395,10 +445,12 @@ instance Exception ExceptionInLinkedThread where
   fromException = E.asyncExceptionFromException
   toException = E.asyncExceptionToException
 
+-- | Like 'Async.link'.
 link :: (MonadAsync m, MonadFork m, MonadMask m)
      => Async m a -> m ()
 link = linkOnly (not . isCancel)
 
+-- | Like 'Async.linkOnly'.
 linkOnly :: forall m a. (MonadAsync m, MonadFork m, MonadMask m)
          => (SomeException -> Bool) -> Async m a -> m ()
 linkOnly shouldThrow a = do
@@ -416,10 +468,12 @@ linkOnly shouldThrow a = do
     exceptionInLinkedThread =
         ExceptionInLinkedThread (show linkedThreadId)
 
+-- | Like 'Async.link2'.
 link2 :: (MonadAsync m, MonadFork m, MonadMask m)
       => Async m a -> Async m b -> m ()
 link2 = link2Only (not . isCancel)
 
+-- | Like 'Async.link2Only'.
 link2Only :: (MonadAsync m, MonadFork m, MonadMask m)
           => (SomeException -> Bool) -> Async m a -> Async m b -> m ()
 link2Only shouldThrow left  right =
