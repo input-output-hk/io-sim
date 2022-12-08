@@ -1,7 +1,8 @@
-# Simulator Monad
+# IOSim - IO Simulator Monad
 
-A pure simulator monad built on top of the `ST` monad which supports:
+A pure simulator monad built on top of the lazy `ST` monad which supports:
 
+  * optional dynamic race discovery and schedule exploration
   * synchronous and asynchronous exceptions; including: throwing, catching and
     masking synchronous and asynchronous exceptions;
   * concurrency (using simulated threads), with interfaces shaped by the
@@ -11,21 +12,25 @@ A pure simulator monad built on top of the `ST` monad which supports:
   * timeouts;
   * dynamically typed traces and event log tracing;
   * lifting any `ST` computations;
-  * deadlock detection.
+  * inspection of `STM` mutable data structures;
+  * deadlock detection;
+  * `MonadFix` instances for both `IOSim` and its corresponding `STM` monad.
 
-`io-sim` is a drop-in replacement for the `IO` monad.  It was designed to write easily
-testable Haskell networking code.  Using
-[io-classes](https://hackage.haskell.org/package/io-classes) library
-one can write code that can run in both: real `IO` and the `SimM` monad.  One
-of the design goals was to keep the api as close as possible to `base`,
-`exceptions`, `async` and `stm` packages.
+`io-sim` together with [`io-classes`] is a drop-in replacement for the `IO`
+monad (with some ramifications).  It was designed to write easily testable
+Haskell code (including simulating socket programming or disk IO).  Using
+[`io-classes`] and [`si-timers`] libraries one can write code that can run in
+both: real `IO` and the `IOSim` monad provided by this package.  One of the
+design goals was to keep the api as close as possible to `base`, `exceptions`,
+`async` and `stm` packages.
 
-As a design choice `IOSim` does not support `MVar`s by default, but they can be
-simulated using `stm` interface.
+`io-sim` package also provides two interpreters, a standard one and `IOSimPOR`
+which supports dynamic discovery or race conditions and schedule exploration
+with partial order reduction.
 
-`io-sim` supports both `io-classes` class hierarchy and `base`
-/ `exceptions` class hierarchies (they diverge in some detail).
-
+`io-sim` provides api to explore trace produced by a simulation.  It can
+contain arbitrary Haskell terms, a feature that is very useful to build
+property based tests using `QuickCheck`.
 
 The package contains thorough tests, including tests of `STM` against the original
 specification (as described in [Composable Memory
@@ -33,3 +38,6 @@ Transactions](https://research.microsoft.com/en-us/um/people/simonpj/papers/stm/
 and its `GHC` implementation.  This can be seen in both ways: as a check that
 our implementation matches the specification and the `GHC` implementation, but also
 the other way around: that `GHC`s `STM` implementation meets the specification.
+
+[`io-classes`]: https://hackage.haskell.org/package/io-classes
+[`si-timers`]: https://hackage.haskell.org/package/si-timers
