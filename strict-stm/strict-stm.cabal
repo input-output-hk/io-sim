@@ -14,6 +14,8 @@ author:              Alexander Vieth, Duncan Coutts, Marcin Szamotulski, Thomas 
 maintainer:          Duncan Coutts dunca@well-typed.com, Marcin Szamotulski coot@coot.me
 category:            Control
 build-type:          Simple
+extra-source-files:  CHANGELOG.md
+                     README.md
 tested-with:         GHC == { 8.10, 9.2, 9.4 }
 
 source-repository head
