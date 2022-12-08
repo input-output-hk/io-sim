@@ -13,6 +13,8 @@ author:              Duncan Coutts, Neil Davis, Marcin Szamotulski
 maintainer:          Duncan Coutts duncan@well-typed.com, Marcin Szamotulski coot@coot.me
 category:            Control
 build-type:          Simple
+extra-source-files:  CHANGELOG.md
+                     README.md
 tested-with:         GHC == { 8.10, 9.2, 9.4 }
 
 flag asserts

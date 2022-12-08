@@ -61,6 +61,7 @@ a complex, highly-concurrent, distributed system
 * `io-classes`: class bases interface, which allows to to abstract over the
     monad
 * `strict-stm`: strict STM operations
+* `si-timers`: non standard timers API
 
 
 ## Differences from `base`, `async` or `exceptions` packages
