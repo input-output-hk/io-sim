@@ -30,6 +30,7 @@ import           Control.Monad (when)
 #endif
 import           Control.Monad.Class.MonadSTM
 
+import           Control.Monad.Cont (ContT (..))
 import           Control.Monad.RWS (RWST (..))
 import           Control.Monad.Reader (ReaderT (..))
 import           Control.Monad.State (StateT (..))
@@ -171,6 +172,14 @@ instance MonadTimeout IO where
 --
 -- Transformer's instances
 --
+
+-- | @since 1.0.0.0
+instance MonadTimeout m => MonadTimeout (ContT r m) where
+  newtype Timeout (ContT r m) = TimeoutC { unTimeoutC :: Timeout m }
+  newTimeout    = lift . fmap TimeoutC . newTimeout
+  readTimeout   = WrappedSTM . readTimeout . unTimeoutC
+  updateTimeout (TimeoutC t) d = lift $ updateTimeout t d
+  cancelTimeout = lift . cancelTimeout . unTimeoutC
 
 instance MonadTimeout m => MonadTimeout (ReaderT r m) where
   newtype Timeout (ReaderT r m) = TimeoutR { unTimeoutR :: Timeout m }
