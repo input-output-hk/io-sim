@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE StandaloneDeriving        #-}
+{-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE TypeFamilies              #-}
 
 module Control.Monad.Class.MonadThrow
@@ -25,8 +26,14 @@ module Control.Monad.Class.MonadThrow
 import           Control.Exception (Exception (..), MaskingState, SomeException)
 import qualified Control.Exception as IO
 import           Control.Monad (liftM)
-import           Control.Monad.Except (ExceptT (..), lift, runExceptT)
-import           Control.Monad.Reader (ReaderT (..), runReaderT)
+
+import           Control.Monad.Except (ExceptT (..), runExceptT)
+import           Control.Monad.RWS (RWST (..))
+import           Control.Monad.Reader (ReaderT (..))
+import           Control.Monad.State (StateT (..))
+import           Control.Monad.Trans (lift)
+import           Control.Monad.Writer (WriterT (..))
+
 import           Control.Monad.STM (STM)
 import qualified Control.Monad.STM as STM
 
@@ -263,7 +270,7 @@ instance MonadCatch STM where
 
 
 --
--- Instances for ReaderT
+-- ReaderT instances
 --
 
 instance MonadThrow m => MonadThrow (ReaderT r m) where
@@ -299,7 +306,7 @@ instance MonadEvaluate m => MonadEvaluate (ReaderT r m) where
   evaluate = lift . evaluate
 
 --
--- Instances for ExceptT
+-- ExceptT Instances
 --
 -- These all follow the @exceptions@ package to the letter
 --
@@ -339,3 +346,127 @@ instance MonadMask m => MonadMask (ExceptT e m) where
       q :: (m (Either e a) -> m (Either e a))
         -> ExceptT e m a -> ExceptT e m a
       q u (ExceptT b) = ExceptT (u b)
+
+--
+-- WriterT instances
+--
+
+-- | @since 1.0.0.0
+instance (Monoid w, MonadCatch m) => MonadThrow (WriterT w m) where
+  throwIO = lift . throwIO
+
+-- | @since 1.0.0.0
+instance (Monoid w, MonadCatch m) => MonadCatch (WriterT w m) where
+  catch (WriterT m) f = WriterT $ catch m (runWriterT . f)
+
+  generalBracket acquire release use = WriterT $ fmap f $
+      generalBracket
+        (runWriterT acquire)
+        (\(resource, w) e ->
+          case e of
+            ExitCaseSuccess (b, w') ->
+              g w' <$> runWriterT (release resource (ExitCaseSuccess b)) 
+            ExitCaseException err ->
+              g w  <$> runWriterT (release resource (ExitCaseException err))
+            ExitCaseAbort ->
+              g w  <$> runWriterT (release resource ExitCaseAbort))
+        (\(resource, w)   -> g w <$> runWriterT (use resource))
+    where f ((x,_),(y,w)) = ((x,y),w)
+          g w (a,w') = (a,w<>w')
+
+-- | @since 1.0.0.0
+instance (Monoid w, MonadMask m) => MonadMask (WriterT w m) where
+  mask f = WriterT $ mask $ \u -> runWriterT $ f (q u)
+    where
+      q :: (forall x. m x -> m x)
+        -> WriterT w m a -> WriterT w m a
+      q u (WriterT b) = WriterT (u b)
+  uninterruptibleMask f = WriterT $ uninterruptibleMask $ \u -> runWriterT $ f (q u)
+    where
+      q :: (forall x. m x -> m x)
+        -> WriterT w m a -> WriterT w m a
+      q u (WriterT b) = WriterT (u b)
+
+
+--
+-- RWST Instances
+--
+
+-- | @since 1.0.0.0
+instance (Monoid w, MonadCatch m) => MonadThrow (RWST r w s m) where
+  throwIO = lift . throwIO
+
+-- | @since 1.0.0.0
+instance (Monoid w, MonadCatch m) => MonadCatch (RWST r w s m) where
+  catch (RWST m) f = RWST $ \r s -> catch (m r s) (\e -> runRWST (f e) r s)
+
+  -- | general bracket ignores the state produced by the release callback
+  generalBracket acquire release use = RWST $ \r s ->
+      f <$> generalBracket
+              (runRWST acquire r s)
+              (\(resource, s', w') e ->
+                case e of
+                  ExitCaseSuccess (b, s'', w'') ->
+                    g w'' <$> runRWST (release resource (ExitCaseSuccess b)) r s''
+                  ExitCaseException err ->
+                    g w'  <$> runRWST (release resource (ExitCaseException err)) r s'
+                  ExitCaseAbort ->
+                    g w'  <$> runRWST (release resource  ExitCaseAbort) r s')
+              (\(a, s', w')   -> g w' <$> runRWST (use a) r s')
+    where
+      f ((x,_,_),(y,s,w)) = ((x,y),s,w)
+      g w (x,s,w') = (x,s,w<>w')
+
+-- | @since 1.0.0.0
+instance (Monoid w, MonadMask m) => MonadMask (RWST r w s m) where
+  mask f = RWST $ \r s -> mask $ \u -> runRWST (f (q u)) r s
+    where
+      q :: (forall x. m x -> m x)
+        -> RWST r w s m a -> RWST r w s m a
+      q u (RWST b) = RWST $ \r s -> u (b r s)
+  uninterruptibleMask f = RWST $ \r s -> uninterruptibleMask $ \u -> runRWST (f (q u)) r s
+    where
+      q :: (forall x. m x -> m x)
+        -> RWST r w s m a -> RWST r w s m a
+      q u (RWST b) = RWST $ \r s -> u (b r s)
+
+--
+-- StateT instances
+--
+
+-- | @since 1.0.0.0
+instance MonadCatch m => MonadThrow (StateT s m) where
+  throwIO = lift . throwIO
+
+-- | @since 1.0.0.0
+instance MonadCatch m => MonadCatch (StateT s m) where
+  catch (StateT m) f = StateT $ \s -> catch (m s) (\e -> runStateT (f e) s)
+
+  -- | general bracket ignores the state produced by the release callback
+  generalBracket acquire release use = StateT $ \s -> fmap f $
+      generalBracket
+        (runStateT acquire s)
+        (\(resource, s') e ->
+          case e of
+            ExitCaseSuccess (b, s'') ->
+              runStateT (release resource (ExitCaseSuccess b)) s''
+            ExitCaseException err ->
+              runStateT (release resource (ExitCaseException err)) s'
+            ExitCaseAbort ->
+              runStateT (release resource ExitCaseAbort) s')
+        (\(a, s')   -> runStateT (use a) s')
+    where f ((x,_),(y,s)) = ((x,y),s)
+
+-- | @since 1.0.0.0
+instance MonadMask m => MonadMask (StateT s m) where
+  mask f = StateT $ \s -> mask $ \u -> runStateT (f (q u)) s
+    where
+      q :: (forall x. m x -> m x)
+        -> StateT s m a -> StateT s m a
+      q u (StateT b) = StateT $ \s -> u (b s)
+  uninterruptibleMask f = StateT $ \s -> uninterruptibleMask $ \u -> runStateT (f (q u)) s
+    where
+      q :: (forall x. m x -> m x)
+        -> StateT s m a -> StateT s m a
+      q u (StateT b) = StateT $ \s -> u (b s)
+
