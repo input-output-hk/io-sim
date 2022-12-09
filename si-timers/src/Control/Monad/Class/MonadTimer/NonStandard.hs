@@ -184,27 +184,27 @@ instance MonadTimeout m => MonadTimeout (ContT r m) where
 instance MonadTimeout m => MonadTimeout (ReaderT r m) where
   newtype Timeout (ReaderT r m) = TimeoutR { unTimeoutR :: Timeout m }
   newTimeout    = lift . fmap TimeoutR . newTimeout
-  readTimeout   = WrappedSTM . readTimeout . unTimeoutR
+  readTimeout   = lift . readTimeout . unTimeoutR
   updateTimeout (TimeoutR t) d = lift $ updateTimeout t d
   cancelTimeout = lift . cancelTimeout . unTimeoutR
 
 instance (Monoid w, MonadTimeout m) => MonadTimeout (WriterT w m) where
   newtype Timeout (WriterT w m) = TimeoutW { unTimeoutW :: Timeout m }
   newTimeout    = lift . fmap TimeoutW . newTimeout
-  readTimeout   = WrappedSTM . readTimeout . unTimeoutW
+  readTimeout   = lift . readTimeout . unTimeoutW
   updateTimeout (TimeoutW t) d = lift $ updateTimeout t d
   cancelTimeout = lift . cancelTimeout . unTimeoutW
 
 instance MonadTimeout m => MonadTimeout (StateT s m) where
   newtype Timeout (StateT s m) = TimeoutS { unTimeoutS :: Timeout m }
   newTimeout    = lift . fmap TimeoutS . newTimeout
-  readTimeout   = WrappedSTM . readTimeout . unTimeoutS
+  readTimeout   = lift . readTimeout . unTimeoutS
   updateTimeout (TimeoutS t) d = lift $ updateTimeout t d
   cancelTimeout = lift . cancelTimeout . unTimeoutS
 
 instance (Monoid w, MonadTimeout m) => MonadTimeout (RWST r w s m) where
   newtype Timeout (RWST r w s m) = TimeoutRWS { unTimeoutRWS :: Timeout m }
   newTimeout    = lift . fmap TimeoutRWS . newTimeout
-  readTimeout   = WrappedSTM . readTimeout . unTimeoutRWS
+  readTimeout   = lift . readTimeout . unTimeoutRWS
   updateTimeout (TimeoutRWS t) d = lift $ updateTimeout t d
   cancelTimeout = lift . cancelTimeout . unTimeoutRWS
