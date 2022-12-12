@@ -40,6 +40,8 @@ import           Control.Monad.Writer (WriterT (..))
 #ifdef GHC_TIMERS_API
 import qualified GHC.Event as GHC (TimeoutKey, getSystemTimerManager,
                      registerTimeout, unregisterTimeout, updateTimeout)
+#else
+import qualified GHC.Conc.IO as GHC (registerDelay)
 #endif
 
 import           Data.Kind (Type)
@@ -143,7 +145,7 @@ instance MonadTimeout IO where
       GHC.unregisterTimeout mgr key
 #else
 instance MonadTimeout IO where
-  data Timeout IO = TimeoutIO !(STM.TVar (STM.TVar Bool)) !(STM.TVar Bool)
+  data Timeout IO = TimeoutIO !(STM.TVar IO (STM.TVar IO Bool)) !(STM.TVar IO Bool)
 
   readTimeout (TimeoutIO timeoutvarvar cancelvar) = do
     canceled <- STM.readTVar cancelvar
@@ -154,13 +156,13 @@ instance MonadTimeout IO where
       (_, True)  -> return TimeoutFired
 
   newTimeout d = do
-    timeoutvar    <- STM.registerDelay d
+    timeoutvar    <- GHC.registerDelay d
     timeoutvarvar <- STM.newTVarIO timeoutvar
     cancelvar     <- STM.newTVarIO False
     return (TimeoutIO timeoutvarvar cancelvar)
 
   updateTimeout (TimeoutIO timeoutvarvar _cancelvar) d = do
-    timeoutvar' <- STM.registerDelay d
+    timeoutvar' <- GHC.registerDelay d
     STM.atomically $ STM.writeTVar timeoutvarvar timeoutvar'
 
   cancelTimeout (TimeoutIO timeoutvarvar cancelvar) =
