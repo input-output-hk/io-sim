@@ -457,35 +457,35 @@ tryAll = try
 -- ReaderT instance
 --
 
-newtype WrappedAsync r (m :: Type -> Type) a =
-    WrappedAsync { unWrapAsync :: Async m a }
+newtype AsyncReaderT r (m :: Type -> Type) a =
+    AsyncReaderT { getAsyncReaderT :: Async m a }
 
 instance ( MonadAsync m
          , MonadCatch (STM m)
          , MonadFork m
          , MonadMask m
          ) => MonadAsync (ReaderT r m) where
-    type Async (ReaderT r m) = WrappedAsync r m
-    asyncThreadId (WrappedAsync a) = asyncThreadId a
+    type Async (ReaderT r m) = AsyncReaderT r m
+    asyncThreadId (AsyncReaderT a) = asyncThreadId a
 
-    async      (ReaderT ma)  = ReaderT $ \r -> WrappedAsync <$> async (ma r)
-    asyncBound (ReaderT ma)  = ReaderT $ \r -> WrappedAsync <$> asyncBound (ma r)
-    asyncOn n  (ReaderT ma)  = ReaderT $ \r -> WrappedAsync <$> asyncOn n (ma r)
+    async      (ReaderT ma)  = ReaderT $ \r -> AsyncReaderT <$> async (ma r)
+    asyncBound (ReaderT ma)  = ReaderT $ \r -> AsyncReaderT <$> asyncBound (ma r)
+    asyncOn n  (ReaderT ma)  = ReaderT $ \r -> AsyncReaderT <$> asyncOn n (ma r)
     withAsync (ReaderT ma) f = ReaderT $ \r -> withAsync (ma r)
-                                       $ \a -> runReaderT (f (WrappedAsync a)) r
+                                       $ \a -> runReaderT (f (AsyncReaderT a)) r
     withAsyncBound (ReaderT ma) f = ReaderT $ \r -> withAsyncBound (ma r)
-                                       $ \a -> runReaderT (f (WrappedAsync a)) r
+                                       $ \a -> runReaderT (f (AsyncReaderT a)) r
     withAsyncOn  n (ReaderT ma) f = ReaderT $ \r -> withAsyncOn n (ma r)
-                                       $ \a -> runReaderT (f (WrappedAsync a)) r
+                                       $ \a -> runReaderT (f (AsyncReaderT a)) r
 
-    asyncWithUnmask f        = ReaderT $ \r -> fmap WrappedAsync
+    asyncWithUnmask f        = ReaderT $ \r -> fmap AsyncReaderT
                                              $ asyncWithUnmask
                                              $ \unmask -> runReaderT (f (liftF unmask)) r
       where
         liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
         liftF g (ReaderT r) = ReaderT (g . r)
 
-    asyncOnWithUnmask n f   = ReaderT $ \r -> fmap WrappedAsync
+    asyncOnWithUnmask n f   = ReaderT $ \r -> fmap AsyncReaderT
                                             $ asyncOnWithUnmask n
                                             $ \unmask -> runReaderT (f (liftF unmask)) r
       where
@@ -495,7 +495,7 @@ instance ( MonadAsync m
     withAsyncWithUnmask action f  =
       ReaderT $ \r -> withAsyncWithUnmask (\unmask -> case action (liftF unmask) of
                                                         ReaderT ma -> ma r)
-              $ \a -> runReaderT (f (WrappedAsync a)) r
+              $ \a -> runReaderT (f (AsyncReaderT a)) r
       where
         liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
         liftF g (ReaderT r) = ReaderT (g . r)
@@ -503,44 +503,44 @@ instance ( MonadAsync m
     withAsyncOnWithUnmask n action f  =
       ReaderT $ \r -> withAsyncOnWithUnmask n (\unmask -> case action (liftF unmask) of
                                                             ReaderT ma -> ma r)
-              $ \a -> runReaderT (f (WrappedAsync a)) r
+              $ \a -> runReaderT (f (AsyncReaderT a)) r
       where
         liftF :: (m a -> m a) -> ReaderT r m a -> ReaderT r m a
         liftF g (ReaderT r) = ReaderT (g . r)
 
-    waitCatchSTM = WrappedSTM . waitCatchSTM . unWrapAsync
-    pollSTM      = WrappedSTM . pollSTM      . unWrapAsync
+    waitCatchSTM = lift . waitCatchSTM . getAsyncReaderT
+    pollSTM      = lift . pollSTM      . getAsyncReaderT
 
     race         (ReaderT ma) (ReaderT mb) = ReaderT $ \r -> race  (ma r) (mb r)
     race_        (ReaderT ma) (ReaderT mb) = ReaderT $ \r -> race_ (ma r) (mb r)
     concurrently (ReaderT ma) (ReaderT mb) = ReaderT $ \r -> concurrently (ma r) (mb r)
 
-    wait                  = lift .  wait         . unWrapAsync
-    poll                  = lift .  poll         . unWrapAsync
-    waitCatch             = lift .  waitCatch    . unWrapAsync
-    cancel                = lift .  cancel       . unWrapAsync
+    wait                  = lift .  wait         . getAsyncReaderT
+    poll                  = lift .  poll         . getAsyncReaderT
+    waitCatch             = lift .  waitCatch    . getAsyncReaderT
+    cancel                = lift .  cancel       . getAsyncReaderT
     uninterruptibleCancel = lift .  uninterruptibleCancel
-                                                 . unWrapAsync
+                                                 . getAsyncReaderT
     cancelWith            = (lift .: cancelWith)
-                          . unWrapAsync
-    waitAny               = fmap (first WrappedAsync)
+                          . getAsyncReaderT
+    waitAny               = fmap (first AsyncReaderT)
                           . lift . waitAny
-                          . map unWrapAsync
-    waitAnyCatch          = fmap (first WrappedAsync)
+                          . map getAsyncReaderT
+    waitAnyCatch          = fmap (first AsyncReaderT)
                           . lift . waitAnyCatch
-                          . map unWrapAsync
-    waitAnyCancel         = fmap (first WrappedAsync)
+                          . map getAsyncReaderT
+    waitAnyCancel         = fmap (first AsyncReaderT)
                           . lift . waitAnyCancel
-                          . map unWrapAsync
-    waitAnyCatchCancel    = fmap (first WrappedAsync)
+                          . map getAsyncReaderT
+    waitAnyCatchCancel    = fmap (first AsyncReaderT)
                           . lift . waitAnyCatchCancel
-                          . map unWrapAsync
-    waitEither            = on (lift .: waitEither)            unWrapAsync
-    waitEitherCatch       = on (lift .: waitEitherCatch)       unWrapAsync
-    waitEitherCancel      = on (lift .: waitEitherCancel)      unWrapAsync
-    waitEitherCatchCancel = on (lift .: waitEitherCatchCancel) unWrapAsync
-    waitEither_           = on (lift .: waitEither_)           unWrapAsync
-    waitBoth              = on (lift .: waitBoth)              unWrapAsync
+                          . map getAsyncReaderT
+    waitEither            = on (lift .: waitEither)            getAsyncReaderT
+    waitEitherCatch       = on (lift .: waitEitherCatch)       getAsyncReaderT
+    waitEitherCancel      = on (lift .: waitEitherCancel)      getAsyncReaderT
+    waitEitherCatchCancel = on (lift .: waitEitherCatchCancel) getAsyncReaderT
+    waitEither_           = on (lift .: waitEither_)           getAsyncReaderT
+    waitBoth              = on (lift .: waitBoth)              getAsyncReaderT
 
 
 --
