@@ -54,8 +54,8 @@ forkWithUnmask = forkIOWithUnmask
 
 instance MonadThread IO where
   type ThreadId IO = IO.ThreadId
-  myThreadId = IO.myThreadId
-  labelThread = IO.labelThread
+  myThreadId   = IO.myThreadId
+  labelThread  = IO.labelThread
   threadStatus = IO.threadStatus
 
 instance MonadFork IO where
@@ -68,17 +68,17 @@ instance MonadFork IO where
 
 instance MonadThread m => MonadThread (ReaderT r m) where
   type ThreadId (ReaderT r m) = ThreadId m
-  myThreadId  = lift myThreadId
+  myThreadId      = lift myThreadId
   labelThread t l = lift (labelThread t l)
-  threadStatus t = lift (threadStatus t)
+  threadStatus t  = lift (threadStatus t)
 
 instance MonadFork m => MonadFork (ReaderT e m) where
   forkIO (ReaderT f)   = ReaderT $ \e -> forkIO (f e)
   forkOn n (ReaderT f) = ReaderT $ \e -> forkOn n (f e)
   forkIOWithUnmask k   = ReaderT $ \e -> forkIOWithUnmask $ \restore ->
-                       let restore' :: ReaderT e m a -> ReaderT e m a
-                           restore' (ReaderT f) = ReaderT $ restore . f
-                       in runReaderT (k restore') e
+                         let restore' :: ReaderT e m a -> ReaderT e m a
+                             restore' (ReaderT f) = ReaderT $ restore . f
+                         in runReaderT (k restore') e
   throwTo e t = lift (throwTo e t)
   yield       = lift yield
 
