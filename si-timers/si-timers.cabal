@@ -3,7 +3,6 @@ name:                si-timers
 version:             0.6.0.0
 synopsis:            Timers using SI units (seconds) which are safe on 32-bit
                      platforms.
--- description:
 license:             Apache-2.0
 license-files:
   LICENSE
