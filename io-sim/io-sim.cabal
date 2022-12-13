@@ -2,7 +2,6 @@ cabal-version:       3.4
 name:                io-sim
 version:             0.6.0.0
 synopsis:            A pure simulator for monadic concurrency with STM
--- description:
 license:             Apache-2.0
 license-files:
   LICENSE
