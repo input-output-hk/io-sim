@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeFamilyDependencies     #-}
 {-# LANGUAGE TypeOperators              #-}
--- undecidable instances needed for 'WrappedSTM' instances of 'MonadThrow' and
+-- undecidable instances needed for 'ContTSTM' instances of 'MonadThrow' and
 -- 'MonadCatch' type classes.
 {-# LANGUAGE UndecidableInstances       #-}
 
@@ -52,8 +52,7 @@ module Control.Monad.Class.MonadSTM.Internal
   , newEmptyTMVarM
   , newEmptyTMVarMDefault
     -- * Utils
-  , WrappedSTM (..)
-  , Trans (..)
+  , ContTSTM (..)
   ) where
 
 import           Prelude hiding (read)
@@ -1297,47 +1296,24 @@ catchSTM = MonadThrow.catch
 -- Monad Transformers
 --
 
-data Trans where
-    Cont   :: Trans
-    Reader :: Trans
-    -- Writer :: Trans
-    -- State  :: Trans
-    -- Except :: Trans
-    -- RWS    :: Trans
-
-
--- | A newtype wrapper for an 'STM' monad for monad transformers.
+-- | A newtype wrapper for an 'STM' monad for 'ContT'
 --
--- Only used for 'ContT' monad. Other monad transformers are transforming the
--- `STM` monad as well.
---
-newtype WrappedSTM (t :: Trans) r (m :: Type -> Type) a = WrappedSTM { runWrappedSTM :: STM m a }
+newtype ContTSTM r (m :: Type -> Type) a = ContTSTM { getContTSTM :: STM m a }
 
-deriving instance MonadSTM m => Functor     (WrappedSTM t r m)
-deriving instance MonadSTM m => Applicative (WrappedSTM t r m)
-deriving instance MonadSTM m => Monad       (WrappedSTM t r m)
--- deriving instance (MonadSTM m, Alternative m) => Alternative (WrappedSTM t r m)
--- deriving instance (MonadSTM m, MonadPlus m)   => MonadPlus   (WrappedSTM t r m)
+deriving instance MonadSTM m => Functor     (ContTSTM r m)
+deriving instance MonadSTM m => Applicative (ContTSTM r m)
+deriving instance MonadSTM m => Monad       (ContTSTM r m)
 
-instance ( Semigroup a, MonadSTM m ) => Semigroup (WrappedSTM t r m a) where
+instance ( Semigroup a, MonadSTM m ) => Semigroup (ContTSTM r m a) where
     a <> b = (<>) <$> a <*> b
-instance ( Monoid a, MonadSTM m )    => Monoid (WrappedSTM t r m a) where
+instance ( Monoid a, MonadSTM m )    => Monoid (ContTSTM r m a) where
     mempty = pure mempty
 
-instance ( MonadSTM m, MArray e a (STM m) ) => MArray e a (WrappedSTM t r m) where
-    getBounds         = WrappedSTM . getBounds
-    getNumElements    = WrappedSTM . getNumElements
-    unsafeRead arr    = WrappedSTM . unsafeRead arr
-    unsafeWrite arr i = WrappedSTM . unsafeWrite arr i
-
-{-
--- TODO: should we provide orphaned instances like this one?
-instance ( MonadSTM m, stm ~ STM m, MArray e a stm ) => MArray e a (ReaderT r stm) where
-    getBounds         = lift . getBounds
-    getNumElements    = lift . getNumElements
-    unsafeRead arr    = lift . unsafeRead arr
-    unsafeWrite arr i = lift . unsafeWrite arr i
--}
+instance ( MonadSTM m, MArray e a (STM m) ) => MArray e a (ContTSTM r m) where
+    getBounds         = ContTSTM . getBounds
+    getNumElements    = ContTSTM . getNumElements
+    unsafeRead arr    = ContTSTM . unsafeRead arr
+    unsafeWrite arr i = ContTSTM . unsafeWrite arr i
 
 
 -- note: this (and the following) instance requires 'UndecidableInstances'
@@ -1349,96 +1325,96 @@ instance ( MonadSTM m, stm ~ STM m, MArray e a stm ) => MArray e a (ReaderT r st
 instance ( MonadSTM m
          , MonadThrow.MonadThrow (STM m)
          , MonadThrow.MonadCatch (STM m)
-         ) => MonadThrow.MonadThrow (WrappedSTM t r m) where
-  throwIO = WrappedSTM . MonadThrow.throwIO
+         ) => MonadThrow.MonadThrow (ContTSTM r m) where
+  throwIO = ContTSTM . MonadThrow.throwIO
 
 instance ( MonadSTM m
          , MonadThrow.MonadThrow (STM m)
          , MonadThrow.MonadCatch (STM m)
-         ) => MonadThrow.MonadCatch (WrappedSTM t r m) where
-  catch action handler = WrappedSTM
-                       $ MonadThrow.catch (runWrappedSTM action) (runWrappedSTM . handler)
-  generalBracket acquire release use = WrappedSTM $
-    MonadThrow.generalBracket (runWrappedSTM    acquire)
-                              (runWrappedSTM .: release)
-                              (runWrappedSTM .  use)
+         ) => MonadThrow.MonadCatch (ContTSTM r m) where
+  catch action handler = ContTSTM
+                       $ MonadThrow.catch (getContTSTM action) (getContTSTM . handler)
+  generalBracket acquire release use = ContTSTM $
+    MonadThrow.generalBracket (getContTSTM    acquire)
+                              (getContTSTM .: release)
+                              (getContTSTM .  use)
 
 -- | @'ContT' r m@ monad is using underlying @'STM' m@ monad as its stm monad,
 -- without transforming it.
 --
 instance MonadSTM m => MonadSTM (ContT r m) where
-    type STM (ContT r m) = WrappedSTM Cont r m
-    atomically = lift . atomically . runWrappedSTM
+    type STM (ContT r m) = ContTSTM r m
+    atomically = lift . atomically . getContTSTM
 
     type TVar (ContT r m) = TVar m
-    newTVar        = WrappedSTM .  newTVar
-    readTVar       = WrappedSTM .  readTVar
-    writeTVar      = WrappedSTM .: writeTVar
-    retry          = WrappedSTM    retry
-    orElse         = WrappedSTM .: on orElse runWrappedSTM
+    newTVar        = ContTSTM .  newTVar
+    readTVar       = ContTSTM .  readTVar
+    writeTVar      = ContTSTM .: writeTVar
+    retry          = ContTSTM    retry
+    orElse         = ContTSTM .: on orElse getContTSTM
 
-    modifyTVar     = WrappedSTM .: modifyTVar
-    modifyTVar'    = WrappedSTM .: modifyTVar'
-    stateTVar      = WrappedSTM .: stateTVar
-    swapTVar       = WrappedSTM .: swapTVar
-    check          = WrappedSTM .  check
+    modifyTVar     = ContTSTM .: modifyTVar
+    modifyTVar'    = ContTSTM .: modifyTVar'
+    stateTVar      = ContTSTM .: stateTVar
+    swapTVar       = ContTSTM .: swapTVar
+    check          = ContTSTM .  check
 
     type TMVar (ContT r m) = TMVar m
-    newTMVar       = WrappedSTM .  newTMVar
-    newEmptyTMVar  = WrappedSTM    newEmptyTMVar
-    takeTMVar      = WrappedSTM .  takeTMVar
-    tryTakeTMVar   = WrappedSTM .  tryTakeTMVar
-    putTMVar       = WrappedSTM .: putTMVar
-    tryPutTMVar    = WrappedSTM .: tryPutTMVar
-    readTMVar      = WrappedSTM .  readTMVar
-    tryReadTMVar   = WrappedSTM .  tryReadTMVar
-    swapTMVar      = WrappedSTM .: swapTMVar
-    isEmptyTMVar   = WrappedSTM .  isEmptyTMVar
+    newTMVar       = ContTSTM .  newTMVar
+    newEmptyTMVar  = ContTSTM    newEmptyTMVar
+    takeTMVar      = ContTSTM .  takeTMVar
+    tryTakeTMVar   = ContTSTM .  tryTakeTMVar
+    putTMVar       = ContTSTM .: putTMVar
+    tryPutTMVar    = ContTSTM .: tryPutTMVar
+    readTMVar      = ContTSTM .  readTMVar
+    tryReadTMVar   = ContTSTM .  tryReadTMVar
+    swapTMVar      = ContTSTM .: swapTMVar
+    isEmptyTMVar   = ContTSTM .  isEmptyTMVar
 
     type TQueue (ContT r m) = TQueue m
-    newTQueue      = WrappedSTM newTQueue
-    readTQueue     = WrappedSTM . readTQueue
-    tryReadTQueue  = WrappedSTM . tryReadTQueue
-    peekTQueue     = WrappedSTM . peekTQueue
-    tryPeekTQueue  = WrappedSTM . tryPeekTQueue
-    flushTQueue    = WrappedSTM .  flushTQueue
-    writeTQueue v  = WrappedSTM . writeTQueue v
-    isEmptyTQueue  = WrappedSTM . isEmptyTQueue
-    unGetTQueue    = WrappedSTM .: unGetTQueue
+    newTQueue      = ContTSTM newTQueue
+    readTQueue     = ContTSTM . readTQueue
+    tryReadTQueue  = ContTSTM . tryReadTQueue
+    peekTQueue     = ContTSTM . peekTQueue
+    tryPeekTQueue  = ContTSTM . tryPeekTQueue
+    flushTQueue    = ContTSTM .  flushTQueue
+    writeTQueue v  = ContTSTM . writeTQueue v
+    isEmptyTQueue  = ContTSTM . isEmptyTQueue
+    unGetTQueue    = ContTSTM .: unGetTQueue
 
     type TBQueue (ContT r m) = TBQueue m
-    newTBQueue     = WrappedSTM .  newTBQueue
-    readTBQueue    = WrappedSTM .  readTBQueue
-    tryReadTBQueue = WrappedSTM .  tryReadTBQueue
-    peekTBQueue    = WrappedSTM .  peekTBQueue
-    tryPeekTBQueue = WrappedSTM .  tryPeekTBQueue
-    flushTBQueue   = WrappedSTM .  flushTBQueue
-    writeTBQueue   = WrappedSTM .: writeTBQueue
-    lengthTBQueue  = WrappedSTM .  lengthTBQueue
-    isEmptyTBQueue = WrappedSTM .  isEmptyTBQueue
-    isFullTBQueue  = WrappedSTM .  isFullTBQueue
-    unGetTBQueue   = WrappedSTM .: unGetTBQueue
+    newTBQueue     = ContTSTM .  newTBQueue
+    readTBQueue    = ContTSTM .  readTBQueue
+    tryReadTBQueue = ContTSTM .  tryReadTBQueue
+    peekTBQueue    = ContTSTM .  peekTBQueue
+    tryPeekTBQueue = ContTSTM .  tryPeekTBQueue
+    flushTBQueue   = ContTSTM .  flushTBQueue
+    writeTBQueue   = ContTSTM .: writeTBQueue
+    lengthTBQueue  = ContTSTM .  lengthTBQueue
+    isEmptyTBQueue = ContTSTM .  isEmptyTBQueue
+    isFullTBQueue  = ContTSTM .  isFullTBQueue
+    unGetTBQueue   = ContTSTM .: unGetTBQueue
 
     type TArray (ContT r m) = TArray m
 
     type TSem (ContT r m) = TSem m
-    newTSem        = WrappedSTM .  newTSem
-    waitTSem       = WrappedSTM .  waitTSem
-    signalTSem     = WrappedSTM .  signalTSem
-    signalTSemN    = WrappedSTM .: signalTSemN
+    newTSem        = ContTSTM .  newTSem
+    waitTSem       = ContTSTM .  waitTSem
+    signalTSem     = ContTSTM .  signalTSem
+    signalTSemN    = ContTSTM .: signalTSemN
 
     type TChan (ContT r m) = TChan m
-    newTChan          = WrappedSTM    newTChan
-    newBroadcastTChan = WrappedSTM    newBroadcastTChan
-    dupTChan          = WrappedSTM .  dupTChan
-    cloneTChan        = WrappedSTM .  cloneTChan
-    readTChan         = WrappedSTM .  readTChan
-    tryReadTChan      = WrappedSTM .  tryReadTChan
-    peekTChan         = WrappedSTM .  peekTChan
-    tryPeekTChan      = WrappedSTM .  tryPeekTChan
-    writeTChan        = WrappedSTM .: writeTChan
-    unGetTChan        = WrappedSTM .: unGetTChan
-    isEmptyTChan      = WrappedSTM .  isEmptyTChan
+    newTChan          = ContTSTM    newTChan
+    newBroadcastTChan = ContTSTM    newBroadcastTChan
+    dupTChan          = ContTSTM .  dupTChan
+    cloneTChan        = ContTSTM .  cloneTChan
+    readTChan         = ContTSTM .  readTChan
+    tryReadTChan      = ContTSTM .  tryReadTChan
+    peekTChan         = ContTSTM .  peekTChan
+    tryPeekTChan      = ContTSTM .  tryPeekTChan
+    writeTChan        = ContTSTM .: writeTChan
+    unGetTChan        = ContTSTM .: unGetTChan
+    isEmptyTChan      = ContTSTM .  isEmptyTChan
 
 
 -- | The underlying stm monad is also transformed.

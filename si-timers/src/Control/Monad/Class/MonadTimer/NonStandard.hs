@@ -179,7 +179,7 @@ instance MonadTimeout IO where
 instance MonadTimeout m => MonadTimeout (ContT r m) where
   newtype Timeout (ContT r m) = TimeoutC { unTimeoutC :: Timeout m }
   newTimeout    = lift . fmap TimeoutC . newTimeout
-  readTimeout   = WrappedSTM . readTimeout . unTimeoutC
+  readTimeout   = ContTSTM . readTimeout . unTimeoutC
   updateTimeout (TimeoutC t) d = lift $ updateTimeout t d
   cancelTimeout = lift . cancelTimeout . unTimeoutC
 
