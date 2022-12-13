@@ -25,23 +25,39 @@ class Monad m => MonadMVar m where
 
   type MVar m :: Type -> Type
 
+  -- | See 'IO.newEmptyMVar'.
   newEmptyMVar      :: m (MVar m a)
+  -- | See 'IO.takeMVar'.
   takeMVar          :: MVar m a -> m a
+  -- | See 'IO.putMVar'.
   putMVar           :: MVar m a -> a -> m ()
+  -- | See 'IO.tryTakeMVar'.
   tryTakeMVar       :: MVar m a -> m (Maybe a)
+  -- | See 'IO.tryPutMVar'.
   tryPutMVar        :: MVar m a -> a -> m Bool
-  readMVar          :: MVar m a -> m a
-  tryReadMVar       :: MVar m a -> m (Maybe a)
+  -- | See 'IO.isEmptyMVar'.
   isEmptyMVar       :: MVar m a -> m Bool
 
   -- methods with a default implementation
+  -- | See 'IO.newMVar'.
   newMVar           :: a -> m (MVar m a)
+  -- | See 'IO.readMVar'.
+  readMVar          :: MVar m a -> m a
+  -- | See 'IO.tryReadMVar'.
+  tryReadMVar       :: MVar m a -> m (Maybe a)
+  -- | See 'IO.swapMVar'.
   swapMVar          :: MVar m a -> a -> m a
+  -- | See 'IO.withMVar'.
   withMVar          :: MVar m a -> (a -> m b) -> m b
+  -- | See 'IO.withMVarMasked'.
   withMVarMasked    :: MVar m a -> (a -> m b) -> m b
+  -- | See 'IO.modifyMVar_'.
   modifyMVar_       :: MVar m a -> (a -> m a) -> m ()
+  -- | See 'IO.modifyMVar'.
   modifyMVar        :: MVar m a -> (a -> m (a, b)) -> m b
+  -- | See 'IO.modifyMVarMasked_'.
   modifyMVarMasked_ :: MVar m a -> (a -> m a) -> m ()
+  -- | See 'IO.modifyMVarMasked'.
   modifyMVarMasked  :: MVar m a -> (a -> m (a,b)) -> m b
 
   default newMVar :: a -> m (MVar m a)
