@@ -24,7 +24,7 @@ module Control.Monad.Class.MonadTimer.NonStandard
   , TimeoutState (..)
   ) where
 
-import qualified Control.Concurrent.Class.MonadSTM as STM
+import qualified Control.Concurrent.STM as STM
 #ifndef GHC_TIMERS_API
 import           Control.Monad (when)
 #endif
@@ -111,7 +111,7 @@ class MonadSTM m => MonadTimeout m where
 
 #ifdef GHC_TIMERS_API
 instance MonadTimeout IO where
-  data Timeout IO = TimeoutIO !(STM.TVar IO TimeoutState) !GHC.TimeoutKey
+  data Timeout IO = TimeoutIO !(STM.TVar TimeoutState) !GHC.TimeoutKey
 
   readTimeout (TimeoutIO var _key) = STM.readTVar var
 
@@ -145,7 +145,7 @@ instance MonadTimeout IO where
       GHC.unregisterTimeout mgr key
 #else
 instance MonadTimeout IO where
-  data Timeout IO = TimeoutIO !(STM.TVar IO (STM.TVar IO Bool)) !(STM.TVar IO Bool)
+  data Timeout IO = TimeoutIO !(STM.TVar (STM.TVar Bool)) !(STM.TVar Bool)
 
   readTimeout (TimeoutIO timeoutvarvar cancelvar) = do
     canceled <- STM.readTVar cancelvar
