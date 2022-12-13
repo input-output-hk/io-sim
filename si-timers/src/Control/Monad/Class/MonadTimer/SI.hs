@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -25,14 +26,12 @@ module Control.Monad.Class.MonadTimer.SI
 
 import           Control.Concurrent.Class.MonadSTM
 import           Control.Exception (assert)
-import           Control.Monad (when)
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadTime.SI
 import qualified Control.Monad.Class.MonadTimer as MonadTimer
 import           Control.Monad.Class.MonadTimer.NonStandard
 
-import           Data.Foldable (traverse_)
-
+import           Data.Functor (($>))
 import           Data.Time.Clock (diffTimeToPicoseconds)
 
 
@@ -178,53 +177,46 @@ registerDelayCancellable d = do
     c <- getMonotonicTime
     -- timeout state
     v <- newTVarIO TimeoutPending
-    -- current timer
-    m <- newTVarIO Nothing
-    tid <- forkIO $ go m v c (d `addTime` c)
+    tid <- forkIO $ go v c (d `addTime` c)
     labelThread tid "delay-thread"
-    let cancel = do
-          t <- atomically $ do
-            a <- readTVar v
-            case a of
-              TimeoutCancelled -> return Nothing
-              TimeoutFired     -> return Nothing
-              TimeoutPending   -> do
-                writeTVar v TimeoutCancelled
-                mt  <- readTVar m
-                case mt of
-                  Nothing -> retry
-                  Just t  -> return (Just t)
-          traverse_ cancelTimeout t
-          killThread tid
+    let cancel = atomically $ readTVar v >>= \case
+          TimeoutCancelled -> return ()
+          TimeoutFired     -> return ()
+          TimeoutPending   -> writeTVar v TimeoutCancelled
     return (readTVar v, cancel)
   where
     maxDelay :: DiffTime
     maxDelay = microsecondsAsIntToDiffTime maxBound
 
-    -- The timeout thread, it might be killed by an async exception. In this
-    -- case the `cancel` action is responsible for updating state state of the
-    -- timeout (held in `v`).
-    go :: TVar m (Maybe (Timeout m))
-       -> TVar m TimeoutState
+    go :: TVar m TimeoutState
        -> Time
        -> Time
        -> m ()
-    go tv v c u | u `diffTime` c >= maxDelay = do
+    go v c u | u `diffTime` c >= maxDelay = do
       t <- newTimeout maxBound
-      _ <- atomically $ swapTVar tv $! Just t
-      fired <- atomically $ awaitTimeout t
-      when fired $ do
-        c' <- getMonotonicTime
-        go tv v c' u
+      ts <- atomically (await v t)
+      case ts of
+        TimeoutPending -> do
+          c' <- getMonotonicTime
+          go v c' u
+        _ -> return ()
 
-    go tv v c u = do
+    go v c u = do
       t <- newTimeout (diffTimeToMicrosecondsAsInt $ u `diffTime` c)
-      _ <- atomically $ swapTVar tv $! Just t
       atomically $ do
-        fired <- awaitTimeout t
-        ts <- readTVar v
-        when (fired && ts == TimeoutPending) $
-          writeTVar v TimeoutFired
+        ts <- await v t
+        case ts of
+          TimeoutPending -> writeTVar v TimeoutFired
+          _              -> return ()
+
+    await :: TVar m TimeoutState -> Timeout m -> STM m TimeoutState
+    await v t =
+      (awaitTimeout t $> TimeoutPending)
+      `orElse`
+      (readTVar v >>= \case
+         a@TimeoutCancelled -> return a
+         TimeoutFired       -> error "registerDelayCancellable: invariant violation!"
+         TimeoutPending     -> retry)
 
 -- | Run IO action within a timeout.
 --
