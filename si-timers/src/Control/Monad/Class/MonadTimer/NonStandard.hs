@@ -5,7 +5,8 @@
 #if  defined(__GLASGOW_HASKELL__) && \
     !defined(mingw32_HOST_OS) && \
     !defined(__GHCJS__) && \
-    !defined(js_HOST_ARCH)
+    !defined(js_HOST_ARCH) && \
+    !defined(wasm32_HOST_ARCH)
 #define GHC_TIMERS_API
 #endif
 
