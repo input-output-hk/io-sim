@@ -217,7 +217,16 @@ tests =
     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask_blocked
     ]
   , testGroup "MonadTimerCancellable"
-    [ testProperty "registerDelayCancellable" prop_registerDelayCancellable
+    [ testProperty "registerDelayCancellable (IOSim impl)"
+        (prop_registerDelayCancellable registerDelayCancellable)
+    , testProperty "registerDelayCancellable (IO impl)"
+        (prop_registerDelayCancellable $
+          defaultRegisterDelayCancellable
+            (newTimeout . microsecondsAsIntToDiffTime)
+            readTimeout
+            cancelTimeout
+            awaitTimeout
+        )
     ]
   ]
 
@@ -1023,6 +1032,7 @@ type TimeoutDuration = DiffTime
 type ActionDuration  = DiffTime
 type TimeoutConstraints m =
       ( MonadAsync m
+      , MonadDelay m
       , MonadFork  m
       , MonadTime  m
       , MonadTimer m
@@ -1444,45 +1454,47 @@ instance Arbitrary DelayWithCancel where
       maxDelay :: DiffTime
       maxDelay = microsecondsAsIntToDiffTime maxBound
 
-
-prop_registerDelayCancellable :: DelayWithCancel
-                              -> Property
-prop_registerDelayCancellable (DelayWithCancel delay mbCancel) =
+prop_registerDelayCancellable
+    :: (forall s. DiffTime -> IOSim s (STM (IOSim s) TimeoutState, IOSim s ()))
+    -- ^ implementation 
+    -> DelayWithCancel
+    -> Property
+prop_registerDelayCancellable registerDelayCancellableImpl
+                              (DelayWithCancel delay mbCancel) =
       -- 'within' covers the case where `registerDelayCancellable` would not
       -- make progress awaiting for the timeout (a live lock).
       within 1000 $
       let trace = runSimTrace sim
       in case traceResult True trace of
-        Left  {} -> counterexample (ppTrace trace) False
-        Right  r -> counterexample (ppTrace trace) r
+        Left  err    -> counterexample (ppTrace trace)
+                      . counterexample (show err)
+                      $ False
+        Right (_, r) -> counterexample (ppTrace trace) r
     where
-      sim :: ( MonadDelay   m
-             , MonadTimer   m
-             )
-          => m Bool
+      sim :: IOSim s (Maybe TimeoutState, Bool)
       sim = do
-        (readTimeout, cancelTimeout) <- registerDelayCancellable delay
+        (readTimeout_, cancelTimeout_) <- registerDelayCancellableImpl delay
         case mbCancel of
 
           Nothing -> do
             atomically $ do
-              tv <- readTimeout
+              tv <- readTimeout_
               case tv of
                 TimeoutFired     -> return ()
                 TimeoutPending   -> retry
                 TimeoutCancelled -> return ()
             t <- getMonotonicTime
-            return (t == Time (delay `max` 0))
+            return (Nothing, t == Time (delay `max` 0))
 
           Just cancelDelay -> do
             threadDelay cancelDelay
-            cancelTimeout
-            tv <- atomically readTimeout
+            cancelTimeout_
+            tv <- atomically readTimeout_
             return $ case () of
-              _ | delay < cancelDelay  -> tv == TimeoutFired
-                | delay == cancelDelay -> tv == TimeoutFired
-                                       || tv == TimeoutCancelled
-                | otherwise            -> tv == TimeoutCancelled
+              _ | delay < cancelDelay  -> (Just tv, tv == TimeoutFired)
+                | delay == cancelDelay -> (Just tv, tv == TimeoutFired
+                                                 || tv == TimeoutCancelled)
+                | otherwise            -> (Just tv, tv == TimeoutCancelled)
 
 --
 -- Utils

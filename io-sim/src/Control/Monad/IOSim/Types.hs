@@ -30,7 +30,6 @@ module Control.Monad.IOSim.Types
   , StmTxResult (..)
   , BranchStmA (..)
   , StmStack (..)
-  , Timeout (..)
   , TimeoutException (..)
   , setCurrentTime
   , unshareClock
@@ -63,6 +62,12 @@ module Control.Monad.IOSim.Types
   , Time (..)
   , addTime
   , diffTime
+    -- * Internal API
+  , Timeout (..)
+  , newTimeout
+  , readTimeout
+  , cancelTimeout
+  , awaitTimeout
   ) where
 
 import           Control.Applicative
@@ -81,7 +86,7 @@ import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
                      TArrayDefault, TChanDefault, TMVarDefault, TSemDefault,
-                     TraceValue)
+                     TraceValue, atomically, retry)
 import qualified Control.Monad.Class.MonadSTM.Internal as MonadSTM
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
@@ -91,7 +96,8 @@ import qualified Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer
-import           Control.Monad.Class.MonadTimer.NonStandard
+import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
+import qualified Control.Monad.Class.MonadTimer.SI as SI
 import           Control.Monad.ST.Lazy
 import qualified Control.Monad.ST.Strict as StrictST
 
@@ -156,15 +162,13 @@ data SimA s a where
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
 
-  StartTimeout      :: Int -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
+  StartTimeout      :: DiffTime -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
   UnregisterTimeout :: TimeoutId -> SimA s a -> SimA s a
-  RegisterDelay :: Int -> (TVar s Bool -> SimA s b) -> SimA s b
-  ThreadDelay   :: Int -> SimA s b -> SimA s b
+  RegisterDelay     :: DiffTime -> (TVar s Bool -> SimA s b) -> SimA s b
+  ThreadDelay       :: DiffTime -> SimA s b -> SimA s b
 
-  -- 'MonadTimerFancy' support
-  NewTimeout    :: Int -> (Timeout (IOSim s) -> SimA s b) -> SimA s b
-  UpdateTimeout :: Timeout (IOSim s) -> Int -> SimA s b -> SimA s b
-  CancelTimeout :: Timeout (IOSim s) -> SimA s b -> SimA s b
+  NewTimeout    :: DiffTime -> (Timeout s -> SimA s b) -> SimA s b
+  CancelTimeout :: Timeout s -> SimA s b -> SimA s b
 
   Throw        :: Thrower -> SomeException -> SimA s a
   Catch        :: Exception e =>
@@ -590,28 +594,58 @@ unshareClock = IOSim $ oneShot $ \k -> UnshareClock (k ())
 
 instance MonadDelay (IOSim s) where
   -- Use optimized IOSim primitive
-  threadDelay d = IOSim $ oneShot $ \k -> ThreadDelay d (k ())
+  threadDelay d =
+    IOSim $ oneShot $ \k -> ThreadDelay (SI.microsecondsAsIntToDiffTime d)
+                                        (k ())
 
-instance MonadTimeout (IOSim s) where
-  data Timeout (IOSim s) = Timeout !(TVar s TimeoutState) !TimeoutId
-                         -- ^ a timeout
-                         | NegativeTimeout !TimeoutId
-                         -- ^ a negative timeout
+instance SI.MonadDelay (IOSim s) where
+  threadDelay d =
+    IOSim $ oneShot $ \k -> ThreadDelay d (k ())
 
-  readTimeout (Timeout var _key)     = MonadSTM.readTVar var
-  readTimeout (NegativeTimeout _key) = pure TimeoutCancelled
+data Timeout s = Timeout !(TVar s TimeoutState) !TimeoutId
+               -- ^ a timeout
+               | NegativeTimeout !TimeoutId
+               -- ^ a negative timeout
 
-  newTimeout      d = IOSim $ oneShot $ \k -> NewTimeout      d k
-  updateTimeout t d = IOSim $ oneShot $ \k -> UpdateTimeout t d (k ())
-  cancelTimeout t   = IOSim $ oneShot $ \k -> CancelTimeout t   (k ())
+newTimeout :: DiffTime -> IOSim s (Timeout s)
+newTimeout d = IOSim $ oneShot $ \k -> NewTimeout d k
+
+readTimeout :: Timeout s -> STM s TimeoutState
+readTimeout (Timeout var _key)     = MonadSTM.readTVar var
+readTimeout (NegativeTimeout _key) = pure TimeoutCancelled
+
+cancelTimeout :: Timeout s -> IOSim s ()
+cancelTimeout t = IOSim $ oneShot $ \k -> CancelTimeout t (k ())
+
+awaitTimeout :: Timeout s -> STM s Bool
+awaitTimeout t  = do s <- readTimeout t
+                     case s of
+                       TimeoutPending   -> retry
+                       TimeoutFired     -> return True
+                       TimeoutCancelled -> return False
 
 instance MonadTimer (IOSim s) where
+  timeout d action
+    | d <  0 = Just <$> action
+    | d == 0 = return Nothing
+    | otherwise = IOSim $ oneShot $ \k -> StartTimeout d' (runIOSim action) k
+        where
+          d' = SI.microsecondsAsIntToDiffTime d
+
+  registerDelay d = IOSim $ oneShot $ \k -> RegisterDelay d' k
+    where
+      d' = SI.microsecondsAsIntToDiffTime d
+
+instance SI.MonadTimer (IOSim s) where
   timeout d action
     | d <  0 = Just <$> action
     | d == 0 = return Nothing
     | otherwise = IOSim $ oneShot $ \k -> StartTimeout d (runIOSim action) k
 
   registerDelay d = IOSim $ oneShot $ \k -> RegisterDelay d k
+  registerDelayCancellable d = do
+    t <- newTimeout d
+    return (readTimeout t, cancelTimeout t)
 
 newtype TimeoutException = TimeoutException TimeoutId deriving Eq
 

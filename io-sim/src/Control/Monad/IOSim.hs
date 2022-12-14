@@ -69,6 +69,10 @@ module Control.Monad.IOSim
   , EventlogMarker (..)
     -- * Low-level API
   , execReadTVar
+  , newTimeout
+  , readTimeout
+  , cancelTimeout
+  , awaitTimeout
     -- * Deprecated interfaces
   , SimM
   , SimSTM
