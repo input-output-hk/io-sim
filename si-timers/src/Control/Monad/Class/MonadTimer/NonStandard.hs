@@ -20,8 +20,15 @@
 -- a better support for timers especially across different OSes).
 --
 module Control.Monad.Class.MonadTimer.NonStandard
-  ( MonadTimeout (..)
-  , TimeoutState (..)
+  ( TimeoutState (..)
+  , newTimeout
+  , readTimeout
+  , cancelTimeout
+  , awaitTimeout
+  , NewTimeout
+  , ReadTimeout
+  , CancelTimeout
+  , AwaitTimeout
   ) where
 
 import qualified Control.Concurrent.STM as STM
@@ -30,21 +37,12 @@ import           Control.Monad (when)
 #endif
 import           Control.Monad.Class.MonadSTM
 
-import           Control.Monad.Cont (ContT (..))
-import           Control.Monad.RWS (RWST (..))
-import           Control.Monad.Reader (ReaderT (..))
-import           Control.Monad.State (StateT (..))
-import           Control.Monad.Trans (lift)
-import           Control.Monad.Writer (WriterT (..))
-
 #ifdef GHC_TIMERS_API
 import qualified GHC.Event as GHC (TimeoutKey, getSystemTimerManager,
-                     registerTimeout, unregisterTimeout, updateTimeout)
+                     registerTimeout, unregisterTimeout)
 #else
 import qualified GHC.Conc.IO as GHC (registerDelay)
 #endif
-
-import           Data.Kind (Type)
 
 
 -- | State of a timeout: pending, fired or cancelled.
@@ -52,161 +50,111 @@ import           Data.Kind (Type)
 data TimeoutState = TimeoutPending | TimeoutFired | TimeoutCancelled
   deriving (Eq, Ord, Show)
 
-class MonadSTM m => MonadTimeout m where
-  -- | The type of the timeout handle, used with 'newTimeout', 'readTimeout',
-  -- 'updateTimeout' and 'cancelTimeout'.
-  --
-  data Timeout m :: Type
 
-  -- | Create a new timeout which will fire at the given time duration in
-  -- the future.
-  --
-  -- The timeout will start in the 'TimeoutPending' state and either
-  -- fire at or after the given time leaving it in the 'TimeoutFired' state,
-  -- or it may be cancelled with 'cancelTimeout', leaving it in the
-  -- 'TimeoutCancelled' state.
-  --
-  -- Timeouts /cannot/ be reset to the pending state once fired or cancelled
-  -- (as this would be very racy). You should create a new timeout if you need
-  -- this functionality.
-  --
-  newTimeout     :: Int -> m (Timeout m)
-
-  -- | Read the current state of a timeout. This does not block, but returns
-  -- the current state. It is your responsibility to use 'retry' to wait.
-  --
-  -- Alternatively you may wish to use the convenience utility 'awaitTimeout'
-  -- to wait for just the fired or cancelled outcomes.
-  --
-  -- You should consider the cancelled state if you plan to use 'cancelTimeout'.
-  --
-  readTimeout    :: Timeout m -> STM m TimeoutState
-
-  -- Adjust when this timer will fire, to the given duration into the future.
-  --
-  -- It is safe to race this concurrently against the timer firing. It will
-  -- have no effect if the timer fires first.
-  --
-  -- The new time can be before or after the original expiry time, though
-  -- arguably it is an application design flaw to move timeouts sooner.
-  --
-  updateTimeout  :: Timeout m -> Int -> m ()
-
-  -- | Cancel a timeout (unless it has already fired), putting it into the
-  -- 'TimeoutCancelled' state. Code reading and acting on the timeout state
-  -- need to handle such cancellation appropriately.
-  --
-  -- It is safe to race this concurrently against the timer firing. It will
-  -- have no effect if the timer fires first.
-  --
-  cancelTimeout  :: Timeout m -> m ()
-
-  -- | Returns @True@ when the timeout is fired, or @False@ if it is cancelled.
-  awaitTimeout   :: Timeout m -> STM m Bool
-  awaitTimeout t  = do s <- readTimeout t
-                       case s of
-                         TimeoutPending   -> retry
-                         TimeoutFired     -> return True
-                         TimeoutCancelled -> return False
-
+-- | The type of the timeout handle, used with 'newTimeout', 'readTimeout', and
+-- 'cancelTimeout'.
+--
 #ifdef GHC_TIMERS_API
-instance MonadTimeout IO where
-  data Timeout IO = TimeoutIO !(STM.TVar TimeoutState) !GHC.TimeoutKey
-
-  readTimeout (TimeoutIO var _key) = STM.readTVar var
-
-  newTimeout = \d -> do
-      var <- STM.newTVarIO TimeoutPending
-      mgr <- GHC.getSystemTimerManager
-      key <- GHC.registerTimeout mgr d (STM.atomically (timeoutAction var))
-      return (TimeoutIO var key)
-    where
-      timeoutAction var = do
-        x <- STM.readTVar var
-        case x of
-          TimeoutPending   -> STM.writeTVar var TimeoutFired
-          TimeoutFired     -> error "MonadTimer(IO): invariant violation"
-          TimeoutCancelled -> return ()
-
-  -- In GHC's TimerManager this has no effect if the timer already fired.
-  -- It is safe to race against the timer firing.
-  updateTimeout (TimeoutIO _var key) d = do
-      mgr <- GHC.getSystemTimerManager
-      GHC.updateTimeout mgr key d
-
-  cancelTimeout (TimeoutIO var key) = do
-      STM.atomically $ do
-        x <- STM.readTVar var
-        case x of
-          TimeoutPending   -> STM.writeTVar var TimeoutCancelled
-          TimeoutFired     -> return ()
-          TimeoutCancelled -> return ()
-      mgr <- GHC.getSystemTimerManager
-      GHC.unregisterTimeout mgr key
+data Timeout = TimeoutIO !(STM.TVar TimeoutState) !GHC.TimeoutKey
 #else
-instance MonadTimeout IO where
-  data Timeout IO = TimeoutIO !(STM.TVar (STM.TVar Bool)) !(STM.TVar Bool)
-
-  readTimeout (TimeoutIO timeoutvarvar cancelvar) = do
-    canceled <- STM.readTVar cancelvar
-    fired    <- STM.readTVar =<< STM.readTVar timeoutvarvar
-    case (canceled, fired) of
-      (True, _)  -> return TimeoutCancelled
-      (_, False) -> return TimeoutPending
-      (_, True)  -> return TimeoutFired
-
-  newTimeout d = do
-    timeoutvar    <- GHC.registerDelay d
-    timeoutvarvar <- STM.newTVarIO timeoutvar
-    cancelvar     <- STM.newTVarIO False
-    return (TimeoutIO timeoutvarvar cancelvar)
-
-  updateTimeout (TimeoutIO timeoutvarvar _cancelvar) d = do
-    timeoutvar' <- GHC.registerDelay d
-    STM.atomically $ STM.writeTVar timeoutvarvar timeoutvar'
-
-  cancelTimeout (TimeoutIO timeoutvarvar cancelvar) =
-    STM.atomically $ do
-      fired <- STM.readTVar =<< STM.readTVar timeoutvarvar
-      when (not fired) $ STM.writeTVar cancelvar True
+data Timeout = TimeoutIO !(STM.TVar (STM.TVar Bool)) !(STM.TVar Bool)
 #endif
 
+-- | Create a new timeout which will fire at the given time duration in
+-- the future.
 --
--- Transformer's instances
+-- The timeout will start in the 'TimeoutPending' state and either
+-- fire at or after the given time leaving it in the 'TimeoutFired' state,
+-- or it may be cancelled with 'cancelTimeout', leaving it in the
+-- 'TimeoutCancelled' state.
 --
+-- Timeouts /cannot/ be reset to the pending state once fired or cancelled
+-- (as this would be very racy). You should create a new timeout if you need
+-- this functionality.
+--
+newTimeout :: NewTimeout IO Timeout
+type NewTimeout m timeout = Int -> m timeout
 
--- | @since 1.0.0.0
-instance MonadTimeout m => MonadTimeout (ContT r m) where
-  newtype Timeout (ContT r m) = TimeoutC { unTimeoutC :: Timeout m }
-  newTimeout    = lift . fmap TimeoutC . newTimeout
-  readTimeout   = ContTSTM . readTimeout . unTimeoutC
-  updateTimeout (TimeoutC t) d = lift $ updateTimeout t d
-  cancelTimeout = lift . cancelTimeout . unTimeoutC
 
-instance MonadTimeout m => MonadTimeout (ReaderT r m) where
-  newtype Timeout (ReaderT r m) = TimeoutR { unTimeoutR :: Timeout m }
-  newTimeout    = lift . fmap TimeoutR . newTimeout
-  readTimeout   = lift . readTimeout . unTimeoutR
-  updateTimeout (TimeoutR t) d = lift $ updateTimeout t d
-  cancelTimeout = lift . cancelTimeout . unTimeoutR
+-- | Read the current state of a timeout. This does not block, but returns
+-- the current state. It is your responsibility to use 'retry' to wait.
+--
+-- Alternatively you may wish to use the convenience utility 'awaitTimeout'
+-- to wait for just the fired or cancelled outcomes.
+--
+-- You should consider the cancelled state if you plan to use 'cancelTimeout'.
+--
+readTimeout :: ReadTimeout IO Timeout
+type ReadTimeout m timeout = timeout -> STM m TimeoutState 
 
-instance (Monoid w, MonadTimeout m) => MonadTimeout (WriterT w m) where
-  newtype Timeout (WriterT w m) = TimeoutW { unTimeoutW :: Timeout m }
-  newTimeout    = lift . fmap TimeoutW . newTimeout
-  readTimeout   = lift . readTimeout . unTimeoutW
-  updateTimeout (TimeoutW t) d = lift $ updateTimeout t d
-  cancelTimeout = lift . cancelTimeout . unTimeoutW
 
-instance MonadTimeout m => MonadTimeout (StateT s m) where
-  newtype Timeout (StateT s m) = TimeoutS { unTimeoutS :: Timeout m }
-  newTimeout    = lift . fmap TimeoutS . newTimeout
-  readTimeout   = lift . readTimeout . unTimeoutS
-  updateTimeout (TimeoutS t) d = lift $ updateTimeout t d
-  cancelTimeout = lift . cancelTimeout . unTimeoutS
+-- | Cancel a timeout (unless it has already fired), putting it into the
+-- 'TimeoutCancelled' state. Code reading and acting on the timeout state
+-- need to handle such cancellation appropriately.
+--
+-- It is safe to race this concurrently against the timer firing. It will
+-- have no effect if the timer fires first.
+--
+cancelTimeout :: CancelTimeout IO Timeout
+type CancelTimeout m timeout = timeout -> m ()
 
-instance (Monoid w, MonadTimeout m) => MonadTimeout (RWST r w s m) where
-  newtype Timeout (RWST r w s m) = TimeoutRWS { unTimeoutRWS :: Timeout m }
-  newTimeout    = lift . fmap TimeoutRWS . newTimeout
-  readTimeout   = lift . readTimeout . unTimeoutRWS
-  updateTimeout (TimeoutRWS t) d = lift $ updateTimeout t d
-  cancelTimeout = lift . cancelTimeout . unTimeoutRWS
+-- | Returns @True@ when the timeout is fired, or @False@ if it is cancelled.
+awaitTimeout :: AwaitTimeout IO Timeout
+type AwaitTimeout m timeout = timeout -> STM m Bool
+
+
+#ifdef GHC_TIMERS_API
+
+readTimeout (TimeoutIO var _key) = STM.readTVar var
+
+newTimeout = \d -> do
+    var <- STM.newTVarIO TimeoutPending
+    mgr <- GHC.getSystemTimerManager
+    key <- GHC.registerTimeout mgr d (STM.atomically (timeoutAction var))
+    return (TimeoutIO var key)
+  where
+    timeoutAction var = do
+      x <- STM.readTVar var
+      case x of
+        TimeoutPending   -> STM.writeTVar var TimeoutFired
+        TimeoutFired     -> error "MonadTimer(IO): invariant violation"
+        TimeoutCancelled -> return ()
+
+cancelTimeout (TimeoutIO var key) = do
+    STM.atomically $ do
+      x <- STM.readTVar var
+      case x of
+        TimeoutPending   -> STM.writeTVar var TimeoutCancelled
+        TimeoutFired     -> return ()
+        TimeoutCancelled -> return ()
+    mgr <- GHC.getSystemTimerManager
+    GHC.unregisterTimeout mgr key
+
+#else
+
+readTimeout (TimeoutIO timeoutvarvar cancelvar) = do
+  canceled <- STM.readTVar cancelvar
+  fired    <- STM.readTVar =<< STM.readTVar timeoutvarvar
+  case (canceled, fired) of
+    (True, _)  -> return TimeoutCancelled
+    (_, False) -> return TimeoutPending
+    (_, True)  -> return TimeoutFired
+
+newTimeout d = do
+  timeoutvar    <- GHC.registerDelay d
+  timeoutvarvar <- STM.newTVarIO timeoutvar
+  cancelvar     <- STM.newTVarIO False
+  return (TimeoutIO timeoutvarvar cancelvar)
+
+cancelTimeout (TimeoutIO timeoutvarvar cancelvar) =
+  STM.atomically $ do
+    fired <- STM.readTVar =<< STM.readTVar timeoutvarvar
+    when (not fired) $ STM.writeTVar cancelvar True
+
+#endif
+
+awaitTimeout t  = do s <- readTimeout t
+                     case s of
+                       TimeoutPending   -> retry
+                       TimeoutFired     -> return True
+                       TimeoutCancelled -> return False

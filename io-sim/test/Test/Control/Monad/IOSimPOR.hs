@@ -34,7 +34,6 @@ import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
-import           Control.Monad.Class.MonadTimer.NonStandard
 import           Control.Monad.IOSim
 
 import           GHC.Generics
@@ -139,7 +138,6 @@ data Step =
 
 data TimeoutStep =
     NewTimeout    Int
-  | UpdateTimeout Int
   | CancelTimeout
   | AwaitTimeout
   deriving (Eq, Ord, Show, Generic)
@@ -167,7 +165,6 @@ instance Arbitrary TimeoutStep where
   arbitrary = do Positive i <- arbitrary
                  frequency $ map (fmap return) $
                    [(3,NewTimeout i),
-                    (1,UpdateTimeout i),
                     (1,CancelTimeout),
                     (3,AwaitTimeout)]
 
@@ -283,9 +280,8 @@ interpret r t (Task steps) = forkIO $ do
         interpretStep (_,timer) (Timeout tstep) = do
           timerVal <- atomically $ readTVar timer
           case (timerVal,tstep) of
-            (_,NewTimeout n)            -> do tout <- newTimeout n
+            (_,NewTimeout n)            -> do tout <- newTimeout (fromIntegral n)
                                               atomically $ writeTVar timer (Just tout)
-            (Just tout,UpdateTimeout n) -> updateTimeout tout n
             (Just tout,CancelTimeout)   -> cancelTimeout tout
             (Just tout,AwaitTimeout)    -> atomically $ awaitTimeout tout >> return ()
             (Nothing,_)                 -> return ()
