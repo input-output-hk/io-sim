@@ -1,0 +1,49 @@
+cabal-version:      3.0
+name:               io-classes-mtl
+version:            0.1.0.0
+synopsis:           Experimental MTL instances for io-classes
+license:            Apache-2.0
+license-files:
+  LICENSE
+  NOTICE
+author:             Duncan Coutts, Marcin Szamotulski
+maintainer:         Marcin Szamotulski coot@coot.me
+copyright:          2022-2023 Input Output Global Inc (IOG)
+category:           Control
+build-type:         Simple
+extra-doc-files:    README.md
+                    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+                 -Wcompat
+                 -Wincomplete-uni-patterns
+                 -Wincomplete-record-updates
+                 -Wpartial-fields
+                 -Widentities
+                 -Wunused-packages
+                 -Wno-redundant-constraints
+                 -Wno-unticked-promoted-constructors
+
+library
+    import:           warnings
+    exposed-modules:  Control.Monad.Class.Trans
+                   ,  Control.Monad.Class.MonadEventlog.Trans
+                   ,  Control.Monad.Class.MonadSay.Trans
+                   ,  Control.Monad.Class.MonadST.Trans
+                   ,  Control.Monad.Class.MonadSTM.Trans
+                   ,  Control.Monad.Class.MonadThrow.Trans
+                   ,  Control.Monad.Class.MonadTime.Trans
+                   ,  Control.Monad.Class.MonadTime.SI.Trans
+                   ,  Control.Monad.Class.MonadTimer.Trans
+                   ,  Control.Monad.Class.MonadTimer.SI.Trans
+    build-depends:    base >=4.9 && <4.18,
+                      array,
+                      mtl,
+
+                      io-classes ^>= 0.6.0.0,
+                      si-timers,
+
+
+    hs-source-dirs:   src
+    default-language: Haskell2010

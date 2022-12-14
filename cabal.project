@@ -16,6 +16,7 @@ index-state:
 
 packages: ./io-sim
           ./io-classes
+          ./io-classes-mtl
           ./strict-mvar
           ./strict-stm
           ./si-timers

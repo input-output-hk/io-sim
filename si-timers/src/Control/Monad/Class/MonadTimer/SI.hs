@@ -30,6 +30,9 @@ import qualified Control.Monad.Class.MonadTimer as MonadTimer
 import           Control.Monad.Class.MonadTimer.NonStandard (TimeoutState (..))
 import qualified Control.Monad.Class.MonadTimer.NonStandard as NonStandard
 
+import           Control.Monad.Reader
+
+import           Data.Bifunctor (bimap)
 import           Data.Functor (($>))
 import           Data.Time.Clock (diffTimeToPicoseconds)
 
@@ -92,6 +95,8 @@ instance MonadDelay IO where
         where
           d' = u `diffTime` c
 
+instance MonadDelay m => MonadDelay (ReaderT r m) where
+  threadDelay = lift . threadDelay
 
 class ( MonadTimer.MonadTimer m
       , MonadMonotonicTime m
@@ -250,3 +255,8 @@ instance MonadTimer IO where
       NonStandard.awaitTimeout
 
   timeout = MonadTimer.timeout . diffTimeToMicrosecondsAsInt
+
+instance MonadTimer m => MonadTimer (ReaderT r m) where
+  registerDelay            = lift . registerDelay
+  registerDelayCancellable = fmap (bimap lift lift) . lift . registerDelayCancellable
+  timeout d f              = ReaderT $ \r -> timeout d (runReaderT f r)
