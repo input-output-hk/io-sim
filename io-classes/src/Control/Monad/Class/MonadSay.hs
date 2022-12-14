@@ -1,6 +1,6 @@
 module Control.Monad.Class.MonadSay where
 
-import           Control.Monad.State
+import           Control.Monad.Reader
 import qualified Data.ByteString.Char8 as BSC
 
 class Monad m => MonadSay m where
@@ -9,5 +9,5 @@ class Monad m => MonadSay m where
 instance MonadSay IO where
   say = BSC.putStrLn . BSC.pack
 
-instance MonadSay m => MonadSay (StateT s m) where
+instance MonadSay m => MonadSay (ReaderT r m) where
   say = lift . say

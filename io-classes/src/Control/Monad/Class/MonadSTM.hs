@@ -18,8 +18,6 @@ module Control.Monad.Class.MonadSTM
   , MonadTraceSTM
   , MonadInspectSTM (..)
   , TraceValue (..)
-    -- * monad transformer 'STM' wrapper
-  , ContTSTM (..)
   ) where
 
 import           Control.Monad.Class.MonadSTM.Internal
