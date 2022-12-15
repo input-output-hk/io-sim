@@ -17,10 +17,13 @@ module Control.Monad.Class.MonadSTM.Trans
 
 import           Control.Monad.Cont (ContT (..))
 import           Control.Monad.Except (ExceptT (..), runExceptT)
-import           Control.Monad.RWS (RWST (..))
-import           Control.Monad.State (StateT (..))
 import           Control.Monad.Trans (lift)
-import           Control.Monad.Writer (WriterT (..))
+import qualified Control.Monad.RWS.Lazy as Lazy
+import qualified Control.Monad.RWS.Strict as Strict
+import qualified Control.Monad.State.Lazy as Lazy
+import qualified Control.Monad.State.Strict as Strict
+import qualified Control.Monad.Writer.Lazy as Lazy
+import qualified Control.Monad.Writer.Strict as Strict
 
 import qualified Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadSTM.Internal
@@ -153,16 +156,16 @@ instance MonadSTM m => MonadSTM (ContT r m) where
 
 -- | The underlying stm monad is also transformed.
 --
-instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
-    type STM (WriterT w m) = WriterT w (STM m)
-    atomically (WriterT stm) = WriterT (atomically stm)
+instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.WriterT w m) where
+    type STM (Lazy.WriterT w m) = Lazy.WriterT w (STM m)
+    atomically (Lazy.WriterT stm) = Lazy.WriterT (atomically stm)
 
-    type TVar (WriterT w m) = TVar m
+    type TVar (Lazy.WriterT w m) = TVar m
     newTVar        = lift .  newTVar
     readTVar       = lift .  readTVar
     writeTVar      = lift .: writeTVar
     retry          = lift    retry
-    orElse (WriterT a) (WriterT b) = WriterT $ a `orElse` b
+    orElse (Lazy.WriterT a) (Lazy.WriterT b) = Lazy.WriterT $ a `orElse` b
 
     modifyTVar     = lift .: modifyTVar
     modifyTVar'    = lift .: modifyTVar'
@@ -170,7 +173,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     swapTVar       = lift .: swapTVar
     check          = lift .  check
 
-    type TMVar (WriterT w m) = TMVar m
+    type TMVar (Lazy.WriterT w m) = TMVar m
     newTMVar       = lift .  newTMVar
     newEmptyTMVar  = lift    newEmptyTMVar
     takeTMVar      = lift .  takeTMVar
@@ -182,7 +185,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     swapTMVar      = lift .: swapTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
-    type TQueue (WriterT w m) = TQueue m
+    type TQueue (Lazy.WriterT w m) = TQueue m
     newTQueue      = lift newTQueue
     readTQueue     = lift .  readTQueue
     tryReadTQueue  = lift .  tryReadTQueue
@@ -193,7 +196,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     isEmptyTQueue  = lift .  isEmptyTQueue
     unGetTQueue    = lift .: unGetTQueue
 
-    type TBQueue (WriterT w m) = TBQueue m
+    type TBQueue (Lazy.WriterT w m) = TBQueue m
     newTBQueue     = lift .  newTBQueue
     readTBQueue    = lift .  readTBQueue
     tryReadTBQueue = lift .  tryReadTBQueue
@@ -206,15 +209,15 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
     isFullTBQueue  = lift .  isFullTBQueue
     unGetTBQueue   = lift .: unGetTBQueue
 
-    type TArray (WriterT w m) = TArray m
+    type TArray (Lazy.WriterT w m) = TArray m
 
-    type TSem (WriterT w m) = TSem m
+    type TSem (Lazy.WriterT w m) = TSem m
     newTSem        = lift .  newTSem
     waitTSem       = lift .  waitTSem
     signalTSem     = lift .  signalTSem
     signalTSemN    = lift .: signalTSemN
 
-    type TChan (WriterT w m) = TChan m
+    type TChan (Lazy.WriterT w m) = TChan m
     newTChan          = lift    newTChan
     newBroadcastTChan = lift    newBroadcastTChan
     dupTChan          = lift .  dupTChan
@@ -230,16 +233,16 @@ instance (Monoid w, MonadSTM m) => MonadSTM (WriterT w m) where
 
 -- | The underlying stm monad is also transformed.
 --
-instance MonadSTM m => MonadSTM (StateT s m) where
-    type STM (StateT s m) = StateT s (STM m)
-    atomically (StateT stm) = StateT $ \s -> atomically (stm s)
+instance (Monoid w, MonadSTM m) => MonadSTM (Strict.WriterT w m) where
+    type STM (Strict.WriterT w m) = Strict.WriterT w (STM m)
+    atomically (Strict.WriterT stm) = Strict.WriterT (atomically stm)
 
-    type TVar (StateT s m) = TVar m
+    type TVar (Strict.WriterT w m) = TVar m
     newTVar        = lift .  newTVar
     readTVar       = lift .  readTVar
     writeTVar      = lift .: writeTVar
     retry          = lift    retry
-    orElse (StateT a) (StateT b) = StateT $ \s -> a s `orElse` b s
+    orElse (Strict.WriterT a) (Strict.WriterT b) = Strict.WriterT $ a `orElse` b
 
     modifyTVar     = lift .: modifyTVar
     modifyTVar'    = lift .: modifyTVar'
@@ -247,7 +250,7 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     swapTVar       = lift .: swapTVar
     check          = lift .  check
 
-    type TMVar (StateT s m) = TMVar m
+    type TMVar (Strict.WriterT w m) = TMVar m
     newTMVar       = lift .  newTMVar
     newEmptyTMVar  = lift    newEmptyTMVar
     takeTMVar      = lift .  takeTMVar
@@ -259,18 +262,18 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     swapTMVar      = lift .: swapTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
-    type TQueue (StateT s m) = TQueue m
+    type TQueue (Strict.WriterT w m) = TQueue m
     newTQueue      = lift newTQueue
-    readTQueue     = lift . readTQueue
-    tryReadTQueue  = lift . tryReadTQueue
-    peekTQueue     = lift . peekTQueue
-    tryPeekTQueue  = lift . tryPeekTQueue
+    readTQueue     = lift .  readTQueue
+    tryReadTQueue  = lift .  tryReadTQueue
+    peekTQueue     = lift .  peekTQueue
+    tryPeekTQueue  = lift .  tryPeekTQueue
     flushTQueue    = lift .  flushTQueue
-    writeTQueue v  = lift . writeTQueue v
-    isEmptyTQueue  = lift . isEmptyTQueue
+    writeTQueue v  = lift .  writeTQueue v
+    isEmptyTQueue  = lift .  isEmptyTQueue
     unGetTQueue    = lift .: unGetTQueue
 
-    type TBQueue (StateT s m) = TBQueue m
+    type TBQueue (Strict.WriterT w m) = TBQueue m
     newTBQueue     = lift .  newTBQueue
     readTBQueue    = lift .  readTBQueue
     tryReadTBQueue = lift .  tryReadTBQueue
@@ -283,15 +286,169 @@ instance MonadSTM m => MonadSTM (StateT s m) where
     isFullTBQueue  = lift .  isFullTBQueue
     unGetTBQueue   = lift .: unGetTBQueue
 
-    type TArray (StateT s m) = TArray m
+    type TArray (Strict.WriterT w m) = TArray m
 
-    type TSem (StateT s m) = TSem m
+    type TSem (Strict.WriterT w m) = TSem m
     newTSem        = lift .  newTSem
     waitTSem       = lift .  waitTSem
     signalTSem     = lift .  signalTSem
     signalTSemN    = lift .: signalTSemN
 
-    type TChan (StateT s m) = TChan m
+    type TChan (Strict.WriterT w m) = TChan m
+    newTChan          = lift    newTChan
+    newBroadcastTChan = lift    newBroadcastTChan
+    dupTChan          = lift .  dupTChan
+    cloneTChan        = lift .  cloneTChan
+    readTChan         = lift .  readTChan
+    tryReadTChan      = lift .  tryReadTChan
+    peekTChan         = lift .  peekTChan
+    tryPeekTChan      = lift .  tryPeekTChan
+    writeTChan        = lift .: writeTChan
+    unGetTChan        = lift .: unGetTChan
+    isEmptyTChan      = lift .  isEmptyTChan
+
+
+-- | The underlying stm monad is also transformed.
+--
+instance MonadSTM m => MonadSTM (Lazy.StateT s m) where
+    type STM (Lazy.StateT s m) = Lazy.StateT s (STM m)
+    atomically (Lazy.StateT stm) = Lazy.StateT $ \s -> atomically (stm s)
+
+    type TVar (Lazy.StateT s m) = TVar m
+    newTVar        = lift .  newTVar
+    readTVar       = lift .  readTVar
+    writeTVar      = lift .: writeTVar
+    retry          = lift    retry
+    orElse (Lazy.StateT a) (Lazy.StateT b) = Lazy.StateT $ \s -> a s `orElse` b s
+
+    modifyTVar     = lift .: modifyTVar
+    modifyTVar'    = lift .: modifyTVar'
+    stateTVar      = lift .: stateTVar
+    swapTVar       = lift .: swapTVar
+    check          = lift .  check
+
+    type TMVar (Lazy.StateT s m) = TMVar m
+    newTMVar       = lift .  newTMVar
+    newEmptyTMVar  = lift    newEmptyTMVar
+    takeTMVar      = lift .  takeTMVar
+    tryTakeTMVar   = lift .  tryTakeTMVar
+    putTMVar       = lift .: putTMVar
+    tryPutTMVar    = lift .: tryPutTMVar
+    readTMVar      = lift .  readTMVar
+    tryReadTMVar   = lift .  tryReadTMVar
+    swapTMVar      = lift .: swapTMVar
+    isEmptyTMVar   = lift .  isEmptyTMVar
+
+    type TQueue (Lazy.StateT s m) = TQueue m
+    newTQueue      = lift newTQueue
+    readTQueue     = lift . readTQueue
+    tryReadTQueue  = lift . tryReadTQueue
+    peekTQueue     = lift . peekTQueue
+    tryPeekTQueue  = lift . tryPeekTQueue
+    flushTQueue    = lift .  flushTQueue
+    writeTQueue v  = lift . writeTQueue v
+    isEmptyTQueue  = lift . isEmptyTQueue
+    unGetTQueue    = lift .: unGetTQueue
+
+    type TBQueue (Lazy.StateT s m) = TBQueue m
+    newTBQueue     = lift .  newTBQueue
+    readTBQueue    = lift .  readTBQueue
+    tryReadTBQueue = lift .  tryReadTBQueue
+    peekTBQueue    = lift .  peekTBQueue
+    tryPeekTBQueue = lift .  tryPeekTBQueue
+    flushTBQueue   = lift .  flushTBQueue
+    writeTBQueue   = lift .: writeTBQueue
+    lengthTBQueue  = lift .  lengthTBQueue
+    isEmptyTBQueue = lift .  isEmptyTBQueue
+    isFullTBQueue  = lift .  isFullTBQueue
+    unGetTBQueue   = lift .: unGetTBQueue
+
+    type TArray (Lazy.StateT s m) = TArray m
+
+    type TSem (Lazy.StateT s m) = TSem m
+    newTSem        = lift .  newTSem
+    waitTSem       = lift .  waitTSem
+    signalTSem     = lift .  signalTSem
+    signalTSemN    = lift .: signalTSemN
+
+    type TChan (Lazy.StateT s m) = TChan m
+    newTChan          = lift    newTChan
+    newBroadcastTChan = lift    newBroadcastTChan
+    dupTChan          = lift .  dupTChan
+    cloneTChan        = lift .  cloneTChan
+    readTChan         = lift .  readTChan
+    tryReadTChan      = lift .  tryReadTChan
+    peekTChan         = lift .  peekTChan
+    tryPeekTChan      = lift .  tryPeekTChan
+    writeTChan        = lift .: writeTChan
+    unGetTChan        = lift .: unGetTChan
+    isEmptyTChan      = lift .  isEmptyTChan
+
+
+-- | The underlying stm monad is also transformed.
+--
+instance MonadSTM m => MonadSTM (Strict.StateT s m) where
+    type STM (Strict.StateT s m) = Strict.StateT s (STM m)
+    atomically (Strict.StateT stm) = Strict.StateT $ \s -> atomically (stm s)
+
+    type TVar (Strict.StateT s m) = TVar m
+    newTVar        = lift .  newTVar
+    readTVar       = lift .  readTVar
+    writeTVar      = lift .: writeTVar
+    retry          = lift    retry
+    orElse (Strict.StateT a) (Strict.StateT b) = Strict.StateT $ \s -> a s `orElse` b s
+
+    modifyTVar     = lift .: modifyTVar
+    modifyTVar'    = lift .: modifyTVar'
+    stateTVar      = lift .: stateTVar
+    swapTVar       = lift .: swapTVar
+    check          = lift .  check
+
+    type TMVar (Strict.StateT s m) = TMVar m
+    newTMVar       = lift .  newTMVar
+    newEmptyTMVar  = lift    newEmptyTMVar
+    takeTMVar      = lift .  takeTMVar
+    tryTakeTMVar   = lift .  tryTakeTMVar
+    putTMVar       = lift .: putTMVar
+    tryPutTMVar    = lift .: tryPutTMVar
+    readTMVar      = lift .  readTMVar
+    tryReadTMVar   = lift .  tryReadTMVar
+    swapTMVar      = lift .: swapTMVar
+    isEmptyTMVar   = lift .  isEmptyTMVar
+
+    type TQueue (Strict.StateT s m) = TQueue m
+    newTQueue      = lift newTQueue
+    readTQueue     = lift . readTQueue
+    tryReadTQueue  = lift . tryReadTQueue
+    peekTQueue     = lift . peekTQueue
+    tryPeekTQueue  = lift . tryPeekTQueue
+    flushTQueue    = lift .  flushTQueue
+    writeTQueue v  = lift . writeTQueue v
+    isEmptyTQueue  = lift . isEmptyTQueue
+    unGetTQueue    = lift .: unGetTQueue
+
+    type TBQueue (Strict.StateT s m) = TBQueue m
+    newTBQueue     = lift .  newTBQueue
+    readTBQueue    = lift .  readTBQueue
+    tryReadTBQueue = lift .  tryReadTBQueue
+    peekTBQueue    = lift .  peekTBQueue
+    tryPeekTBQueue = lift .  tryPeekTBQueue
+    flushTBQueue   = lift .  flushTBQueue
+    writeTBQueue   = lift .: writeTBQueue
+    lengthTBQueue  = lift .  lengthTBQueue
+    isEmptyTBQueue = lift .  isEmptyTBQueue
+    isFullTBQueue  = lift .  isFullTBQueue
+    unGetTBQueue   = lift .: unGetTBQueue
+
+    type TArray (Strict.StateT s m) = TArray m
+
+    type TSem (Strict.StateT s m) = TSem m
+    newTSem        = lift .  newTSem
+    waitTSem       = lift .  waitTSem
+    signalTSem     = lift .  signalTSem
+    signalTSemN    = lift .: signalTSemN
+
+    type TChan (Strict.StateT s m) = TChan m
     newTChan          = lift    newTChan
     newBroadcastTChan = lift    newBroadcastTChan
     dupTChan          = lift .  dupTChan
@@ -384,16 +541,16 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
 
 -- | The underlying stm monad is also transformed.
 --
-instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
-    type STM (RWST r w s m) = RWST r w s (STM m)
-    atomically (RWST stm) = RWST $ \r s -> atomically (stm r s)
+instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.RWST r w s m) where
+    type STM (Lazy.RWST r w s m) = Lazy.RWST r w s (STM m)
+    atomically (Lazy.RWST stm) = Lazy.RWST $ \r s -> atomically (stm r s)
 
-    type TVar (RWST r w s m) = TVar m
+    type TVar (Lazy.RWST r w s m) = TVar m
     newTVar        = lift .  newTVar
     readTVar       = lift .  readTVar
     writeTVar      = lift .: writeTVar
     retry          = lift    retry
-    orElse (RWST a) (RWST b) = RWST $ \r s -> a r s `orElse` b r s
+    orElse (Lazy.RWST a) (Lazy.RWST b) = Lazy.RWST $ \r s -> a r s `orElse` b r s
 
     modifyTVar     = lift .: modifyTVar
     modifyTVar'    = lift .: modifyTVar'
@@ -401,7 +558,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     swapTVar       = lift .: swapTVar
     check          = lift .  check
 
-    type TMVar (RWST r w s m) = TMVar m
+    type TMVar (Lazy.RWST r w s m) = TMVar m
     newTMVar       = lift .  newTMVar
     newEmptyTMVar  = lift    newEmptyTMVar
     takeTMVar      = lift .  takeTMVar
@@ -413,7 +570,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     swapTMVar      = lift .: swapTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
-    type TQueue (RWST r w s m) = TQueue m
+    type TQueue (Lazy.RWST r w s m) = TQueue m
     newTQueue      = lift newTQueue
     readTQueue     = lift .  readTQueue
     tryReadTQueue  = lift .  tryReadTQueue
@@ -424,7 +581,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     isEmptyTQueue  = lift .  isEmptyTQueue
     unGetTQueue    = lift .: unGetTQueue
 
-    type TBQueue (RWST r w s m) = TBQueue m
+    type TBQueue (Lazy.RWST r w s m) = TBQueue m
     newTBQueue     = lift . newTBQueue
     readTBQueue    = lift . readTBQueue
     tryReadTBQueue = lift . tryReadTBQueue
@@ -437,15 +594,92 @@ instance (Monoid w, MonadSTM m) => MonadSTM (RWST r w s m) where
     isFullTBQueue  = lift . isFullTBQueue
     unGetTBQueue   = lift .: unGetTBQueue
 
-    type TArray (RWST r w s m) = TArray m
+    type TArray (Lazy.RWST r w s m) = TArray m
 
-    type TSem (RWST r w s m) = TSem m
+    type TSem (Lazy.RWST r w s m) = TSem m
     newTSem        = lift .  newTSem
     waitTSem       = lift .  waitTSem
     signalTSem     = lift .  signalTSem
     signalTSemN    = lift .: signalTSemN
 
-    type TChan (RWST r w s m) = TChan m
+    type TChan (Lazy.RWST r w s m) = TChan m
+    newTChan          = lift    newTChan
+    newBroadcastTChan = lift    newBroadcastTChan
+    dupTChan          = lift .  dupTChan
+    cloneTChan        = lift .  cloneTChan
+    readTChan         = lift .  readTChan
+    tryReadTChan      = lift .  tryReadTChan
+    peekTChan         = lift .  peekTChan
+    tryPeekTChan      = lift .  tryPeekTChan
+    writeTChan        = lift .: writeTChan
+    unGetTChan        = lift .: unGetTChan
+    isEmptyTChan      = lift .  isEmptyTChan
+
+
+-- | The underlying stm monad is also transformed.
+--
+instance (Monoid w, MonadSTM m) => MonadSTM (Strict.RWST r w s m) where
+    type STM (Strict.RWST r w s m) = Strict.RWST r w s (STM m)
+    atomically (Strict.RWST stm) = Strict.RWST $ \r s -> atomically (stm r s)
+
+    type TVar (Strict.RWST r w s m) = TVar m
+    newTVar        = lift .  newTVar
+    readTVar       = lift .  readTVar
+    writeTVar      = lift .: writeTVar
+    retry          = lift    retry
+    orElse (Strict.RWST a) (Strict.RWST b) = Strict.RWST $ \r s -> a r s `orElse` b r s
+
+    modifyTVar     = lift .: modifyTVar
+    modifyTVar'    = lift .: modifyTVar'
+    stateTVar      = lift .: stateTVar
+    swapTVar       = lift .: swapTVar
+    check          = lift .  check
+
+    type TMVar (Strict.RWST r w s m) = TMVar m
+    newTMVar       = lift .  newTMVar
+    newEmptyTMVar  = lift    newEmptyTMVar
+    takeTMVar      = lift .  takeTMVar
+    tryTakeTMVar   = lift .  tryTakeTMVar
+    putTMVar       = lift .: putTMVar
+    tryPutTMVar    = lift .: tryPutTMVar
+    readTMVar      = lift .  readTMVar
+    tryReadTMVar   = lift .  tryReadTMVar
+    swapTMVar      = lift .: swapTMVar
+    isEmptyTMVar   = lift .  isEmptyTMVar
+
+    type TQueue (Strict.RWST r w s m) = TQueue m
+    newTQueue      = lift newTQueue
+    readTQueue     = lift .  readTQueue
+    tryReadTQueue  = lift .  tryReadTQueue
+    peekTQueue     = lift .  peekTQueue
+    tryPeekTQueue  = lift .  tryPeekTQueue
+    flushTQueue    = lift .  flushTQueue
+    writeTQueue v  = lift .  writeTQueue v
+    isEmptyTQueue  = lift .  isEmptyTQueue
+    unGetTQueue    = lift .: unGetTQueue
+
+    type TBQueue (Strict.RWST r w s m) = TBQueue m
+    newTBQueue     = lift . newTBQueue
+    readTBQueue    = lift . readTBQueue
+    tryReadTBQueue = lift . tryReadTBQueue
+    peekTBQueue    = lift . peekTBQueue
+    tryPeekTBQueue = lift . tryPeekTBQueue
+    flushTBQueue   = lift . flushTBQueue
+    writeTBQueue   = lift .: writeTBQueue
+    lengthTBQueue  = lift . lengthTBQueue
+    isEmptyTBQueue = lift . isEmptyTBQueue
+    isFullTBQueue  = lift . isFullTBQueue
+    unGetTBQueue   = lift .: unGetTBQueue
+
+    type TArray (Strict.RWST r w s m) = TArray m
+
+    type TSem (Strict.RWST r w s m) = TSem m
+    newTSem        = lift .  newTSem
+    waitTSem       = lift .  waitTSem
+    signalTSem     = lift .  signalTSem
+    signalTSemN    = lift .: signalTSemN
+
+    type TChan (Strict.RWST r w s m) = TChan m
     newTChan          = lift    newTChan
     newBroadcastTChan = lift    newBroadcastTChan
     dupTChan          = lift .  dupTChan

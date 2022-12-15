@@ -3,9 +3,12 @@ module Control.Monad.Class.MonadST.Trans () where
 
 import           Control.Monad.Cont
 import           Control.Monad.Except
-import           Control.Monad.RWS
-import           Control.Monad.State
-import           Control.Monad.Writer
+import qualified Control.Monad.RWS.Lazy as Lazy
+import qualified Control.Monad.RWS.Strict as Strict
+import qualified Control.Monad.State.Lazy as Lazy
+import qualified Control.Monad.State.Strict as Strict
+import qualified Control.Monad.Writer.Lazy as Lazy
+import qualified Control.Monad.Writer.Strict as Strict
 
 import           Control.Monad.Class.MonadST
 
@@ -16,11 +19,20 @@ instance MonadST m => MonadST (ContT r m) where
 instance MonadST m => MonadST (ExceptT e m) where
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
-instance (Monoid w, MonadST m) => MonadST (RWST r w s m) where
+instance (Monoid w, MonadST m) => MonadST (Lazy.RWST r w s m) where
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
-instance MonadST m => MonadST (StateT s m) where
+instance (Monoid w, MonadST m) => MonadST (Strict.RWST r w s m) where
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
-instance (Monoid w, MonadST m) => MonadST (WriterT w m) where
+instance MonadST m => MonadST (Lazy.StateT s m) where
+  withLiftST f = withLiftST $ \g -> f (lift . g)
+
+instance MonadST m => MonadST (Strict.StateT s m) where
+  withLiftST f = withLiftST $ \g -> f (lift . g)
+
+instance (Monoid w, MonadST m) => MonadST (Lazy.WriterT w m) where
+   withLiftST f = withLiftST $ \g -> f (lift . g) 
+
+instance (Monoid w, MonadST m) => MonadST (Strict.WriterT w m) where
   withLiftST f = withLiftST $ \g -> f (lift . g)
