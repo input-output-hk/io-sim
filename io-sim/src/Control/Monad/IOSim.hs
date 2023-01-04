@@ -72,7 +72,6 @@ module Control.Monad.IOSim
   , EventlogEvent (..)
   , EventlogMarker (..)
     -- * Low-level API
-  , execReadTVar
   , newTimeout
   , readTimeout
   , cancelTimeout
