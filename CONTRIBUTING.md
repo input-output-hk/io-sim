@@ -1,8 +1,7 @@
 # Building
 
 The project is build with `cabal-install`.  You might need to run `cabal
-update` after cloning the repository (to update [`Cardano Haskell
-Packages`][CHaP] (`ChaP`) index).
+update` after cloning the repository.
 
 # Design Principles
 
@@ -12,14 +11,9 @@ the core packages, see
 [example](https://github.com/input-output-hk/io-sim/blob/main/io-classes/src/Control/Monad/Class/MonadSTM.hs?plain=1#L410-L446).
 Please keep this in mind when adding new functionality.
 
-# Using in your project
+# Roles and Responsibilities
 
-Currently the package is published to [`CHaP`][CHaP].  In future it will be
-published to `Hackage`.  If you want to pull it from [`CHaP`][CHaP], this is
-relatively easy to setup; for example, checkout the
-[`cabal.project`](https://github.com/input-output-hk/typed-protocols/blob/master/cabal.project)
-file.  Alternatively, you can relay on `source-repository-package` stanza in
-a `cabal.project` file.
+Maintainers of each package are listed in the corresponding `*.cabal` file.
 
 # Testing
 
@@ -67,7 +61,8 @@ Please follow local style.  For a more detailed style guide see
 
 Each commit shall be small and preferably address one thing at a time.  Well
 organised & documented commits make it much easier for the maintainers to
-review them.
+review them.  Hacking sessions are great, but please take your time to organise
+your work, this usually improves the quality too!
 
 New features should be well documented & tested, which means including new
 tests as necessary.  You might be asked by the maintainers to write & include
@@ -76,7 +71,7 @@ additional tests.
 Each commit should build & test, at least the package you are changing.  You
 can update other packages from this repository in a subsequent commit.
 
-Please use a draft PRs if the work is still in progress.
+Please use a draft PR if the work is still in progress.
 
 We require all commits to be signed, see [this guide][gh-signing-commits].
 
@@ -85,21 +80,35 @@ issue, see [GitHub documentation][gh-link-issue].
 
 Please include your changes in `CHANGELOG.md` files (per package).
 
+We prefer to avoid merging commits, rebasing a well organised PR is usually
+quite simple.
+
+## Code Style
+
+Please follow local style.  For a more detailed style guide see
+[link](https://github.com/input-output-hk/ouroboros-network/blob/master/docs/StyleGuide.md).
+
 ## MonadSTM features
 
 If you are adding a new functionality to `MonadSTM`, don't forget to support it
 in `strict-stm` package.
 
+## CI
+
+We run CI using [GitHub actions][ci].
+
 # Releases
 
-The major version of `io-sim`, `io-classes` and `strict-stm` packages are kept
-in sync.  This means that if any of the packages introduces a breaking change
-all major version SHOULD be bumped.  The minor versions are kept independent.
+The major version of `io-sim`, `io-classes`, `strict-stm` and `si-timers`
+packages are kept in sync.  This means that if any of the packages introduces
+a breaking change all major version SHOULD be bumped.  The minor versions are
+kept independent.  The `io-classes-mtl` is still experimental and thus it's not
+following that principle.
 
 The drawback is that if you declare `io-classes ^>= 0.x` then you will need to
 bump it when new version of `io-sim` is published (even if there are no changes
 in `io-classes`).  The con is that you just need to declare version of
-`io-classes` to have a consistent ecosystem of the three packages.
+`io-classes` to have a consistent ecosystem of the four packages.
 
 # Tips
 
@@ -128,5 +137,4 @@ more lazy than `IO` monad.  Thus if you want to use `Debug.Trace.traceM` inside
 [CHaP]: https://github.com/input-output-hk/cardano-haskell-packages/
 [gh-link-issue]: https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue
 [gh-signing-commits]: https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits
-
-
+[ci]: https://github.com/input-output-hk/io-sim/actions
