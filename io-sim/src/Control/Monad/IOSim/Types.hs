@@ -141,7 +141,7 @@ runIOSim (IOSim k) = k Return
 
 -- | 'IOSim' has the ability to story any 'Typeable' value in its trace which
 -- can then be recovered with `selectTraceEventsDynamic` or
--- `selectTraceVentsDynamic'`.
+-- `selectTraceEventsDynamic'`.
 --
 traceM :: Typeable a => a -> IOSim s ()
 traceM x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())

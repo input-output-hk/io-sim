@@ -1,4 +1,4 @@
--- | This module corresponds to `Control.Concurrent.STM` in "stm" package
+-- | This module corresponds to "Control.Concurrent.STM" in "stm" package
 --
 module Control.Concurrent.Class.MonadSTM
   (module STM)

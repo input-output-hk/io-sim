@@ -40,7 +40,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar
   ) where
 
 import qualified Control.Concurrent.Class.MonadSTM.TVar as Lazy
-import           Control.Monad.Class.MonadSTM
+import           Control.Monad.Class.MonadSTM hiding (traceTVar, traceTVarIO)
 
 import           GHC.Stack
 

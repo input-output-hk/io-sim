@@ -4,7 +4,11 @@ module Control.Concurrent.Class.MonadSTM.Strict
   (module STM)
   where
 
-import           Control.Monad.Class.MonadSTM                     as STM
+import           Control.Monad.Class.MonadSTM                     as STM hiding ( traceTVar, traceTVarIO,
+                                                                                  traceTMVar, traceTMVarIO,
+                                                                                  traceTQueue, traceTQueueIO,
+                                                                                  traceTBQueue, traceTBQueueIO
+                                                                                )
 import           Control.Concurrent.Class.MonadSTM.Strict.TVar    as STM
 import           Control.Concurrent.Class.MonadSTM.Strict.TMVar   as STM
 import           Control.Concurrent.Class.MonadSTM.Strict.TChan   as STM
