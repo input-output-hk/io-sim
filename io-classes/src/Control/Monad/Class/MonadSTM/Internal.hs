@@ -76,18 +76,27 @@ import           GHC.Stack
 import           Numeric.Natural (Natural)
 
 
--- The STM primitives
+-- | The STM primitives parametrised by a monad `m`.
+--
 class (Monad m, Monad (STM m)) => MonadSTM m where
-  -- STM transactions
+  -- | The STM monad.
   type STM  m = (stm :: Type -> Type)  | stm -> m
+  -- | Atomically run an STM computation.
+  --
+  -- See `STM.atomically`.
   atomically :: HasCallStack => STM m a -> m a
 
+  -- | A type of a 'TVar'.
+  --
+  -- See `STM.TVar'.
   type TVar m  :: Type -> Type
 
   newTVar      :: a -> STM m (TVar m a)
   readTVar     :: TVar m a -> STM m a
   writeTVar    :: TVar m a -> a -> STM m ()
+  -- | See `STM.retry`.
   retry        :: STM m a
+  -- | See `STM.orElse`.
   orElse       :: STM m a -> STM m a -> STM m a
 
   modifyTVar   :: TVar m a -> (a -> a) -> STM m ()
@@ -103,6 +112,7 @@ class (Monad m, Monad (STM m)) => MonadSTM m where
   swapTVar     :: TVar m a -> a -> STM m a
   swapTVar     = swapTVarDefault
 
+  -- | See `STM.check`.
   check        :: Bool -> STM m ()
   check True = return ()
   check _    = retry
@@ -384,10 +394,15 @@ swapTVarDefault var new = do
     return old
 
 
--- | Labelled 'TVar's, 'TMVar's, 'TQueue's and 'TBQueue's.
+-- | Labelled `TVar`s & friends.
+--
+-- The `IO` instances is no-op, the `IOSim` instance enhances simulation trace.
+-- This is very useful when analysing low lever concurrency issues (e.g.
+-- deadlocks, livelocks etc).
 --
 class MonadSTM m
    => MonadLabelledSTM m where
+  -- | Name a `TVar`.
   labelTVar    :: TVar    m a   -> String -> STM m ()
   labelTMVar   :: TMVar   m a   -> String -> STM m ()
   labelTQueue  :: TQueue  m a   -> String -> STM m ()
@@ -460,15 +475,21 @@ class MonadSTM m
   labelTChanIO = \v l -> atomically (labelTChan v l)
 
 
--- | This type class is indented for 'io-sim', where one might want to access
--- 'TVar' in the underlying 'ST' monad.
+-- | This type class is indented for
+-- ['io-sim'](https://hackage.haskell.org/package/io-sim), where one might want
+-- to access a 'TVar' in the underlying 'ST' monad.
 --
 class ( MonadSTM m
       , Monad (InspectMonad m)
       )
     => MonadInspectSTM m where
     type InspectMonad m :: Type -> Type
+    -- | Return the value of a `TVar` as an `InspectMonad` computation.
+    --
+    -- `inspectTVar` is useful if the value of a `TVar` observed by `traceTVar`
+    -- contains other `TVar`s.
     inspectTVar  :: proxy m -> TVar  m a -> InspectMonad m a
+    -- | Return the value of a `TMVar` as an `InspectMonad` computation.
     inspectTMVar :: proxy m -> TMVar m a -> InspectMonad m (Maybe a)
     -- TODO: inspectTQueue, inspectTBQueue
 
@@ -480,8 +501,10 @@ instance MonadInspectSTM IO where
 
 
 -- | A GADT which instructs how to trace the value.  The 'traceDynamic' will
--- use dynamic tracing, e.g. 'Control.Monad.IOSim.traceM'; while 'traceString'
--- will be traced with 'EventSay'.
+-- use dynamic tracing, e.g. "Control.Monad.IOSim.traceM"; while 'traceString'
+-- will be traced with 'EventSay'.  The `IOSim`s dynamic tracing allows to
+-- recover the value from the simulation trace (see
+-- "Control.Monad.IOSim.selectTraceEventsDynamic").
 --
 data TraceValue where
     TraceValue :: forall tr. Typeable tr
@@ -491,7 +514,7 @@ data TraceValue where
                -> TraceValue
 
 
--- | Use only dynamic tracer.
+-- | Use only a dynamic tracer.
 --
 pattern TraceDynamic :: () => forall tr. Typeable tr => tr -> TraceValue
 pattern TraceDynamic tr <- TraceValue { traceDynamic = Just tr }
@@ -520,14 +543,23 @@ pattern DontTrace <- TraceValue Nothing Nothing
 --
 class MonadInspectSTM m
    => MonadTraceSTM m where
-  -- | Construct a trace out of previous & new value of a 'TVar'.  The callback
-  -- is called whenever an stm transaction which modifies the 'TVar' is
-  -- committed.
-  --
-  -- This is supported by 'IOSim' and 'IOSimPOR'; 'IO' has a trivial instance.
-  --
   {-# MINIMAL traceTVar, traceTQueue, traceTBQueue #-}
 
+  -- | Construct a trace output out of previous & new value of a 'TVar'.  The
+  -- callback is called whenever an stm transaction which modifies the 'TVar' is
+  -- committed.
+  --
+  -- This is supported by 'IOSim' (and 'IOSimPOR'); 'IO' has a trivial instance.
+  --
+  -- The simplest example is:
+  -- 
+  -- >
+  -- > traceTVar (Proxy @m) tvar (\_ -> TraceString . show)
+  -- >
+  --
+  -- Note that the interpretation of `TraceValue` depends on the monad `m`
+  -- itself (see 'TraceValue').
+  --
   traceTVar    :: proxy m
                -> TVar m a
                -> (Maybe a -> a -> InspectMonad m TraceValue)

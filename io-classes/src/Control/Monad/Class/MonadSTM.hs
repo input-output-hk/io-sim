@@ -1,4 +1,4 @@
--- | This module corresponds to `Control.Monad.STM` in "stm" package
+-- | This module corresponds to "Control.Monad.STM" in "stm" package
 --
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DerivingStrategies         #-}
@@ -14,10 +14,20 @@ module Control.Monad.Class.MonadSTM
   ( MonadSTM (STM, atomically, retry, orElse, check)
   , throwSTM
     -- * non standard extensions
+    --
+    -- $non-standard-extensions
   , MonadLabelledSTM
-  , MonadTraceSTM
-  , MonadInspectSTM (..)
+  , MonadTraceSTM (..)
   , TraceValue (..)
+  , MonadInspectSTM (..)
   ) where
 
 import           Control.Monad.Class.MonadSTM.Internal
+
+-- $non-standard-extensions
+--
+-- The non standard extensions include `MonadLabelledSTM` and `MonadTraceSTM` /
+-- `MonadInspectSTM`.  For `IO` these are all no-op, however they greatly
+-- enhance [`IOSim`](https://hackage.haskell.org/package/io-sim) capabilities.
+-- They are not only useful for debugging concurrency issues, but also to write
+-- testable properties.

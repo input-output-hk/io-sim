@@ -34,7 +34,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TQueue
 
 
 import qualified Control.Concurrent.Class.MonadSTM.TQueue as Lazy
-import           Control.Monad.Class.MonadSTM
+import           Control.Monad.Class.MonadSTM hiding (traceTQueue, traceTQueueIO)
 
 
 type LazyTQueue  m = Lazy.TQueue m
