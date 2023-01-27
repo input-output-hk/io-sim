@@ -19,7 +19,7 @@
 --
 -- <https://research.microsoft.com/en-us/um/people/simonpj/papers/stm/stm.pdf>
 --
-module Test.STM where
+module Test.Control.Monad.STM where
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map

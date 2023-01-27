@@ -10,9 +10,9 @@ module Control.Monad.IOSim.InternalTypes
   , IsLocked (..)
   ) where
 
-import           Data.STRef.Lazy (STRef)
 import           Control.Exception (Exception)
 import           Control.Monad.Class.MonadThrow (MaskingState (..))
+import           Data.STRef.Lazy (STRef)
 
 import           Control.Monad.IOSim.Types (SimA, ThreadId, TimeoutId)
 
