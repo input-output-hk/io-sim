@@ -488,6 +488,17 @@ instance MonadSTM (IOSim s) where
   retry             = STM $ oneShot $ \_ -> Retry
   orElse        a b = STM $ oneShot $ \k -> OrElse (runSTM a) (runSTM b) k
 
+  newTMVar          = MonadSTM.newTMVarDefault
+  newEmptyTMVar     = MonadSTM.newEmptyTMVarDefault
+  takeTMVar         = MonadSTM.takeTMVarDefault
+  tryTakeTMVar      = MonadSTM.tryTakeTMVarDefault
+  putTMVar          = MonadSTM.putTMVarDefault
+  tryPutTMVar       = MonadSTM.tryPutTMVarDefault
+  readTMVar         = MonadSTM.readTMVarDefault
+  tryReadTMVar      = MonadSTM.tryReadTMVarDefault
+  swapTMVar         = MonadSTM.swapTMVarDefault
+  isEmptyTMVar      = MonadSTM.isEmptyTMVarDefault
+
   newTQueue         = newTQueueDefault
   readTQueue        = readTQueueDefault
   tryReadTQueue     = tryReadTQueueDefault
@@ -509,6 +520,23 @@ instance MonadSTM (IOSim s) where
   isEmptyTBQueue    = isEmptyTBQueueDefault
   isFullTBQueue     = isFullTBQueueDefault
   unGetTBQueue      = unGetTBQueueDefault
+
+  newTSem           = MonadSTM.newTSemDefault
+  waitTSem          = MonadSTM.waitTSemDefault
+  signalTSem        = MonadSTM.signalTSemDefault
+  signalTSemN       = MonadSTM.signalTSemNDefault
+
+  newTChan          = MonadSTM.newTChanDefault
+  newBroadcastTChan = MonadSTM.newBroadcastTChanDefault
+  writeTChan        = MonadSTM.writeTChanDefault
+  readTChan         = MonadSTM.readTChanDefault
+  tryReadTChan      = MonadSTM.tryReadTChanDefault
+  peekTChan         = MonadSTM.peekTChanDefault
+  tryPeekTChan      = MonadSTM.tryPeekTChanDefault
+  dupTChan          = MonadSTM.dupTChanDefault
+  unGetTChan        = MonadSTM.unGetTChanDefault
+  isEmptyTChan      = MonadSTM.isEmptyTChanDefault
+  cloneTChan        = MonadSTM.cloneTChanDefault
 
 instance MonadInspectSTM (IOSim s) where
   type InspectMonad (IOSim s) = ST s

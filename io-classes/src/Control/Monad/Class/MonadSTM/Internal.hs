@@ -28,22 +28,82 @@ module Control.Monad.Class.MonadSTM.Internal
   , MonadInspectSTM (..)
   , TraceValue (TraceValue, TraceDynamic, TraceString, DontTrace, traceDynamic, traceString)
   , MonadTraceSTM (..)
-    -- * Default 'TMVar' implementation
-  , TMVarDefault (..)
-    -- * Default 'TBQueue' implementation
-  , TQueueDefault (..)
-    -- * Default 'TBQueue' implementation
-  , TBQueueDefault (..)
-    -- * Default 'TArray' implementation
-  , TArrayDefault (..)
-    -- * Default 'TSem' implementation
-  , TSemDefault (..)
-    -- * Default 'TChan' implementation
-  , TChanDefault (..)
     -- * MonadThrow aliases
   , throwSTM
   , catchSTM
+    -- * Default implementations
+    -- $default-implementations
+    --
+    -- ** Default 'TMVar' implementation
+  , TMVarDefault (..)
+  , newTMVarDefault
+  , newEmptyTMVarDefault
+  , takeTMVarDefault
+  , tryTakeTMVarDefault
+  , putTMVarDefault
+  , tryPutTMVarDefault
+  , readTMVarDefault
+  , tryReadTMVarDefault
+  , swapTMVarDefault
+  , isEmptyTMVarDefault
+  , labelTMVarDefault
+  , traceTMVarDefault
+    -- ** Default 'TBQueue' implementation
+  , TQueueDefault (..)
+  , newTQueueDefault
+  , writeTQueueDefault
+  , readTQueueDefault
+  , tryReadTQueueDefault
+  , isEmptyTQueueDefault
+  , peekTQueueDefault
+  , tryPeekTQueueDefault
+  , flushTQueueDefault
+  , unGetTQueueDefault
+  , labelTQueueDefault
+    -- ** Default 'TBQueue' implementation
+  , TBQueueDefault (..)
+  , newTBQueueDefault
+  , writeTBQueueDefault
+  , readTBQueueDefault
+  , tryReadTBQueueDefault
+  , peekTBQueueDefault
+  , tryPeekTBQueueDefault
+  , isEmptyTBQueueDefault
+  , isFullTBQueueDefault
+  , lengthTBQueueDefault
+  , flushTBQueueDefault
+  , unGetTBQueueDefault
+  , labelTBQueueDefault
+    -- ** Default 'TArray' implementation
+  , TArrayDefault (..)
+    -- ** Default 'TSem' implementation
+  , TSemDefault (..)
+  , newTSemDefault
+  , waitTSemDefault
+  , signalTSemDefault
+  , signalTSemNDefault
+  , labelTSemDefault
+    -- ** Default 'TChan' implementation
+  , TChanDefault (..)
+  , newTChanDefault
+  , newBroadcastTChanDefault
+  , writeTChanDefault
+  , readTChanDefault
+  , tryReadTChanDefault
+  , peekTChanDefault
+  , tryPeekTChanDefault
+  , dupTChanDefault
+  , unGetTChanDefault
+  , isEmptyTChanDefault
+  , cloneTChanDefault
+  , labelTChanDefault
   ) where
+
+-- $default-implementations
+--
+-- The default implementations are based on a `TVar` defined in the class.  They
+-- are tailored towards `IOSim` rather than instances which would like to derive
+-- from `IO` or monad transformers.
 
 import           Prelude hiding (read)
 
@@ -192,14 +252,6 @@ class (Monad m, Monad (STM m)) => MonadSTM m where
   -- default implementations
   --
 
-  default newTMVar :: TMVar m ~ TMVarDefault m
-                   => a -> STM m (TMVar m a)
-  newTMVar = newTMVarDefault
-
-  default newEmptyTMVar :: TMVar m ~ TMVarDefault m
-                        => STM m (TMVar m a)
-  newEmptyTMVar = newEmptyTMVarDefault
-
   newTVarIO           = atomically . newTVar
   readTVarIO          = atomically . readTVar
   newTMVarIO          = atomically . newTMVar
@@ -209,175 +261,6 @@ class (Monad m, Monad (STM m)) => MonadSTM m where
   newTChanIO          = atomically   newTChan
   newBroadcastTChanIO = atomically   newBroadcastTChan
 
-  default takeTMVar :: TMVar m ~ TMVarDefault m
-                    => TMVar m a -> STM m a
-  takeTMVar = takeTMVarDefault
-
-  default tryTakeTMVar :: TMVar m ~ TMVarDefault m
-                       => TMVar m a -> STM m (Maybe a)
-  tryTakeTMVar = tryTakeTMVarDefault
-
-  default putTMVar :: TMVar m ~ TMVarDefault m => TMVar m a -> a -> STM m ()
-  putTMVar = putTMVarDefault
-
-  default tryPutTMVar :: TMVar m ~ TMVarDefault m => TMVar m a -> a -> STM m Bool
-  tryPutTMVar = tryPutTMVarDefault
-
-  default readTMVar :: TMVar m ~ TMVarDefault m
-                    => TMVar m a -> STM m a
-  readTMVar = readTMVarDefault
-
-  default tryReadTMVar :: TMVar m ~ TMVarDefault m
-                    => TMVar m a -> STM m (Maybe a)
-  tryReadTMVar = tryReadTMVarDefault
-
-  default swapTMVar :: TMVar m ~ TMVarDefault m
-                    => TMVar m a -> a -> STM m a
-  swapTMVar = swapTMVarDefault
-
-  default isEmptyTMVar :: TMVar m ~ TMVarDefault m
-                       => TMVar m a -> STM m Bool
-  isEmptyTMVar = isEmptyTMVarDefault
-
-  default newTQueue :: TQueue m ~ TQueueDefault m
-                    => STM m (TQueue m a)
-  newTQueue = newTQueueDefault
-
-  default writeTQueue :: TQueue m ~ TQueueDefault m
-                      => TQueue m a -> a -> STM m ()
-  writeTQueue = writeTQueueDefault
-
-  default readTQueue :: TQueue m ~ TQueueDefault m
-                     => TQueue m a -> STM m a
-  readTQueue = readTQueueDefault
-
-  default tryReadTQueue :: TQueue m ~ TQueueDefault m
-                         => TQueue m a -> STM m (Maybe a)
-  tryReadTQueue = tryReadTQueueDefault
-
-  default isEmptyTQueue :: TQueue m ~ TQueueDefault m
-                        => TQueue m a -> STM m Bool
-  isEmptyTQueue = isEmptyTQueueDefault
-
-  default unGetTQueue :: TQueue m ~ TQueueDefault m
-                      => TQueue m a -> a -> STM m ()
-  unGetTQueue = unGetTQueueDefault
-
-  default peekTQueue :: TQueue m ~ TQueueDefault m
-                     => TQueue m a -> STM m a
-  peekTQueue = peekTQueueDefault
-
-  default tryPeekTQueue :: TQueue m ~ TQueueDefault m
-                        => TQueue m a -> STM m (Maybe a)
-  tryPeekTQueue = tryPeekTQueueDefault
-
-  default flushTQueue :: TQueue m ~ TQueueDefault m
-                      => TQueue m a -> STM m [a]
-  flushTQueue = flushTQueueDefault
-
-  default newTBQueue :: TBQueue m ~ TBQueueDefault m
-                     => Natural -> STM m (TBQueue m a)
-  newTBQueue = newTBQueueDefault
-
-  default writeTBQueue :: TBQueue m ~ TBQueueDefault m
-                       => TBQueue m a -> a -> STM m ()
-  writeTBQueue = writeTBQueueDefault
-
-  default readTBQueue :: TBQueue m ~ TBQueueDefault m
-                      => TBQueue m a -> STM m a
-  readTBQueue = readTBQueueDefault
-
-  default tryReadTBQueue :: TBQueue m ~ TBQueueDefault m
-                          => TBQueue m a -> STM m (Maybe a)
-  tryReadTBQueue = tryReadTBQueueDefault
-
-  default isEmptyTBQueue :: TBQueue m ~ TBQueueDefault m
-                         => TBQueue m a -> STM m Bool
-  isEmptyTBQueue = isEmptyTBQueueDefault
-
-  default peekTBQueue :: TBQueue m ~ TBQueueDefault m
-                      => TBQueue m a -> STM m a
-  peekTBQueue = peekTBQueueDefault
-
-  default tryPeekTBQueue :: TBQueue m ~ TBQueueDefault m
-                         => TBQueue m a -> STM m (Maybe a)
-  tryPeekTBQueue = tryPeekTBQueueDefault
-
-  default isFullTBQueue :: TBQueue m ~ TBQueueDefault m
-                        => TBQueue m a -> STM m Bool
-  isFullTBQueue = isFullTBQueueDefault
-
-  default lengthTBQueue :: TBQueue m ~ TBQueueDefault m
-                        => TBQueue m a -> STM m Natural
-  lengthTBQueue = lengthTBQueueDefault
-
-  default flushTBQueue :: TBQueue m ~ TBQueueDefault m
-                       => TBQueue m a -> STM m [a]
-  flushTBQueue = flushTBQueueDefault
-
-  default unGetTBQueue :: TBQueue m ~ TBQueueDefault m
-                      => TBQueue m a -> a -> STM m ()
-  unGetTBQueue = unGetTBQueueDefault
-
-  default newTSem :: TSem m ~ TSemDefault m
-                  => Integer -> STM m (TSem m)
-  newTSem = newTSemDefault
-
-  default waitTSem :: TSem m ~ TSemDefault m
-                   => TSem m -> STM m ()
-  waitTSem = waitTSemDefault
-
-  default signalTSem :: TSem m ~ TSemDefault m
-                     => TSem m -> STM m ()
-  signalTSem = signalTSemDefault
-
-  default signalTSemN :: TSem m ~ TSemDefault m
-                      => Natural -> TSem m -> STM m ()
-  signalTSemN = signalTSemNDefault
-
-  default newTChan :: TChan m ~ TChanDefault m
-                   => STM m (TChan m a)
-  newTChan = newTChanDefault
-
-  default newBroadcastTChan :: TChan m ~ TChanDefault m
-                            => STM m (TChan m a)
-  newBroadcastTChan = newBroadcastTChanDefault
-
-  default writeTChan :: TChan m ~ TChanDefault m
-                     => TChan m a -> a -> STM m ()
-  writeTChan = writeTChanDefault
-
-  default readTChan :: TChan m ~ TChanDefault m
-                     => TChan m a -> STM m a
-  readTChan = readTChanDefault
-
-  default tryReadTChan :: TChan m ~ TChanDefault m
-                       => TChan m a -> STM m (Maybe a)
-  tryReadTChan = tryReadTChanDefault
-
-  default peekTChan :: TChan m ~ TChanDefault m
-                     => TChan m a -> STM m a
-  peekTChan = peekTChanDefault
-
-  default tryPeekTChan :: TChan m ~ TChanDefault m
-                       => TChan m a -> STM m (Maybe a)
-  tryPeekTChan = tryPeekTChanDefault
-
-  default dupTChan :: TChan m ~ TChanDefault m
-                   => TChan m a -> STM m (TChan m a)
-  dupTChan = dupTChanDefault
-
-  default unGetTChan :: TChan m ~ TChanDefault m
-                     => TChan m a -> a -> STM m ()
-  unGetTChan = unGetTChanDefault
-
-  default isEmptyTChan :: TChan m ~ TChanDefault m
-                        => TChan m a -> STM m Bool
-  isEmptyTChan = isEmptyTChanDefault
-
-  default cloneTChan :: TChan m ~ TChanDefault m
-                     => TChan m a -> STM m (TChan m a)
-  cloneTChan = cloneTChanDefault
 
 
 stateTVarDefault :: MonadSTM m => TVar m s -> (s -> (a, s)) -> STM m a
