@@ -1,14 +1,14 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTSyntax                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE BangPatterns              #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DerivingVia               #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTSyntax                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE NamedFieldPuns            #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 {-# OPTIONS_GHC -Wno-orphans            #-}
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
@@ -49,9 +49,7 @@ module Control.Monad.IOSim.Internal
 import           Prelude hiding (read)
 
 import           Data.Dynamic
-import           Data.Foldable (toList, traverse_, foldlM)
-import           Deque.Strict (Deque)
-import qualified Deque.Strict as Deque
+import           Data.Foldable (foldlM, toList, traverse_)
 import qualified Data.List as List
 import qualified Data.List.Trace as Trace
 import           Data.Map.Strict (Map)
@@ -62,12 +60,14 @@ import qualified Data.OrdPSQ as PSQ
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
+import           Deque.Strict (Deque)
+import qualified Deque.Strict as Deque
 
 import           GHC.Exts (fromList)
 import           GHC.Conc (ThreadStatus(..), BlockReason(..))
 
-import           Control.Exception
-                   (NonTermination (..), assert, throw, AsyncException (..))
+import           Control.Exception (AsyncException (..), NonTermination (..),
+                     assert, throw)
 import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
