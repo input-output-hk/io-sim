@@ -676,7 +676,9 @@ type SimTrace a = Trace.Trace (SimResult a) SimEvent
 
 -- | Pretty print simulation trace.
 --
-ppTrace :: Show a => SimTrace a -> String
+-- The type signature is slightly more general than `SimTrace a -> String`.
+--
+ppTrace :: Show a => Trace.Trace a SimEvent -> String
 ppTrace tr = Trace.ppTrace
                show
                (ppSimEvent timeWidth tidWith labelWidth)
@@ -704,7 +706,7 @@ ppTrace tr = Trace.ppTrace
 
 -- | Like 'ppTrace' but does not show the result value.
 --
-ppTrace_ :: SimTrace a -> String
+ppTrace_ :: Trace.Trace a SimEvent -> String
 ppTrace_ tr = Trace.ppTrace
                 (const "")
                 (ppSimEvent timeWidth tidWith labelWidth)
