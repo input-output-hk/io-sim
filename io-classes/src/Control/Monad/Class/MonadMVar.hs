@@ -347,9 +347,8 @@ isEmptyMVarDefault (MVar tv) =
     atomically $ do
       s <- readTVar tv
       case s of
-        MVarFull {} -> return False
-        MVarEmpty blockedq | null blockedq -> return True
-                           | otherwise -> error "isEmptyMVarDefault: invariant violation"
+        MVarFull  {} -> return False
+        MVarEmpty {} -> return True
 
 
 --
