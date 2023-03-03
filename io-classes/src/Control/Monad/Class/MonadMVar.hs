@@ -221,9 +221,12 @@ putMVarDefault (MVar tv) x = mask_ $ do
                 -- a space leak.
                 let blockedq' = Deque.filter ((/= wakevar) . snd) blockedq
                 writeTVar tv (MVarFull x' blockedq')
-              -- the exception was thrown when we were blocked on 'waketvar', so
-              -- the 'MVar' must not be empty.
-              MVarEmpty {} -> error "putMVarDefault: invariant violation"
+
+              -- This case is unlikely but possible if another thread ran
+              -- first and modified the mvar. This situation is fine as far as
+              -- space leaks are concerned because it means our wait var is no
+              -- longer in the wait queue.
+              MVarEmpty {} -> return ()
           throwIO e
 
       -- we managed to do the put synchronously
@@ -274,9 +277,12 @@ takeMVarDefault (MVar tv) = mask_ $ do
                 -- will have a space leak.
                 let blockedq' = Deque.filter (/= wakevar) blockedq
                 writeTVar tv (MVarEmpty blockedq')
-              -- the exception was thrown while we were blocked on 'wakevar', so
-              -- the 'MVar' must not be full.
-              MVarFull {} -> error "takeMVarDefault: invariant violation"
+
+              -- This case is unlikely but possible if another thread ran
+              -- first and modified the mvar. This situation is fine as far as
+              -- space leaks are concerned because it means our wait var is no
+              -- longer in the wait queue.
+              MVarFull {} -> return ()
           throwIO e
 
       -- we managed to do the take synchronously
