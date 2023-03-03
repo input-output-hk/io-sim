@@ -251,7 +251,8 @@ takeMVarDefault (MVar tv) = mask_ $ do
         -- unblocking them.
         MVarFull x blockedq ->
           case Deque.uncons blockedq of
-            Nothing ->
+            Nothing -> do
+              writeTVar tv (MVarEmpty mempty)
               return (Right x)
 
             Just ((x', wakevar), blockedq') -> do
@@ -330,7 +331,9 @@ tryTakeMVarDefault (MVar tv) = do
         MVarEmpty _ -> return Nothing
         MVarFull x blockedq ->
           case Deque.uncons blockedq of
-            Nothing -> return (Just x)
+            Nothing -> do
+              writeTVar tv (MVarEmpty mempty)
+              return (Just x)
 
             Just ((x', wakevar), blockedq') -> do
               writeTVar wakevar True
