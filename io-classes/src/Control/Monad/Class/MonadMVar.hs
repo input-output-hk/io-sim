@@ -33,7 +33,7 @@ import qualified Deque.Strict as Deque
 class Monad m => MonadMVar m where
   {-# MINIMAL newEmptyMVar, takeMVar, putMVar, tryTakeMVar, tryPutMVar, isEmptyMVar #-}
 
-  type MVar m = (mvar :: Type -> Type) | mvar -> m
+  type MVar m :: Type -> Type
 
   newEmptyMVar      :: m (MVar m a)
   takeMVar          :: MVar m a -> m a
