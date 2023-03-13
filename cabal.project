@@ -16,12 +16,16 @@ index-state:
 
 packages: ./io-sim
           ./io-classes
+          ./strict-mvar
           ./strict-stm
 
 package io-sim
   flags: +asserts
 
 package io-classes
+  flags: +asserts
+
+package strict-mvar
   flags: +asserts
 
 package strict-stm
