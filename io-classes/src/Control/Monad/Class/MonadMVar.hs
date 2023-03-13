@@ -149,10 +149,6 @@ instance MonadMVar IO where
     modifyMVarMasked  = IO.modifyMVarMasked
 
 
-data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- ^ blocked on take
-                                 !(Deque (TVar m (Maybe a))) -- ^ blocked on read
-                   | MVarFull  a !(Deque (a, TVar m Bool))   -- ^ blocked on put
-
 -- | A default 'MVar' implementation based on `TVar`'s.  An 'MVar' provides
 -- fairness guarantees.
 --
@@ -169,6 +165,10 @@ data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- ^ blocked on tak
 -- turns.
 --
 newtype MVarDefault m a = MVar (TVar m (MVarState m a))
+
+data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- ^ blocked on take
+                                 !(Deque (TVar m (Maybe a))) -- ^ blocked on read
+                   | MVarFull  a !(Deque (a, TVar m Bool))   -- ^ blocked on put
 
 
 newEmptyMVarDefault :: MonadSTM m => m (MVarDefault m a)
