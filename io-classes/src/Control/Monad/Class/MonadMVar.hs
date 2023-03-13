@@ -150,6 +150,7 @@ instance MonadMVar IO where
 
 
 data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- ^ blocked on take
+                                 !(Deque (TVar m (Maybe a))) -- ^ blocked on read
                    | MVarFull  a !(Deque (a, TVar m Bool))   -- ^ blocked on put
 
 -- | A default 'MVar' implementation based on `TVar`'s.  An 'MVar' provides
@@ -171,7 +172,7 @@ newtype MVarDefault m a = MVar (TVar m (MVarState m a))
 
 
 newEmptyMVarDefault :: MonadSTM m => m (MVarDefault m a)
-newEmptyMVarDefault = MVar <$> newTVarIO (MVarEmpty mempty)
+newEmptyMVarDefault = MVar <$> newTVarIO (MVarEmpty mempty mempty)
 
 
 newMVarDefault :: MonadSTM m => a -> m (MVarDefault m a)
@@ -196,16 +197,19 @@ putMVarDefault (MVar tv) x = mask_ $ do
 
         -- if it's empty we fill in the value, and also complete the action of
         -- the next thread blocked in takeMVar
-        MVarEmpty takeq ->
+        MVarEmpty takeq readq -> do
+
+          mapM_ (\readvar -> writeTVar readvar (Just x)) readq
+
           case Deque.uncons takeq of
-            Nothing -> do
+            Nothing ->
               writeTVar tv (MVarFull x mempty)
-              return Nothing
 
             Just (takevar, takeq') -> do
               writeTVar takevar (Just x)
-              writeTVar tv (MVarEmpty takeq')
-              return Nothing
+              writeTVar tv (MVarEmpty takeq' mempty)
+
+          return Nothing
 
     case res of
       -- we have to block on our own putvar until we can complete the put
@@ -241,16 +245,19 @@ tryPutMVarDefault (MVar tv) x =
       case s of
         MVarFull {} -> return False
 
-        MVarEmpty takeq ->
+        MVarEmpty takeq readq -> do
+
+          mapM_ (\readvar -> writeTVar readvar (Just x)) readq
+
           case Deque.uncons takeq of
-            Nothing -> do
+            Nothing ->
               writeTVar tv (MVarFull x mempty)
-              return True
 
             Just (takevar, takeq') -> do
               writeTVar takevar (Just x)
-              writeTVar tv (MVarEmpty takeq')
-              return True
+              writeTVar tv (MVarEmpty takeq' mempty)
+
+          return True
 
 
 takeMVarDefault :: ( MonadMask m
@@ -264,9 +271,9 @@ takeMVarDefault (MVar tv) = mask_ $ do
       s <- readTVar tv
       case s of
         -- if it's empty we add ourselves to the 'take' blocked queue
-        MVarEmpty takeq -> do
+        MVarEmpty takeq readq -> do
           takevar <- newTVar Nothing
-          writeTVar tv (MVarEmpty (Deque.snoc takevar takeq))
+          writeTVar tv (MVarEmpty (Deque.snoc takevar takeq) readq)
           return (Left takevar)
 
         -- if it's full we grab the value, and also complete the action of the
@@ -275,7 +282,7 @@ takeMVarDefault (MVar tv) = mask_ $ do
         MVarFull x putq ->
           case Deque.uncons putq of
             Nothing -> do
-              writeTVar tv (MVarEmpty mempty)
+              writeTVar tv (MVarEmpty mempty mempty)
               return (Right x)
 
             Just ((x', putvar), putq') -> do
@@ -291,12 +298,12 @@ takeMVarDefault (MVar tv) = mask_ $ do
           atomically $ do
             s <- readTVar tv
             case s of
-              MVarEmpty takeq -> do
+              MVarEmpty takeq readq -> do
                 -- async exception was thrown while were were blocked on
                 -- takevar; we need to remove it from 'takeq', otherwise we
                 -- will have a space leak.
                 let takeq' = Deque.filter (/= takevar) takeq
-                writeTVar tv (MVarEmpty takeq')
+                writeTVar tv (MVarEmpty takeq' readq)
 
               -- This case is unlikely but possible if another thread ran
               -- first and modified the mvar. This situation is fine as far as
@@ -316,11 +323,11 @@ tryTakeMVarDefault (MVar tv) = do
     atomically $ do
       s <- readTVar tv
       case s of
-        MVarEmpty _ -> return Nothing
+        MVarEmpty _ _ -> return Nothing
         MVarFull x putq ->
           case Deque.uncons putq of
             Nothing -> do
-              writeTVar tv (MVarEmpty mempty)
+              writeTVar tv (MVarEmpty mempty mempty)
               return (Just x)
 
             Just ((x', putvar), putq') -> do
@@ -333,18 +340,49 @@ tryTakeMVarDefault (MVar tv) = do
 -- 'putMVar' value.  It will also not block if the 'MVar' is full, even if there
 -- are other threads attempting to 'putMVar'.
 --
-readMVarDefault :: MonadSTM m
+readMVarDefault :: ( MonadSTM m
+                   , MonadMask m
+                   , forall x tvar. tvar ~ TVar m x => Eq tvar
+                   ) 
                 => MVarDefault m a
                 -> m a
 readMVarDefault (MVar tv) = do
-    atomically $ do
+    res <- atomically $ do
       s <- readTVar tv
       case s of
-        -- if it's empty block
-        MVarEmpty {} -> retry
+        -- if it's empty we add ourselves to the 'read' blocked queue
+        MVarEmpty takeq readq -> do
+          readvar <- newTVar Nothing
+          writeTVar tv (MVarEmpty takeq (Deque.snoc readvar readq))
+          return (Left readvar)
 
         -- if it's full return the value
-        MVarFull x _ -> return x
+        MVarFull x _ -> return (Right x)
+
+    case res of
+      -- we have to block on our own readvar until we can complete the read
+      Left readvar ->
+        atomically (readTVar readvar >>= maybe retry return)
+        `catch` \e@SomeAsyncException {} -> do
+          atomically $ do
+            s <- readTVar tv
+            case s of
+              MVarEmpty takeq readq -> do
+                -- async exception was thrown while were were blocked on
+                -- readvar; we need to remove it from 'readq', otherwise we
+                -- will have a space leak.
+                let readq' = Deque.filter (/= readvar) readq
+                writeTVar tv (MVarEmpty takeq readq')
+
+              -- This case is unlikely but possible if another thread ran
+              -- first and modified the mvar. This situation is fine as far as
+              -- space leaks are concerned because it means our wait var is no
+              -- longer in the wait queue.
+              MVarFull {} -> return ()
+          throwIO e
+
+      -- we managed to do the take synchronously
+      Right x -> return x
 
 
 isEmptyMVarDefault :: MonadSTM  m
