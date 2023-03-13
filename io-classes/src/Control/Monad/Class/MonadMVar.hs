@@ -189,16 +189,16 @@ putMVarDefault (MVar tv) x = mask_ $ do
     res <- atomically $ do
       s <- readTVar tv
       case s of
-        -- if it's full we add ourselves to the 'put' blocked queue
+        -- It's full, add ourselves to the end of the 'put' blocked queue.
         MVarFull x' putq -> do
           putvar <- newTVar False
           writeTVar tv (MVarFull x' (Deque.snoc (x, putvar) putq))
           return (Just putvar)
 
-        -- if it's empty we fill in the value, and also complete the action of
-        -- the next thread blocked in takeMVar
+        -- The MVar is empty. Wake up any threads blocked in readMVar.
+        -- If there's at least one thread blocked in takeMVar, we wake up the
+        -- first, leaving the MVar empty. Otherwise the MVar becomes full.
         MVarEmpty takeq readq -> do
-
           mapM_ (\readvar -> writeTVar readvar (Just x)) readq
 
           case Deque.uncons takeq of
@@ -245,6 +245,9 @@ tryPutMVarDefault (MVar tv) x =
       case s of
         MVarFull {} -> return False
 
+        -- The MVar is empty. Wake up any threads blocked in readMVar.
+        -- If there's at least one thread blocked in takeMVar, we wake up the
+        -- first, leaving the MVar empty. Otherwise the MVar becomes full.
         MVarEmpty takeq readq -> do
 
           mapM_ (\readvar -> writeTVar readvar (Just x)) readq
@@ -270,15 +273,15 @@ takeMVarDefault (MVar tv) = mask_ $ do
     res <- atomically $ do
       s <- readTVar tv
       case s of
-        -- if it's empty we add ourselves to the 'take' blocked queue
+        -- It's empty, add ourselves to the end of the 'take' blocked queue.
         MVarEmpty takeq readq -> do
           takevar <- newTVar Nothing
           writeTVar tv (MVarEmpty (Deque.snoc takevar takeq) readq)
           return (Left takevar)
 
-        -- if it's full we grab the value, and also complete the action of the
-        -- next thread blocked in putMVar, by setting the new MVar value and
-        -- unblocking them.
+        -- It's full. If there's at least one thread blocked in putMVar, wake
+        -- up the first one leaving the MVar full with the new put value.
+        -- Otherwise the MVar becomes empty.
         MVarFull x putq ->
           case Deque.uncons putq of
             Nothing -> do
@@ -324,6 +327,10 @@ tryTakeMVarDefault (MVar tv) = do
       s <- readTVar tv
       case s of
         MVarEmpty _ _ -> return Nothing
+
+        -- It's full. If there's at least one thread blocked in putMVar, wake
+        -- up the first one leaving the MVar full with the new put value.
+        -- Otherwise the MVar becomes empty.
         MVarFull x putq ->
           case Deque.uncons putq of
             Nothing -> do
@@ -350,7 +357,7 @@ readMVarDefault (MVar tv) = do
     res <- atomically $ do
       s <- readTVar tv
       case s of
-        -- if it's empty we add ourselves to the 'read' blocked queue
+        -- It's empty, add ourselves to the 'read' blocked queue.
         MVarEmpty takeq readq -> do
           readvar <- newTVar Nothing
           writeTVar tv (MVarEmpty takeq (Deque.snoc readvar readq))
