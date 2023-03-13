@@ -233,6 +233,26 @@ putMVarDefault (MVar tv) x = mask_ $ do
       Nothing -> return ()
 
 
+tryPutMVarDefault :: MonadSTM m
+                  => MVarDefault m a -> a -> m Bool
+tryPutMVarDefault (MVar tv) x =
+    atomically $ do
+      s <- readTVar tv
+      case s of
+        MVarFull {} -> return False
+
+        MVarEmpty blockedq ->
+          case Deque.uncons blockedq of
+            Nothing -> do
+              writeTVar tv (MVarFull x mempty)
+              return True
+
+            Just (wakevar, blockedq') -> do
+              writeTVar wakevar (Just x)
+              writeTVar tv (MVarEmpty blockedq')
+              return True
+
+
 takeMVarDefault :: ( MonadMask m
                    , MonadSTM  m
                    , forall x tvar. tvar ~ TVar m x => Eq tvar
@@ -289,44 +309,6 @@ takeMVarDefault (MVar tv) = mask_ $ do
       Right x -> return x
 
 
-tryPutMVarDefault :: MonadSTM m
-                  => MVarDefault m a -> a -> m Bool
-tryPutMVarDefault (MVar tv) x =
-    atomically $ do
-      s <- readTVar tv
-      case s of
-        MVarFull {} -> return False
-
-        MVarEmpty blockedq ->
-          case Deque.uncons blockedq of
-            Nothing -> do
-              writeTVar tv (MVarFull x mempty)
-              return True
-
-            Just (wakevar, blockedq') -> do
-              writeTVar wakevar (Just x)
-              writeTVar tv (MVarEmpty blockedq')
-              return True
-
-
--- | 'readMVarDefault' when the 'MVar' is empty, guarantees to receive next
--- 'putMVar' value.  It will also not block if the 'MVar' is full, even if there
--- are other threads attempting to 'putMVar'.
---
-readMVarDefault :: MonadSTM m
-                => MVarDefault m a
-                -> m a
-readMVarDefault (MVar tv) = do
-    atomically $ do
-      s <- readTVar tv
-      case s of
-        -- if it's empty block
-        MVarEmpty {} -> retry
-
-        -- if it's full return the value
-        MVarFull x _ -> return x
-
-
 tryTakeMVarDefault :: MonadSTM m
                    => MVarDefault m a
                    -> m (Maybe a)
@@ -345,6 +327,24 @@ tryTakeMVarDefault (MVar tv) = do
               writeTVar wakevar True
               writeTVar tv (MVarFull x' blockedq')
               return (Just x)
+
+
+-- | 'readMVarDefault' when the 'MVar' is empty, guarantees to receive next
+-- 'putMVar' value.  It will also not block if the 'MVar' is full, even if there
+-- are other threads attempting to 'putMVar'.
+--
+readMVarDefault :: MonadSTM m
+                => MVarDefault m a
+                -> m a
+readMVarDefault (MVar tv) = do
+    atomically $ do
+      s <- readTVar tv
+      case s of
+        -- if it's empty block
+        MVarEmpty {} -> retry
+
+        -- if it's full return the value
+        MVarFull x _ -> return x
 
 
 isEmptyMVarDefault :: MonadSTM  m
