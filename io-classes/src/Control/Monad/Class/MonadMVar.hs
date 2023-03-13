@@ -11,6 +11,7 @@ module Control.Monad.Class.MonadMVar
   , putMVarDefault
   , takeMVarDefault
   , readMVarDefault
+  , tryReadMVarDefault
   , tryTakeMVarDefault
   , tryPutMVarDefault
   , isEmptyMVarDefault
@@ -34,7 +35,7 @@ class Monad m => MonadMVar m where
   {-# MINIMAL newEmptyMVar,
               takeMVar, tryTakeMVar,
               putMVar,  tryPutMVar,
-              readMVar,
+              readMVar, tryReadMVar,
               isEmptyMVar #-}
 
   type MVar m :: Type -> Type
@@ -45,6 +46,7 @@ class Monad m => MonadMVar m where
   tryTakeMVar       :: MVar m a -> m (Maybe a)
   tryPutMVar        :: MVar m a -> a -> m Bool
   readMVar          :: MVar m a -> m a
+  tryReadMVar       :: MVar m a -> m (Maybe a)
   isEmptyMVar       :: MVar m a -> m Bool
 
   -- methods with a default implementation
@@ -137,6 +139,7 @@ instance MonadMVar IO where
     swapMVar          = IO.swapMVar
     tryTakeMVar       = IO.tryTakeMVar
     tryPutMVar        = IO.tryPutMVar
+    tryReadMVar       = IO.tryReadMVar
     isEmptyMVar       = IO.isEmptyMVar
     withMVar          = IO.withMVar
     withMVarMasked    = IO.withMVarMasked
@@ -382,6 +385,17 @@ readMVarDefault (MVar tv) = do
       Right x -> return x
 
 
+tryReadMVarDefault :: MonadSTM m
+                   => MVarDefault m a -> m (Maybe a)
+tryReadMVarDefault (MVar tv) =
+    atomically $ do
+      s <- readTVar tv
+      case s of
+        MVarFull  x _ -> return (Just x)
+        MVarEmpty {}  -> return Nothing
+
+
+
 isEmptyMVarDefault :: MonadSTM  m
                    => MVarDefault m a -> m Bool
 isEmptyMVarDefault (MVar tv) =
@@ -408,6 +422,7 @@ instance ( MonadMask m
     takeMVar     = lift .   takeMVar    . unwrapMVar
     putMVar      = lift .: (putMVar     . unwrapMVar)
     readMVar     = lift .   readMVar    . unwrapMVar
+    tryReadMVar  = lift .   tryReadMVar . unwrapMVar
     swapMVar     = lift .: (swapMVar    . unwrapMVar)
     tryTakeMVar  = lift .   tryTakeMVar . unwrapMVar
     tryPutMVar   = lift .: (tryPutMVar  . unwrapMVar)
