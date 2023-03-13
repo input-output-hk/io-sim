@@ -508,6 +508,7 @@ instance MonadMVar (IOSim s) where
   putMVar      = putMVarDefault
   tryTakeMVar  = tryTakeMVarDefault
   tryPutMVar   = tryPutMVarDefault
+  readMVar     = readMVarDefault
   isEmptyMVar  = isEmptyMVarDefault
 
 data Async s a = Async !ThreadId (STM s (Either SomeException a))

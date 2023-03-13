@@ -31,7 +31,11 @@ import qualified Deque.Strict as Deque
 
 
 class Monad m => MonadMVar m where
-  {-# MINIMAL newEmptyMVar, takeMVar, putMVar, tryTakeMVar, tryPutMVar, isEmptyMVar #-}
+  {-# MINIMAL newEmptyMVar,
+              takeMVar, tryTakeMVar,
+              putMVar,  tryPutMVar,
+              readMVar,
+              isEmptyMVar #-}
 
   type MVar m :: Type -> Type
 
@@ -40,11 +44,11 @@ class Monad m => MonadMVar m where
   putMVar           :: MVar m a -> a -> m ()
   tryTakeMVar       :: MVar m a -> m (Maybe a)
   tryPutMVar        :: MVar m a -> a -> m Bool
+  readMVar          :: MVar m a -> m a
   isEmptyMVar       :: MVar m a -> m Bool
 
   -- methods with a default implementation
   newMVar           :: a -> m (MVar m a)
-  readMVar          :: MVar m a -> m a
   swapMVar          :: MVar m a -> a -> m a
   withMVar          :: MVar m a -> (a -> m b) -> m b
   withMVarMasked    :: MVar m a -> (a -> m b) -> m b
@@ -59,13 +63,6 @@ class Monad m => MonadMVar m where
     putMVar v a
     return v
   {-# INLINE newMVar #-}
-
-  default readMVar :: MVar m a -> m a
-  readMVar v = do
-    a <- takeMVar v
-    putMVar v a
-    return a
-  {-# INLINE readMVar #-}
 
   default swapMVar :: MonadMask m => MVar m a -> a -> m a
   swapMVar mvar new =
