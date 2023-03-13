@@ -1,4 +1,4 @@
-cabal-version:       2.0
+cabal-version:       3.0
 name:                strict-mvar
 version:             0.1.0.0
 synopsis:            Strict MVars for `IO` and `io-sim`
@@ -16,7 +16,7 @@ tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.3
 
 source-repository head
   type:     git
-  location: https://github.com/input-output-hk/ouroboros-network
+  location: https://github.com/input-output-hk/io-sim
   subdir:   strict-mvar
 
 flag asserts

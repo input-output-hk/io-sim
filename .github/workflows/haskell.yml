@@ -115,8 +115,7 @@ jobs:
 
     - name: Build dependencies
       run: |
-        cabal build --only-dependencies io-sim
-        cabal build --only-dependencies io-classes
+        cabal build --only-dependencies all
 
     - name: Build projects [build]
       run: cabal build all

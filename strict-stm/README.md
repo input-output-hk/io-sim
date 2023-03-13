@@ -3,7 +3,7 @@
 The `strict-stm` package provides a strict interface to software transaction
 memory.  It builds on top of `io-classes` and thus it provides the interface
 for both [STM](https://hackage.haskell.org/package/stm) as well as
-[io-sim](https://github.com/input-output-hk/ouroboros-network/tree/master/io-classes).
+[io-sim](https://github.com/input-output-hk/io-sim).
 
 # Novel testing / space-leak elimination approach
 
