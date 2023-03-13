@@ -188,39 +188,39 @@ putMVarDefault (MVar tv) x = mask_ $ do
     res <- atomically $ do
       s <- readTVar tv
       case s of
-        -- if it's full we add ourselves to the blocked queue
-        MVarFull x' blockedq -> do
-          wakevar <- newTVar False
-          writeTVar tv (MVarFull x' (Deque.snoc (x, wakevar) blockedq))
-          return (Just wakevar)
+        -- if it's full we add ourselves to the 'put' blocked queue
+        MVarFull x' putq -> do
+          putvar <- newTVar False
+          writeTVar tv (MVarFull x' (Deque.snoc (x, putvar) putq))
+          return (Just putvar)
 
         -- if it's empty we fill in the value, and also complete the action of
         -- the next thread blocked in takeMVar
-        MVarEmpty blockedq ->
-          case Deque.uncons blockedq of
+        MVarEmpty takeq ->
+          case Deque.uncons takeq of
             Nothing -> do
               writeTVar tv (MVarFull x mempty)
               return Nothing
 
-            Just (wakevar, blockedq') -> do
-              writeTVar wakevar (Just x)
-              writeTVar tv (MVarEmpty blockedq')
+            Just (takevar, takeq') -> do
+              writeTVar takevar (Just x)
+              writeTVar tv (MVarEmpty takeq')
               return Nothing
 
     case res of
-      -- we have to block on our own wakevar until we can complete the put
-      Just wakevar ->
-        atomically (readTVar wakevar >>= check)
+      -- we have to block on our own putvar until we can complete the put
+      Just putvar ->
+        atomically (readTVar putvar >>= check)
         `catch` \e@SomeAsyncException {} -> do
           atomically $ do
             s <- readTVar tv
             case s of
-              MVarFull x' blockedq -> do
-                -- async exception was thrown while we were blocked on wakevar;
+              MVarFull x' putq -> do
+                -- async exception was thrown while we were blocked on putvar;
                 -- we need to remove it from the queue, otherwise we will have
                 -- a space leak.
-                let blockedq' = Deque.filter ((/= wakevar) . snd) blockedq
-                writeTVar tv (MVarFull x' blockedq')
+                let putq' = Deque.filter ((/= putvar) . snd) putq
+                writeTVar tv (MVarFull x' putq')
 
               -- This case is unlikely but possible if another thread ran
               -- first and modified the mvar. This situation is fine as far as
@@ -241,15 +241,15 @@ tryPutMVarDefault (MVar tv) x =
       case s of
         MVarFull {} -> return False
 
-        MVarEmpty blockedq ->
-          case Deque.uncons blockedq of
+        MVarEmpty takeq ->
+          case Deque.uncons takeq of
             Nothing -> do
               writeTVar tv (MVarFull x mempty)
               return True
 
-            Just (wakevar, blockedq') -> do
-              writeTVar wakevar (Just x)
-              writeTVar tv (MVarEmpty blockedq')
+            Just (takevar, takeq') -> do
+              writeTVar takevar (Just x)
+              writeTVar tv (MVarEmpty takeq')
               return True
 
 
@@ -263,40 +263,40 @@ takeMVarDefault (MVar tv) = mask_ $ do
     res <- atomically $ do
       s <- readTVar tv
       case s of
-        -- if it's empty we add ourselves to the blocked queue
-        MVarEmpty blockedq -> do
-          wakevar <- newTVar Nothing
-          writeTVar tv (MVarEmpty (Deque.snoc wakevar blockedq))
-          return (Left wakevar)
+        -- if it's empty we add ourselves to the 'take' blocked queue
+        MVarEmpty takeq -> do
+          takevar <- newTVar Nothing
+          writeTVar tv (MVarEmpty (Deque.snoc takevar takeq))
+          return (Left takevar)
 
         -- if it's full we grab the value, and also complete the action of the
         -- next thread blocked in putMVar, by setting the new MVar value and
         -- unblocking them.
-        MVarFull x blockedq ->
-          case Deque.uncons blockedq of
+        MVarFull x putq ->
+          case Deque.uncons putq of
             Nothing -> do
               writeTVar tv (MVarEmpty mempty)
               return (Right x)
 
-            Just ((x', wakevar), blockedq') -> do
-              writeTVar wakevar True
-              writeTVar tv (MVarFull x' blockedq')
+            Just ((x', putvar), putq') -> do
+              writeTVar putvar True
+              writeTVar tv (MVarFull x' putq')
               return (Right x)
 
     case res of
-      -- we have to block on our own wakevar until we can complete the read
-      Left wakevar ->
-        atomically (readTVar wakevar >>= maybe retry return)
+      -- we have to block on our own takevar until we can complete the read
+      Left takevar ->
+        atomically (readTVar takevar >>= maybe retry return)
         `catch` \e@SomeAsyncException {} -> do
           atomically $ do
             s <- readTVar tv
             case s of
-              MVarEmpty blockedq -> do
+              MVarEmpty takeq -> do
                 -- async exception was thrown while were were blocked on
-                -- wakevar; we need to remove it from 'blockedq', otherwise we
+                -- takevar; we need to remove it from 'takeq', otherwise we
                 -- will have a space leak.
-                let blockedq' = Deque.filter (/= wakevar) blockedq
-                writeTVar tv (MVarEmpty blockedq')
+                let takeq' = Deque.filter (/= takevar) takeq
+                writeTVar tv (MVarEmpty takeq')
 
               -- This case is unlikely but possible if another thread ran
               -- first and modified the mvar. This situation is fine as far as
@@ -317,15 +317,15 @@ tryTakeMVarDefault (MVar tv) = do
       s <- readTVar tv
       case s of
         MVarEmpty _ -> return Nothing
-        MVarFull x blockedq ->
-          case Deque.uncons blockedq of
+        MVarFull x putq ->
+          case Deque.uncons putq of
             Nothing -> do
               writeTVar tv (MVarEmpty mempty)
               return (Just x)
 
-            Just ((x', wakevar), blockedq') -> do
-              writeTVar wakevar True
-              writeTVar tv (MVarFull x' blockedq')
+            Just ((x', putvar), putq') -> do
+              writeTVar putvar True
+              writeTVar tv (MVarFull x' putq')
               return (Just x)
 
 
