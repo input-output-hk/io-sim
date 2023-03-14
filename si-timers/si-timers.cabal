@@ -16,7 +16,7 @@ category:            Control
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
                      README.md
-tested-with:         GHC == { 8.10, 9.2, 9.4 }
+tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6 }
 
 flag asserts
   description: Enable assertions
@@ -54,7 +54,7 @@ library
                        NumericUnderscores,
                        ScopedTypeVariables,
                        TypeFamilies
-  build-depends:       base              >=4.9 && <4.18,
+  build-depends:       base              >=4.9 && <4.19,
                        mtl,
                        stm,
                        time              >=1.9.1 && <1.13,
