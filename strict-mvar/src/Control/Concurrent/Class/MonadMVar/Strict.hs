@@ -26,6 +26,8 @@ module Control.Concurrent.Class.MonadMVar.Strict
   , modifyMVarMasked_
   , modifyMVarMasked
   , tryReadMVar
+    -- * Re-exports
+  , MonadMVar
   ) where
 
 import           Control.Monad.Class.MonadMVar (MonadMVar)
