@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns              #-}
-{-# LANGUAGE CPP                       #-}
 {-# LANGUAGE DerivingVia               #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances         #-}
