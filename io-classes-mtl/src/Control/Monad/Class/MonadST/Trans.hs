@@ -1,12 +1,13 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Control.Monad.Class.MonadST.Trans () where
 
-import           Control.Monad.Cont
-import           Control.Monad.Except
+import           Control.Monad.Cont (ContT)
+import           Control.Monad.Except (ExceptT)
 import qualified Control.Monad.RWS.Lazy as Lazy
 import qualified Control.Monad.RWS.Strict as Strict
 import qualified Control.Monad.State.Lazy as Lazy
 import qualified Control.Monad.State.Strict as Strict
+import           Control.Monad.Trans (lift)
 import qualified Control.Monad.Writer.Lazy as Lazy
 import qualified Control.Monad.Writer.Strict as Strict
 

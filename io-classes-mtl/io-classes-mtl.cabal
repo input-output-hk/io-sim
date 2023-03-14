@@ -17,6 +17,7 @@ category:           Control
 build-type:         Simple
 extra-doc-files:    README.md
                     CHANGELOG.md
+tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6 }
 
 common warnings
     ghc-options: -Wall
@@ -41,7 +42,7 @@ library
                    ,  Control.Monad.Class.MonadTime.SI.Trans
                    ,  Control.Monad.Class.MonadTimer.Trans
                    ,  Control.Monad.Class.MonadTimer.SI.Trans
-    build-depends:    base >=4.9 && <4.18,
+    build-depends:    base >=4.9 && <4.19,
                       array,
                       mtl,
 

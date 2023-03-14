@@ -29,7 +29,11 @@ module Control.Monad.Class.MonadAsync
 
 import           Prelude hiding (read)
 
+#if MIN_VERSION_base(4,18,0)
+import           Control.Applicative (Alternative (..))
+#else
 import           Control.Applicative (Alternative (..), liftA2)
+#endif
 import           Control.Monad (forever)
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSTM

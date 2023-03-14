@@ -18,7 +18,7 @@ category:            Control
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
                      README.md
-tested-with:         GHC == { 8.10, 9.2, 9.4 }
+tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6 }
 
 source-repository head
   type:     git
@@ -55,7 +55,7 @@ library
                        GADTs,
                        NamedFieldPuns,
                        TypeOperators
-  build-depends:       base        >= 4.9 && <4.18,
+  build-depends:       base        >= 4.9 && <4.19,
                        array,
                        stm         >= 2.5 && <2.6,
 
