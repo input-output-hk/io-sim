@@ -241,11 +241,18 @@ unGetTBQueueDefault (TBQueue queue _size) a = do
 -- an effect as if all the racing `putMVarDefault` calls where executed in
 -- turns.
 --
+-- Note that 'readMVar' has interesting semantics: it is guaranteed to read
+-- the next value put using 'putMVar', and all readers will wake up, not just
+-- the first. To support this, the implementation uses two queues in the empty
+-- MVar case: one for threads blocked on 'takeMVar', and one for threads
+-- blocked on 'readMVar'. The 'putMVar' has to wake up all readers and the
+-- first \"taker\" (if any).
+--
 newtype MVarDefault m a = MVar (TVar m (MVarState m a))
 
-data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- ^ blocked on take
-                                 !(Deque (TVar m (Maybe a))) -- ^ blocked on read
-                   | MVarFull  a !(Deque (a, TVar m Bool))   -- ^ blocked on put
+data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- blocked on take
+                                 !(Deque (TVar m (Maybe a))) -- blocked on read
+                   | MVarFull  a !(Deque (a, TVar m Bool))   -- blocked on put
 
 
 newEmptyMVarDefault :: MonadSTM m => m (MVarDefault m a)
