@@ -26,7 +26,7 @@ supports interfaces commonly known from `base`, `exceptions`, `stm`, `async` or
 
 One of the principles of `io-classes` was to stay as close to `IO` as possible,
 thus most of the `IO` instances are directly referring to `base` or `async` api.
-However we made some differences, which are reported below.
+However we made some distinctions, which are reported below.
 
 `io-classes` supports a novel hierarchy for error handling monads as well more
 familiar `exception` style.  The new hierarchy provides `bracket` and
@@ -40,7 +40,7 @@ base.
 `IOSim` exposes a detailed trace, which can be enhanced by labelling threads,
 or mutable variables, tracing `Dynamic` values (which can be recovered from the
 trace) or simple `String` based tracing.  Although its agnostic with respect to
-the logging framework, it worked of us particularly well using
+the logging framework, it worked for us particularly well using
 [contra-tracer][contra-tracer].  It has been used to develop, test and debug
 a complex, highly-concurrent, distributed system
 ([ouroboros-network][ouroboros-network]), in particular
@@ -68,7 +68,7 @@ a complex, highly-concurrent, distributed system
 ### Major differences
 
 * `threadDelay` is using `DiffTime` (which is measured in _seconds_ rather than _microseconds_).
-* `regiterDelay` is using `DiffTime`
+* `registerDelay` is using `DiffTime`
 * `timeout` is using `DiffTime`
 * `getMonotonicTime` returns `Time` (a newtype wrapper around `DiffTime`)
 
