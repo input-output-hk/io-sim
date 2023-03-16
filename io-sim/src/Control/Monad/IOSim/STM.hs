@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 -- | 'io-sim' implementation of 'TQueue', 'TBQueue' and 'MVar'.
 --
@@ -263,8 +264,7 @@ newMVarDefault :: MonadSTM m => a -> m (MVarDefault m a)
 newMVarDefault a = MVar <$> newTVarIO (MVarFull a mempty)
 
 
-putMVarDefault :: ( MonadCatch m
-                  , MonadMask  m
+putMVarDefault :: ( MonadMask  m
                   , MonadSTM   m
                   , forall x tvar. tvar ~ TVar m x => Eq tvar
                   )
