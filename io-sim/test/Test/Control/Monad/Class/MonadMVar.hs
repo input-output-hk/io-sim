@@ -111,7 +111,7 @@ unit_putMVar_blocks_on_full
 unit_putMVar_blocks_on_full = do
     start <- getMonotonicTime
     let delta = 0.01
-    v :: MVar m () <- newMVar ()
+    v <- newMVar ()
     _ <- forkIO $ threadDelay delta
                >> takeMVar v
                $> ()
@@ -168,7 +168,7 @@ unit_takeMVar_blocks_on_empty
 unit_takeMVar_blocks_on_empty = do
     start <- getMonotonicTime
     let delta = 0.01
-    v :: MVar m () <- newEmptyMVar
+    v <- newEmptyMVar
     _ <- forkIO $ threadDelay delta
                >> putMVar v ()
     takeMVar v
@@ -218,8 +218,7 @@ tryTakeMVar_return_value
   => Bool
   -> m Bool
 tryTakeMVar_return_value isEmpty =
-    do v :: MVar m ()
-         <- if isEmpty
+    do v <- if isEmpty
             then newEmptyMVar
             else newMVar ()
        a <- tryTakeMVar v

@@ -5,46 +5,37 @@
 
 module Control.Monad.Class.MonadMVar
   ( MonadMVar (..)
-  , MVarDefault
-  , newEmptyMVarDefault
-  , newMVarDefault
-  , putMVarDefault
-  , takeMVarDefault
-  , readMVarDefault
-  , tryTakeMVarDefault
-  , tryPutMVarDefault
-  , isEmptyMVarDefault
   ) where
 
-import           Control.Concurrent.Class.MonadSTM.TVar
 import qualified Control.Concurrent.MVar as IO
-import           Control.Exception (SomeAsyncException (..))
-import           Control.Monad.Class.MonadSTM
 import           Control.Monad.Class.MonadThrow
 
 import           Control.Monad.Reader (ReaderT (..))
 import           Control.Monad.Trans (lift)
 
 import           Data.Kind (Type)
-import           Deque.Strict (Deque)
-import qualified Deque.Strict as Deque
 
 
 class Monad m => MonadMVar m where
-  {-# MINIMAL newEmptyMVar, takeMVar, putMVar, tryTakeMVar, tryPutMVar, isEmptyMVar #-}
+  {-# MINIMAL newEmptyMVar,
+              takeMVar, tryTakeMVar,
+              putMVar,  tryPutMVar,
+              readMVar, tryReadMVar,
+              isEmptyMVar #-}
 
-  type MVar m = (mvar :: Type -> Type) | mvar -> m
+  type MVar m :: Type -> Type
 
   newEmptyMVar      :: m (MVar m a)
   takeMVar          :: MVar m a -> m a
   putMVar           :: MVar m a -> a -> m ()
   tryTakeMVar       :: MVar m a -> m (Maybe a)
   tryPutMVar        :: MVar m a -> a -> m Bool
+  readMVar          :: MVar m a -> m a
+  tryReadMVar       :: MVar m a -> m (Maybe a)
   isEmptyMVar       :: MVar m a -> m Bool
 
   -- methods with a default implementation
   newMVar           :: a -> m (MVar m a)
-  readMVar          :: MVar m a -> m a
   swapMVar          :: MVar m a -> a -> m a
   withMVar          :: MVar m a -> (a -> m b) -> m b
   withMVarMasked    :: MVar m a -> (a -> m b) -> m b
@@ -59,13 +50,6 @@ class Monad m => MonadMVar m where
     putMVar v a
     return v
   {-# INLINE newMVar #-}
-
-  default readMVar :: MVar m a -> m a
-  readMVar v = do
-    a <- takeMVar v
-    putMVar v a
-    return a
-  {-# INLINE readMVar #-}
 
   default swapMVar :: MonadMask m => MVar m a -> a -> m a
   swapMVar mvar new =
@@ -140,6 +124,7 @@ instance MonadMVar IO where
     swapMVar          = IO.swapMVar
     tryTakeMVar       = IO.tryTakeMVar
     tryPutMVar        = IO.tryPutMVar
+    tryReadMVar       = IO.tryReadMVar
     isEmptyMVar       = IO.isEmptyMVar
     withMVar          = IO.withMVar
     withMVarMasked    = IO.withMVarMasked
@@ -147,206 +132,6 @@ instance MonadMVar IO where
     modifyMVar        = IO.modifyMVar
     modifyMVarMasked_ = IO.modifyMVarMasked_
     modifyMVarMasked  = IO.modifyMVarMasked
-
-
-data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- ^ blocked on take
-                   | MVarFull  a !(Deque (a, TVar m Bool))   -- ^ blocked on put
-
--- | A default 'MVar' implementation based on `TVar`'s.  An 'MVar' provides
--- fairness guarantees.
---
--- /Implementation details:/
---
--- 'STM' does not guarantee fairness, instead it provide compositionally.
--- Fairness of 'putMVarDefault' and 'takeMVarDefault' is provided by tracking
--- queue of blocked operation in the 'MVarState', e.g.  when a 'putMVarDefault'
--- is scheduled on a full 'MVar', the request is put on to the back of the queue
--- together with a wakeup var.  When 'takeMVarDefault' executes, it returns the
--- value and is using the first element of the queue to set the new value of
--- the 'MVar' and signals next `putMVarDefault` operation to unblock.  This has
--- an effect as if all the racing `putMVarDefault` calls where executed in
--- turns.
---
-newtype MVarDefault m a = MVar (TVar m (MVarState m a))
-
-
-newEmptyMVarDefault :: MonadSTM m => m (MVarDefault m a)
-newEmptyMVarDefault = MVar <$> newTVarIO (MVarEmpty mempty)
-
-
-newMVarDefault :: MonadSTM m => a -> m (MVarDefault m a)
-newMVarDefault a = MVar <$> newTVarIO (MVarFull a mempty)
-
-
-putMVarDefault :: ( MonadCatch m
-                  , MonadMask  m
-                  , MonadSTM   m
-                  , forall x tvar. tvar ~ TVar m x => Eq tvar
-                  )
-               => MVarDefault m a -> a -> m ()
-putMVarDefault (MVar tv) x = mask_ $ do
-    res <- atomically $ do
-      s <- readTVar tv
-      case s of
-        -- if it's full we add ourselves to the blocked queue
-        MVarFull x' blockedq -> do
-          wakevar <- newTVar False
-          writeTVar tv (MVarFull x' (Deque.snoc (x, wakevar) blockedq))
-          return (Just wakevar)
-
-        -- if it's empty we fill in the value, and also complete the action of
-        -- the next thread blocked in takeMVar
-        MVarEmpty blockedq ->
-          case Deque.uncons blockedq of
-            Nothing -> do
-              writeTVar tv (MVarFull x mempty)
-              return Nothing
-
-            Just (wakevar, blockedq') -> do
-              writeTVar wakevar (Just x)
-              writeTVar tv (MVarEmpty blockedq')
-              return Nothing
-
-    case res of
-      -- we have to block on our own wakevar until we can complete the put
-      Just wakevar ->
-        atomically (readTVar wakevar >>= check)
-        `catch` \e@SomeAsyncException {} -> do
-          atomically $ do
-            s <- readTVar tv
-            case s of
-              MVarFull x' blockedq -> do
-                -- async exception was thrown while we were blocked on wakevar;
-                -- we need to remove it from the queue, otherwise we will have
-                -- a space leak.
-                let blockedq' = Deque.filter ((/= wakevar) . snd) blockedq
-                writeTVar tv (MVarFull x' blockedq')
-              -- the exception was thrown when we were blocked on 'waketvar', so
-              -- the 'MVar' must not be empty.
-              MVarEmpty {} -> error "putMVarDefault: invariant violation"
-          throwIO e
-
-      -- we managed to do the put synchronously
-      Nothing -> return ()
-
-
-takeMVarDefault :: ( MonadMask m
-                   , MonadSTM  m
-                   , forall x tvar. tvar ~ TVar m x => Eq tvar
-                   )
-                => MVarDefault m a
-                -> m a
-takeMVarDefault (MVar tv) = mask_ $ do
-    res <- atomically $ do
-      s <- readTVar tv
-      case s of
-        -- if it's empty we add ourselves to the blocked queue
-        MVarEmpty blockedq -> do
-          wakevar <- newTVar Nothing
-          writeTVar tv (MVarEmpty (Deque.snoc wakevar blockedq))
-          return (Left wakevar)
-
-        -- if it's full we grab the value, and also complete the action of the
-        -- next thread blocked in putMVar, by setting the new MVar value and
-        -- unblocking them.
-        MVarFull x blockedq ->
-          case Deque.uncons blockedq of
-            Nothing ->
-              return (Right x)
-
-            Just ((x', wakevar), blockedq') -> do
-              writeTVar wakevar True
-              writeTVar tv (MVarFull x' blockedq')
-              return (Right x)
-
-    case res of
-      -- we have to block on our own wakevar until we can complete the read
-      Left wakevar ->
-        atomically (readTVar wakevar >>= maybe retry return)
-        `catch` \e@SomeAsyncException {} -> do
-          atomically $ do
-            s <- readTVar tv
-            case s of
-              MVarEmpty blockedq -> do
-                -- async exception was thrown while were were blocked on
-                -- wakevar; we need to remove it from 'blockedq', otherwise we
-                -- will have a space leak.
-                let blockedq' = Deque.filter (/= wakevar) blockedq
-                writeTVar tv (MVarEmpty blockedq')
-              -- the exception was thrown while we were blocked on 'wakevar', so
-              -- the 'MVar' must not be full.
-              MVarFull {} -> error "takeMVarDefault: invariant violation"
-          throwIO e
-
-      -- we managed to do the take synchronously
-      Right x -> return x
-
-
-tryPutMVarDefault :: MonadSTM m
-                  => MVarDefault m a -> a -> m Bool
-tryPutMVarDefault (MVar tv) x =
-    atomically $ do
-      s <- readTVar tv
-      case s of
-        MVarFull {} -> return False
-
-        MVarEmpty blockedq ->
-          case Deque.uncons blockedq of
-            Nothing -> do
-              writeTVar tv (MVarFull x mempty)
-              return True
-
-            Just (wakevar, blockedq') -> do
-              writeTVar wakevar (Just x)
-              writeTVar tv (MVarEmpty blockedq')
-              return True
-
-
--- | 'readMVarDefault' when the 'MVar' is empty, guarantees to receive next
--- 'putMVar' value.  It will also not block if the 'MVar' is full, even if there
--- are other threads attempting to 'putMVar'.
---
-readMVarDefault :: MonadSTM m
-                => MVarDefault m a
-                -> m a
-readMVarDefault (MVar tv) = do
-    atomically $ do
-      s <- readTVar tv
-      case s of
-        -- if it's empty block
-        MVarEmpty {} -> retry
-
-        -- if it's full return the value
-        MVarFull x _ -> return x
-
-
-tryTakeMVarDefault :: MonadSTM m
-                   => MVarDefault m a
-                   -> m (Maybe a)
-tryTakeMVarDefault (MVar tv) = do
-    atomically $ do
-      s <- readTVar tv
-      case s of
-        MVarEmpty _ -> return Nothing
-        MVarFull x blockedq ->
-          case Deque.uncons blockedq of
-            Nothing -> return (Just x)
-
-            Just ((x', wakevar), blockedq') -> do
-              writeTVar wakevar True
-              writeTVar tv (MVarFull x' blockedq')
-              return (Just x)
-
-
-isEmptyMVarDefault :: MonadSTM  m
-                   => MVarDefault m a -> m Bool
-isEmptyMVarDefault (MVar tv) =
-    atomically $ do
-      s <- readTVar tv
-      case s of
-        MVarFull {} -> return False
-        MVarEmpty blockedq | null blockedq -> return True
-                           | otherwise -> error "isEmptyMVarDefault: invariant violation"
 
 
 --
@@ -365,6 +150,7 @@ instance ( MonadMask m
     takeMVar     = lift .   takeMVar    . unwrapMVar
     putMVar      = lift .: (putMVar     . unwrapMVar)
     readMVar     = lift .   readMVar    . unwrapMVar
+    tryReadMVar  = lift .   tryReadMVar . unwrapMVar
     swapMVar     = lift .: (swapMVar    . unwrapMVar)
     tryTakeMVar  = lift .   tryTakeMVar . unwrapMVar
     tryPutMVar   = lift .: (tryPutMVar  . unwrapMVar)
