@@ -90,18 +90,10 @@ isEmptyMVar :: MonadMVar m => StrictMVar m a -> m Bool
 isEmptyMVar v = Lazy.isEmptyMVar (mvar v)
 
 withMVar :: MonadMVar m => StrictMVar m a -> (a -> m b) -> m b
-withMVar v io = Lazy.withMVar (mvar v) io'
-  where
-    io' a = do
-      !b <- io a
-      pure b
+withMVar v = Lazy.withMVar (mvar v)
 
 withMVarMasked :: MonadMVar m => StrictMVar m a -> (a -> m b) -> m b
-withMVarMasked v io = Lazy.withMVarMasked (mvar v) io'
-  where
-    io' a = do
-      !b <- io a
-      pure b
+withMVarMasked v = Lazy.withMVarMasked (mvar v)
 
 modifyMVar_ :: MonadMVar m => StrictMVar m a -> (a -> m a) -> m ()
 modifyMVar_ v io = Lazy.modifyMVar_ (mvar v) io'
