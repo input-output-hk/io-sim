@@ -1,8 +1,8 @@
 cabal-version:       3.0
 name:                strict-mvar
 version:             0.1.0.0
-synopsis:            Strict MVars for `IO` and `io-sim`
-description:         Strict MVars for `IO` and `io-sim`.
+synopsis:            Strict MVars for implementations of the `io-classes` MVar interface
+description:         Strict MVars for implementations of the `io-classes` MVar interface.
 license:             Apache-2.0
 license-files:
   LICENSE
@@ -12,7 +12,7 @@ author:              IOHK Engineering Team
 maintainer:          operations@iohk.io
 category:            Control
 build-type:          Simple
-tested-with:         GHC == 8.10.7, GHC == 9.2.5, GHC == 9.4.3
+tested-with:         GHC == { 8.10.7, 9.2.5, 9.4.4 }
 
 source-repository head
   type:     git
@@ -30,7 +30,7 @@ library
   exposed-modules:     Control.Concurrent.Class.MonadMVar.Strict
   default-language:    Haskell2010
   build-depends:       base        >= 4.9 && <4.18,
-                       io-classes  >= 0.3 && <0.5
+                       io-classes  >= 0.3 && <0.6
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
                        -Wcompat
