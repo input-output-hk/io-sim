@@ -1,6 +1,6 @@
 cabal-version:       2.0
 name:                strict-stm
-version:             0.4.0.0
+version:             0.5.0.0
 synopsis:            Strict STM interface polymorphic over stm implementation.
 description:         The `strict-stm` package gives a strict interface to stm,
                      currently either one provided by `stm` package for the
@@ -46,7 +46,7 @@ library
   build-depends:       base        >= 4.9 && <4.18,
                        array,
                        stm         >= 2.5 && <2.6,
-                       io-classes  >= 0.3 && <0.5
+                       io-classes  >= 0.3 && <0.6
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
                        -Wcompat
