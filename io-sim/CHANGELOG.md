@@ -2,6 +2,12 @@
 
 ## next version
 
+## 0.5.0.0
+
+* `MVar` type family is not injective anymore.
+* Removed default implementation of `readMVar` in the `MonadMVar` type class.
+* Moved `MVarDefault` to `io-sim` package.
+
 ## 0.4.0.0
 
 * support `ghc-9.4` (except on Windows input-output-hk/io-sim#51)
