@@ -2,6 +2,14 @@
 
 ## next version
 
+## 0.5.0.0
+
+* fixed `tryTakeMVarDefault`, `takeMVarDefault`, `putMVarDefault` and
+  `isEmptyMVarDefault`.
+* Implemented the proper `readMVar` semantics.
+* Added `tryReadMVar` to `MonadMVar` type class.
+* Moved `MVarDefault` to `io-sim` package.
+
 ## 0.4.0.0
 
 * support `ghc-9.4` (except on Windows input-output-hk/io-sim#51)
