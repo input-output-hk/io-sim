@@ -127,6 +127,9 @@ jobs:
     - name: si-timers [test]
       run: cabal run si-timers:test
 
+    - name: strict-mvar [test]
+      run: cabal run strict-mvar:test
+
   stylish-haskell:
     runs-on: ubuntu-22.04
 
