@@ -6,6 +6,10 @@ package io-classes
   ghc-options: -Werror
   flags: +asserts
 
+package strict-mvar
+  ghc-options: -Werror
+  flags: +asserts
+
 package strict-stm
   ghc-options: -Werror
   flags: +asserts
