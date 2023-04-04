@@ -49,6 +49,7 @@ tests =
   testGroup "IO simulator POR"
   [ testProperty "propSimulates"    propSimulates
   , testProperty "propExploration"  propExploration
+  , testProperty "unit 76"          prop_unit_76
   -- , testProperty "propPermutations" propPermutations
   , testGroup "IO simulator properties"
     [ testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
@@ -374,6 +375,17 @@ traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
 -- IOSim reused properties
 --
 
+-- propExploration unit tests
+--
+prop_unit_76 :: Property
+prop_unit_76 =
+  propExploration (Tasks [Task [WhenSet 9 0],Task [WhenSet 0 0],Task [WhenSet 10 10,WhenSet 10 9],Task [WhenSet 0 0]])
+  .&&.
+  propExploration (Tasks [Task [],Task [ThrowTo 4],Task [WhenSet 19 18,ThrowTo 0],Task [WhenSet 18 0,ThrowTo 2],Task [WhenSet 0 0]])
+  .&&.
+  propExploration (Tasks [Task [WhenSet 4 0],Task [WhenSet 0 0],Task [WhenSet 5 5,WhenSet 5 4],Task [WhenSet 0 0]])
+  .&&.
+  propExploration (Tasks [Task [WhenSet 4 0],Task [WhenSet 0 0],Task [WhenSet 5 5,WhenSet 5 4],Task [CheckStatus 0,WhenSet 0 0]])
 
 --
 -- Read/Write graph

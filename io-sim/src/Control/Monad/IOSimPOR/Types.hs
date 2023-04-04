@@ -64,8 +64,17 @@ statusWriteEffects tids = mempty{effectStatusWrites = tids}
 someTvarId :: SomeTVar s -> TVarId
 someTvarId (SomeTVar r) = tvarId r
 
+-- | Make sure we only have read effects
+--
+-- We ignore `effectStatusReads` and `effectStatusWrites`. This is because
+-- effects of `threadStatus` are non-blocking, if they block it is a result of
+-- of a blocking stm transaction.
+--
 onlyReadEffect :: Effect -> Bool
-onlyReadEffect e = e { effectReads = effectReads mempty } == mempty
+onlyReadEffect e = e { effectReads        = effectReads mempty
+                     , effectStatusReads  = effectStatusReads mempty
+                     , effectStatusWrites = effectStatusWrites mempty
+                     } == mempty
 
 racingEffects :: Effect -> Effect -> Bool
 racingEffects e e' =
