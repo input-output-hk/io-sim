@@ -64,8 +64,17 @@ statusWriteEffects tids = mempty{effectStatusWrites = tids}
 someTvarId :: SomeTVar s -> TVarId
 someTvarId (SomeTVar r) = tvarId r
 
+-- | Make sure we only have read effects
+--
+-- It seems we need to ignore statusWrites effects to avoid generating bad
+-- schedules. See issue #76 for examples.
+--
 onlyReadEffect :: Effect -> Bool
-onlyReadEffect e = e { effectReads = effectReads mempty } == mempty
+onlyReadEffect e = e { effectReads = effectReads mempty
+                     , effectStatusReads = effectStatusReads mempty
+                     -- TODO: This is a quick fix for #76.
+                     , effectStatusWrites = effectStatusWrites mempty
+                     } == mempty
 
 racingEffects :: Effect -> Effect -> Bool
 racingEffects e e' =
