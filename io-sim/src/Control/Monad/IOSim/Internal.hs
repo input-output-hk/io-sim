@@ -119,7 +119,7 @@ labelledThreads threadMap =
 data TimerCompletionInfo s =
        Timer !(TVar s TimeoutState)
      | TimerRegisterDelay !(TVar s Bool)
-     | TimerThreadDelay !ThreadId
+     | TimerThreadDelay !ThreadId !TimeoutId
      | TimerTimeout !ThreadId !TimeoutId !(STRef s IsLocked)
 
 -- | Internal state.
@@ -445,21 +445,22 @@ schedule !thread@Thread{
 
     ThreadDelay d k | d < 0 ->
       {-# SCC "schedule.NewThreadDelay" #-} do
-      let !expiry  = d `addTime` time
-          !thread' = thread { threadControl = ThreadControl k ctl }
-      trace <- schedule thread' simstate
-      return (SimTrace time tid tlbl (EventThreadDelay expiry) $
-              SimTrace time tid tlbl EventThreadDelayFired $
+      let !expiry    = d `addTime` time
+          !thread'   = thread { threadControl = ThreadControl k ctl }
+          !simstate' = simstate { nextTmid = succ nextTmid }
+      trace <- schedule thread' simstate'
+      return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) $
+              SimTrace time tid tlbl (EventThreadDelayFired nextTmid) $
               trace)
 
     ThreadDelay d k ->
       {-# SCC "schedule.NewThreadDelay" #-} do
       let !expiry  = d `addTime` time
-          !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid) timers
+          !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           !thread' = thread { threadControl = ThreadControl k ctl }
       !trace <- deschedule Blocked thread' simstate { timers   = timers'
                                                     , nextTmid = succ nextTmid }
-      return (SimTrace time tid tlbl (EventThreadDelay expiry) trace)
+      return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) trace)
 
     -- we do not follow `GHC.Event` behaviour here; updating a timer to the past
     -- effectively cancels it.
@@ -829,8 +830,8 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
         !_ <- mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
             -- Check all fired threadDelays
-        let wakeupThreadDelay = [ tid | TimerThreadDelay tid <- fired ]
-            wakeup            = wakeupThreadDelay ++ wakeupSTM
+        let wakeupThreadDelay = [ (tid, tmid) | TimerThreadDelay tid tmid <- fired ]
+            wakeup            = fst `fmap` wakeupThreadDelay ++ wakeupSTM
             (_, !simstate')   = unblockThreads wakeup simstate
 
             -- For each 'timeout' action where the timeout has fired, start a
@@ -862,8 +863,8 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
                      , let tlbl' = lookupThreadLabel tid' threads
                      , let Just vids = Set.toList <$> Map.lookup tid' wokeby ]
                   ++ [ ( time', tid, Just "thread delay timer"
-                       , EventThreadDelayFired)
-                     | tid <- wakeupThreadDelay ]
+                       , EventThreadDelayFired tmid)
+                     | (tid, tmid) <- wakeupThreadDelay ]
                   ++ [ ( time', tid, Just "timeout timer"
                        , EventTimeoutFired tmid)
                      | (tid, tmid, _, _) <- timeoutExpired' ]

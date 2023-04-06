@@ -822,8 +822,8 @@ data SimEventType
                        (Maybe Effect)    -- effect performed (only for `IOSimPOR`)
   | EventTxWakeup      [Labelled TVarId] -- changed vars causing retry
 
-  | EventThreadDelay        Time
-  | EventThreadDelayFired
+  | EventThreadDelay        TimeoutId Time
+  | EventThreadDelayFired   TimeoutId
 
   | EventTimeoutCreated        TimeoutId ThreadId Time
   | EventTimeoutFired          TimeoutId
