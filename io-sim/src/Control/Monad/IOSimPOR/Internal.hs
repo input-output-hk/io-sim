@@ -158,7 +158,7 @@ labelledThreads threadMap =
 data TimerCompletionInfo s =
        Timer !(TVar s TimeoutState)
      | TimerRegisterDelay !(TVar s Bool)
-     | TimerThreadDelay !ThreadId
+     | TimerThreadDelay !ThreadId !TimeoutId
      | TimerTimeout !ThreadId !TimeoutId !(STRef s IsLocked)
 
 type RunQueue = OrdPSQ (Down ThreadId) (Down ThreadId) ()
@@ -547,20 +547,21 @@ schedule thread@Thread{
                 (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
 
     ThreadDelay d k | d < 0 -> do
-      let expiry  = d `addTime` time
-          thread' = thread { threadControl = ThreadControl k ctl }
-      trace <- schedule thread' simstate
-      return (SimPORTrace time tid tstep tlbl (EventThreadDelay expiry) $
-              SimPORTrace time tid tstep tlbl EventThreadDelayFired $
+      let expiry    = d `addTime` time
+          thread'   = thread { threadControl = ThreadControl k ctl }
+          simstate' = simstate { nextTmid = succ nextTmid }
+      trace <- schedule thread' simstate'
+      return (SimPORTrace time tid tstep tlbl (EventThreadDelay nextTmid expiry) $
+              SimPORTrace time tid tstep tlbl (EventThreadDelayFired nextTmid) $
               trace)
 
     ThreadDelay d k -> do
       let expiry  = d `addTime` time
-          timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid) timers
+          timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           thread' = thread { threadControl = ThreadControl k ctl }
       trace <- deschedule Blocked thread' simstate { timers   = timers'
-                                                    , nextTmid = succ nextTmid }
-      return (SimPORTrace time tid tstep tlbl (EventThreadDelay expiry) trace)
+                                                   , nextTmid = succ nextTmid }
+      return (SimPORTrace time tid tstep tlbl (EventThreadDelay nextTmid expiry) trace)
 
     -- we do not follow `GHC.Event` behaviour here; updating a timer to the past
     -- effectively cancels it.
@@ -1035,8 +1036,8 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         (wakeupSTM, wokeby) <- threadsUnblockedByWrites written
         mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
-        let wakeupThreadDelay = [ tid | TimerThreadDelay tid <- fired ]
-            wakeup            = wakeupThreadDelay ++ wakeupSTM
+        let wakeupThreadDelay = [ (tid, tmid) | TimerThreadDelay tid tmid <- fired ]
+            wakeup            = fst `fmap` wakeupThreadDelay ++ wakeupSTM
             -- TODO: the vector clock below cannot be right, can it?
             (_, !simstate')   = unblockThreads bottomVClock wakeup simstate
 
@@ -1069,8 +1070,8 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
                      , let tlbl' = lookupThreadLabel tid' threads
                      , let Just vids = Set.toList <$> Map.lookup tid' wokeby ]
                   ++ [ ( time', tid, -1, Just "thread delay timer"
-                       , EventThreadDelayFired)
-                     | tid <- wakeupThreadDelay ]
+                       , EventThreadDelayFired tmid)
+                     | (tid, tmid) <- wakeupThreadDelay ]
                   ++ [ ( time', tid, -1, Just "timeout timer"
                        , EventTimeoutFired tmid)
                      | (tid, tmid, _, _) <- timeoutExpired' ]
@@ -1089,7 +1090,7 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         TimeoutFired     -> error "MonadTimer(Sim): invariant violation"
         TimeoutCancelled -> return ()
     timeoutAction (TimerRegisterDelay var) = writeTVar var True
-    timeoutAction (TimerThreadDelay _)     = return ()
+    timeoutAction (TimerThreadDelay _ _)    = return ()
     timeoutAction (TimerTimeout _ _ _)     = return ()
 
 unblockThreads :: forall s a.
