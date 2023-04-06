@@ -279,7 +279,7 @@ schedule !thread@Thread{
       -- Found a CatchFrame
       Right thread'@Thread { threadMasking = maskst' } -> do
         -- We found a suitable exception handler, continue with that
-        trace <- schedule thread' simstate
+        trace <- schedule thread' simstate { timers = timers' }
         return (SimTrace time tid tlbl (EventThrow e) $
                 SimTrace time tid tlbl (EventMask maskst') trace)
 
@@ -296,11 +296,22 @@ schedule !thread@Thread{
           -- An unhandled exception in any other thread terminates the thread
           let reason | ThrowSelf <- thrower = FinishedNormally
                      | otherwise            = FinishedDied
-          !trace <- deschedule (Terminated reason) thread simstate
+          !trace <- deschedule (Terminated reason) thread simstate { timers = timers' }
           return $ SimTrace time tid tlbl (EventThrow e)
                  $ SimTrace time tid tlbl (EventThreadUnhandled e)
                  $ SimTrace time tid tlbl (EventDeschedule $ Terminated reason)
                  $ trace
+      where
+        -- When we throw an exception we need to cancel thread delay action
+        -- which could be blocking the current thread.  This is important for
+        -- `TimeoutException` or any other asynchronous exceptions.
+        timers' = PSQ.fromList
+                . filter (\(_,_,info) -> case info of
+                            TimerThreadDelay tid' _
+                              -> tid' /= tid
+                            _ -> True)
+                . PSQ.toAscList
+                $ timers
 
     Catch action' handler k ->
       {-# SCC "schedule.Catch" #-} do

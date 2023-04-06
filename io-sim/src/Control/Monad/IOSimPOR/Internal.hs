@@ -388,7 +388,9 @@ schedule thread@Thread{
         let thread'  = stepThread thread0
             control' = advanceControl (threadStepId thread0) control
             races'   = updateRacesInSimState thread0 simstate
-        trace <- schedule thread' simstate{ races = races', control = control' }
+        trace <- schedule thread' simstate{ races = races',
+                                            control = control',
+                                            timers = timers' }
         return (SimPORTrace time tid tstep tlbl (EventThrow e) $
                 SimPORTrace time tid tstep tlbl (EventMask maskst') trace)
 
@@ -409,11 +411,22 @@ schedule thread@Thread{
               thread' = thread { threadEffect  = effect <> statusWriteEffect tid
                                }
               terminated = Terminated reason
-          !trace <- deschedule terminated thread' simstate
+          !trace <- deschedule terminated thread' simstate { timers = timers' }
           return $ SimPORTrace time tid tstep tlbl (EventThrow e)
                  $ SimPORTrace time tid tstep tlbl (EventThreadUnhandled e)
                  $ SimPORTrace time tid tstep tlbl (EventDeschedule terminated)
                  $ trace
+      where
+        -- When we throw an exception we need to cancel thread delay action
+        -- which could be blocking the current thread.  This is important for
+        -- `TimeoutException` or any other asynchronous exceptions.
+        timers' = PSQ.fromList
+                . filter (\(_,_,info) -> case info of
+                            TimerThreadDelay tid' _
+                              -> tid' /= tid
+                            _ -> True)
+                . PSQ.toAscList
+                $ timers
 
     Catch action' handler k -> do
       -- push the failure and success continuations onto the control stack
@@ -517,7 +530,7 @@ schedule thread@Thread{
                                                (TimeoutFrame nextTmid isLockedRef k ctl)
                               }
       trace <- deschedule Yield thread' simstate { timers   = timers'
-                                                  , nextTmid = succ nextTmid }
+                                                 , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
 
     RegisterDelay d k | d < 0 -> do
