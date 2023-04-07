@@ -363,14 +363,14 @@ schedule thread@Thread{
         locked <- readSTRef isLockedRef
         case locked of
           Locked etid -> do
-            let -- Kill the exception throwing thread and carry on the
-                -- continuation
+            let -- Kill the assassin throwing thread then unmask exceptions and
+                -- carry on the continuation
                 thread' =
                   thread { threadControl =
                             ThreadControl (ThrowTo (toException ThreadKilled)
                                                    etid
-                                                   (k (Just x)))
-                                          ctl'
+                                                   (Return ()))
+                                          (MaskFrame (\_ -> k (Just x)) maskst ctl')
                          , threadMasking = MaskedUninterruptible
                          }
             schedule thread' simstate

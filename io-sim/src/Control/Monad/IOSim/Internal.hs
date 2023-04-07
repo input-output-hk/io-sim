@@ -257,14 +257,14 @@ schedule !thread@Thread{
         locked <- readSTRef isLockedRef
         case locked of
           Locked etid -> do
-            let -- Kill the assassin throwing thread and carry on the
-                -- continuation
+            let -- Kill the assassin throwing thread then unmask exceptions and
+                -- carry on the continuation
                 thread' =
                   thread { threadControl =
                             ThreadControl (ThrowTo (toException ThreadKilled)
                                                    etid
-                                                   (k (Just x)))
-                                          ctl'
+                                                   (Return ()))
+                                          (MaskFrame (\_ -> k (Just x)) maskst ctl')
                          , threadMasking = MaskedUninterruptible
                          }
             schedule thread' simstate
@@ -939,7 +939,7 @@ unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
 -- receive a 'ThreadKilled' exception.
 --
 forkTimeoutInterruptThreads :: forall s a.
-                              [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
+                               [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
                             -> SimState s a
                             -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
