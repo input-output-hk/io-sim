@@ -875,6 +875,7 @@ prop_timeouts times = exploreSimTrace id experiment $ \_ trace ->
                                         intendedActionDuration
           | ((intendedTimeoutDuration,
               intendedActionDuration), n) <- zip times [1 :: Int ..] ]
+
 --
 -- MonadMask properties
 --
