@@ -2,6 +2,18 @@
 
 ## next version
 
+## 0.6.0.0
+
+### Breaking changes
+
+* Added `TimeoutId` to `EventThreadDelay` and `EventThreadFired` events.
+
+### Non breaking changes
+
+* Fixed `threadDelay` in presence of asynchronous exceptions (in `IOSim` and `IOSimPOR`) (#80).
+* Fixed bug in `IOSim` & `IOSimPOR` which resulted in reusing existing
+  `ThreadId`s (#80).
+
 ## 0.5.0.0
 
 * `MVar` type family is not injective anymore.
