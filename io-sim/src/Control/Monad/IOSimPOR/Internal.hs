@@ -242,7 +242,7 @@ timeSinceEpoch (Time t) = fromRational (toRational t)
 -- | Insert thread into `runqueue`.
 --
 insertThread :: Thread s a -> RunQueue -> RunQueue
-insertThread Thread { threadId } = PSQ.insert (Down threadId) (Down threadId) ()
+insertThread Thread { threadId, threadDone } = PSQ.insert (Down threadId) (Down threadId) ()
 
 
 -- | Schedule / run a thread.
@@ -396,7 +396,8 @@ schedule thread@Thread{
         -- We unwound and did not find any suitable exception handler, so we
         -- have an unhandled exception at the top level of the thread.
         | isMain -> do
-          let thread' = thread { threadEffect = effect <> statusWriteEffect tid }
+          let thread' = thread { threadEffect = effect <> statusWriteEffect tid,
+                                 threadDone = True }
           -- An unhandled exception in the main thread terminates the program
           return (SimPORTrace time tid tstep tlbl (EventThrow e) $
                   SimPORTrace time tid tstep tlbl (EventThreadUnhandled e) $
@@ -528,7 +529,7 @@ schedule thread@Thread{
                                                (TimeoutFrame nextTmid isLockedRef k ctl)
                               }
       trace <- deschedule Yield thread' simstate { timers   = timers'
-                                                 , nextTmid = succ nextTmid }
+                                                  , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
 
     RegisterDelay d k | d < 0 -> do
@@ -954,7 +955,7 @@ deschedule Blocked thread@Thread{ threadId = tid, threadEffect = effect } simsta
                           control = advanceControl (threadStepId thread1) control }
 
 deschedule (Terminated reason) thread@Thread { threadId = tid, threadVClock = vClock, threadEffect = effect }
-                               simstate@SimState{ curTime = time, control, finished = finished } = do
+                               simstate@SimState{ curTime = time, control, finished } = do
     -- This thread is done. If there are other threads blocked in a
     -- ThrowTo targeted at this thread then we can wake them up now.
     let thread1     = thread { threadEffect = effect <> statusWriteEffect tid }
@@ -1058,11 +1059,11 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
                               | TimerTimeout tid tmid isLockedRef <- fired ]
 
         -- Get the isLockedRef values
-        !timeoutExpired' <- traverse (\(tid, tmid, isLockedRef) -> do
+        timeoutExpired' <- traverse (\(tid, tmid, isLockedRef) -> do
                                         locked <- readSTRef isLockedRef
                                         return (tid, tmid, isLockedRef, locked)
-                                    )
-                                    timeoutExpired
+                                     )
+                                     timeoutExpired
 
         -- all open races will be completed and reported at this time
         !simstate'' <- forkTimeoutInterruptThreads timeoutExpired'
@@ -1154,19 +1155,21 @@ unblockThreads vClock wakeup simstate@SimState {runqueue, threads} =
 -- should run this interrupting thread in an unmasked state since it might
 -- receive a 'ThreadKilled' exception.
 --
-forkTimeoutInterruptThreads :: [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
+forkTimeoutInterruptThreads :: forall s a.
+                               [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
                             -> SimState s a
                             -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
   foldlM (\st@SimState{ runqueue = runqueue,
                         threads  = threads'
                       }
-           (t, isLockedRef)
+           (t0, t1, isLockedRef)
           -> do
-            let tid'      = threadId t
-                threads'' = Map.insert tid' t threads'
-                runqueue' = insertThread t runqueue
-            writeSTRef isLockedRef (Locked tid')
+            let threads'' = Map.insert (threadId t0) t0
+                          . Map.insert (threadId t1) t1
+                          $ threads'
+                runqueue' = insertThread t1 runqueue
+            writeSTRef isLockedRef (Locked (threadId t1))
 
             return st { runqueue = runqueue',
                         threads  = threads''
@@ -1184,10 +1187,12 @@ forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
               ]
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
+    throwToThread :: [(Thread s a, Thread s a, STRef s IsLocked)]
     throwToThread =
       [ let nextId   = threadNextTId t
             tid'     = childThreadId tid nextId
-         in ( Thread { threadId      = tid',
+         in ( t { threadNextTId = nextId + 1 }
+            , Thread { threadId      = tid',
                        threadControl =
                         ThreadControl
                           (ThrowTo (toException (TimeoutException tmid))

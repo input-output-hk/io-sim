@@ -932,20 +932,22 @@ unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
 -- should run this interrupting thread in an unmasked state since it might
 -- receive a 'ThreadKilled' exception.
 --
-forkTimeoutInterruptThreads :: [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
+forkTimeoutInterruptThreads :: forall s a.
+                              [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
                             -> SimState s a
                             -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
   foldlM (\st@SimState{ runqueue = runqueue,
                         threads  = threads'
                       }
-           (t, isLockedRef)
+           (t0, t1, isLockedRef)
           -> do
-            let tid'      = threadId t
-                threads'' = Map.insert tid' t threads'
-                runqueue' = Deque.snoc tid' runqueue
+            let threads'' = Map.insert (threadId t0) t0
+                          . Map.insert (threadId t1) t1
+                          $ threads'
+                runqueue' = Deque.snoc (threadId t1) runqueue
 
-            writeSTRef isLockedRef (Locked tid')
+            writeSTRef isLockedRef (Locked (threadId t1))
 
             return st { runqueue = runqueue',
                         threads  = threads''
@@ -963,10 +965,12 @@ forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
               ]
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
+    throwToThread :: [(Thread s a, Thread s a, STRef s IsLocked)]
     throwToThread =
       [ let nextId   = threadNextTId t
             tid'     = childThreadId tid nextId
-         in ( Thread { threadId      = tid',
+         in ( t { threadNextTId = succ nextId }
+            , Thread { threadId      = tid',
                        threadControl =
                          ThreadControl
                           (ThrowTo (toException (TimeoutException tmid))
