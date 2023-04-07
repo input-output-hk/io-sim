@@ -61,6 +61,7 @@ tests =
                                               prop_timeout_no_deadlock_Sim
     , testProperty "prop_timeout"             prop_timeout
     , testProperty "prop_timeouts"            prop_timeouts
+    , testProperty "prop_stacked_timeouts"    prop_stacked_timeouts
     , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
     , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
     , testGroup "throw/catch unit tests"
@@ -887,6 +888,38 @@ prop_timeouts times = exploreSimTrace id experiment $ \_ trace ->
            in counterexample
                ("too many failures: " ++ show numFailures ++ " ≰ " ++ show maxFailures)
                (numFailures <= maxFailures)
+
+
+prop_stacked_timeouts :: DiffTime
+                      -> DiffTime
+                      -> DiffTime
+                      -> Property
+prop_stacked_timeouts timeout0 timeout1 actionDuration =
+    exploreSimTrace id experiment $ \_ trace ->
+      case traceResult False trace of
+        Right result -> result === predicted
+        Left e       -> counterexample (show e) False
+  where
+    experiment :: IOSim s (Maybe (Maybe ()))
+    experiment = exploreRaces
+              >> timeout timeout0 (timeout timeout1 (threadDelay actionDuration))
+
+    predicted | timeout0 == 0
+              = Nothing
+
+              | timeout1 == 0
+              = Just Nothing
+
+              -- This differs from `IOSim` case; `IOSimPOR` is using
+              -- different scheduler.
+              | actionDuration < min timeout0 timeout1
+              = Just (Just ())
+
+              | timeout0 < timeout1
+              = Nothing
+
+              | otherwise -- i.e. timeout0 >= timeout1
+              = Just Nothing
 
 --
 -- MonadMask properties
