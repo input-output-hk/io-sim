@@ -157,9 +157,15 @@ labelledThreads threadMap =
 --
 data TimerCompletionInfo s =
        Timer !(TVar s TimeoutState)
+     -- ^ `newTimeout` timer.
      | TimerRegisterDelay !(TVar s Bool)
+     -- ^ `registerDelay` timer.
      | TimerThreadDelay !ThreadId !TimeoutId
+     -- ^ `threadDelay` timer run by `ThreadId` which was assigned the given
+     -- `TimeoutId` (only used to report in a trace).
      | TimerTimeout !ThreadId !TimeoutId !(STRef s IsLocked)
+     -- ^ `timeout` timer run by `ThreadId` which was assigned the given
+     -- `TimeoutId` (only used to report in a trace).
 
 type RunQueue = OrdPSQ (Down ThreadId) (Down ThreadId) ()
 
