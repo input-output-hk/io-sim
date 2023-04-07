@@ -1,11 +1,20 @@
 {-# LANGUAGE CPP                 #-}
+{-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Control.Monad.IOSim
   ( tests
   , TestThreadGraph (..)
+    -- * Timeout tests
+  , TimeoutConstraints
+  , TimeoutDuration
+  , ActionDuration
+  , singleTimeoutExperiment
   ) where
 
 import           Data.Either (isLeft)
@@ -21,6 +30,7 @@ import           System.IO.Error (ioeGetErrorString, isUserError)
 
 import           Control.Concurrent.Class.MonadSTM.Strict
 import qualified Control.Concurrent.Class.MonadSTM.TVar as LazySTM
+import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadThrow
@@ -32,7 +42,7 @@ import           Test.Control.Monad.Utils
 import           Test.Control.Monad.STM
 
 import           Test.QuickCheck
-import           Test.Tasty
+import           Test.Tasty hiding (after)
 import           Test.Tasty.QuickCheck
 
 import           GHC.Conc (ThreadStatus(..))
@@ -50,6 +60,8 @@ tests =
                                             prop_timeout_no_deadlock_Sim
   , testProperty "timeout (IO): no deadlock"
                                             prop_timeout_no_deadlock_IO
+  , testProperty "prop_timeout"             prop_timeout
+  , testProperty "prop_timeouts"            prop_timeouts
   , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
   , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
   , testProperty "order (IO)"               (expectFailure prop_fork_order_IO)
@@ -1002,12 +1014,122 @@ prop_stm_referenceSim :: SomeTerm -> Property
 prop_stm_referenceSim t =
     runSimOrThrow (prop_stm_referenceM t)
 
+--
+-- MonadTimer
+--
+
 prop_timeout_no_deadlock_Sim :: Bool
 prop_timeout_no_deadlock_Sim = runSimOrThrow prop_timeout_no_deadlockM
 
 prop_timeout_no_deadlock_IO :: Property
 prop_timeout_no_deadlock_IO = ioProperty prop_timeout_no_deadlockM
 
+type TimeoutDuration = DiffTime
+type ActionDuration  = DiffTime
+type TimeoutConstraints m =
+      ( MonadAsync m
+      , MonadFork  m
+      , MonadTime  m
+      , MonadTimer m
+      , MonadMask  m
+      , MonadThrow (STM m)
+      )
+
+instance Arbitrary DiffTime where
+    arbitrary = millisecondsToDiffTime <$>
+                frequency
+                  [ (4, choose (0,  5))
+                  , (1, choose (5, 10))
+                  ]
+      where
+        millisecondsToDiffTime = picosecondsToDiffTime . (* 1_000_000_000)
+
+    shrink = map (fromRational . getNonNegative)
+           . shrink
+           . NonNegative
+           . toRational
+
+singleTimeoutExperiment
+    :: TimeoutConstraints m
+    => TimeoutDuration
+    -> ActionDuration
+    -> m Property
+singleTimeoutExperiment intendedTimeoutDuration
+                        intendedActionDuration = do
+
+    before <- getMonotonicTime
+
+              -- Allow the action to run for intendedTimeoutDuration
+    result <- timeout intendedTimeoutDuration $ do
+
+                  -- Simulate an action that should take intendedActionDuration
+                  threadDelay intendedActionDuration
+
+                  -- but we also measure the actual duration
+                  getMonotonicTime
+
+    after  <- getMonotonicTime
+
+    return $ experimentResult intendedTimeoutDuration
+                              intendedActionDuration
+                              before after result
+
+experimentResult :: TimeoutDuration
+                 -> ActionDuration
+                 -> Time
+                 -> Time
+                 -> Maybe Time
+                 -> Property
+experimentResult intendedTimeoutDuration
+                 intendedActionDuration
+                 before after result =
+    counterexamples
+      [ "intendedTimeoutDuration: " ++ show intendedTimeoutDuration
+      , "intendedActionDuration:  " ++ show intendedActionDuration
+      , "actualOverallDuration:   " ++ show actualOverallDuration
+      ] $ timeoutCheck
+  where
+    actualOverallDuration   = diffTime after before
+
+    timeoutCheck =
+      case result of
+        Nothing ->
+          counterexamples
+            [ "timeout fired"
+            , "violation of timeout property:\n" ++
+              "  actualOverallDuration == intendedTimeoutDuration"
+            ] $
+          actualOverallDuration === intendedTimeoutDuration
+
+        Just afterAction ->
+          let actualActionDuration = diffTime afterAction before in
+          counterexamples
+            [ "actualActionDuration:  " ++ show actualActionDuration
+            , "timeout did not fire"
+            , "violation of timeout property:\n" ++
+              "  actualActionDuration == intendedTimeoutDuration"
+            ] $
+          actualActionDuration === intendedActionDuration
+
+
+prop_timeout
+    :: TimeoutDuration
+    -> ActionDuration
+    -> Property
+prop_timeout intendedTimeoutDuration intendedActionDuration = 
+    runSimOrThrow (singleTimeoutExperiment intendedTimeoutDuration intendedActionDuration)
+
+prop_timeouts
+    :: [(TimeoutDuration, ActionDuration)]
+    -> Property
+prop_timeouts times = runSimOrThrow $
+      conjoin <$>
+      sequence
+        [ counterexample ("failure on timeout test #" ++ show n)
+          <$> singleTimeoutExperiment intendedTimeoutDuration
+                                      intendedActionDuration
+        | ((intendedTimeoutDuration,
+            intendedActionDuration), n) <- zip times [1 :: Int ..] ]
 
 --
 -- MonadMask properties
@@ -1072,3 +1194,11 @@ unit_catch_throwTo_masking_state_async_mayblock_IO =
 unit_catch_throwTo_masking_state_async_mayblock_ST :: MaskingState -> Property
 unit_catch_throwTo_masking_state_async_mayblock_ST ms =
     runSimOrThrow (prop_catch_throwTo_masking_state_async_mayblock ms)
+
+--
+-- Utils
+--
+
+counterexamples :: Testable t => [String] -> t -> Property
+counterexamples []     p = property p
+counterexamples (c:cs) p = counterexample c (counterexamples cs p)

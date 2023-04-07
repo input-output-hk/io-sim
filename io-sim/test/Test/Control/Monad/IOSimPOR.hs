@@ -37,6 +37,8 @@ import           Control.Monad.IOSim
 
 import           GHC.Generics
 
+import           Test.Control.Monad.IOSim (TimeoutDuration, ActionDuration,
+                   singleTimeoutExperiment)
 import           Test.Control.Monad.Utils
 import           Test.Control.Monad.STM
 
@@ -55,6 +57,8 @@ tests =
     , testProperty "timers (IOSim)"           (withMaxSuccess 1000 prop_timers_ST)
     , testProperty "timeout (IOSim): no deadlock"
                                               prop_timeout_no_deadlock_Sim
+    , testProperty "prop_timeout"             prop_timeout
+    , testProperty "prop_timeouts"            prop_timeouts
     , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
     , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
     , testGroup "throw/catch unit tests"
@@ -838,6 +842,39 @@ prop_timeout_no_deadlock_Sim = -- runSimOrThrow prop_timeout_no_deadlockM
       Right a -> property a
       Left e  -> counterexample (show e) False
 
+prop_timeout
+    :: TimeoutDuration
+    -> ActionDuration
+    -> Property
+prop_timeout intendedTimeoutDuration intendedActionDuration = 
+    exploreSimTrace id experiment $ \_ trace ->
+        case traceResult False trace of
+          Right a -> a
+          Left e  -> counterexample (show e) False
+  where
+    experiment :: IOSim s Property
+    experiment = do
+      exploreRaces
+      singleTimeoutExperiment intendedTimeoutDuration intendedActionDuration
+
+prop_timeouts
+    :: [(TimeoutDuration, ActionDuration)]
+    -> Property
+prop_timeouts times = exploreSimTrace id experiment $ \_ trace ->
+    case traceResult False trace of
+      Right a -> a
+      Left e  -> counterexample (show e) False
+  where
+    experiment :: IOSim s Property
+    experiment = do
+      exploreRaces
+      conjoin <$>
+        sequence
+          [ counterexample ("failure on timeout test #" ++ show n)
+            <$> singleTimeoutExperiment intendedTimeoutDuration
+                                        intendedActionDuration
+          | ((intendedTimeoutDuration,
+              intendedActionDuration), n) <- zip times [1 :: Int ..] ]
 --
 -- MonadMask properties
 --
