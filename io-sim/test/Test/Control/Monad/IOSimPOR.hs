@@ -38,7 +38,9 @@ import           Control.Monad.IOSim
 import           GHC.Generics
 
 import           Test.Control.Monad.IOSim (TimeoutDuration, ActionDuration,
-                   singleTimeoutExperiment)
+                   WithSanityCheck (..), ignoreSanityCheck,
+                   isSanityCheckIgnored, singleTimeoutExperiment,
+                   withSanityCheck)
 import           Test.Control.Monad.Utils
 import           Test.Control.Monad.STM
 
@@ -855,7 +857,7 @@ prop_timeout intendedTimeoutDuration intendedActionDuration =
     experiment :: IOSim s Property
     experiment = do
       exploreRaces
-      singleTimeoutExperiment intendedTimeoutDuration intendedActionDuration
+      withSanityCheck <$> singleTimeoutExperiment intendedTimeoutDuration intendedActionDuration
 
 prop_timeouts
     :: [(TimeoutDuration, ActionDuration)]
@@ -868,13 +870,23 @@ prop_timeouts times = exploreSimTrace id experiment $ \_ trace ->
     experiment :: IOSim s Property
     experiment = do
       exploreRaces
-      conjoin <$>
+      conjoin' <$>
         sequence
-          [ counterexample ("failure on timeout test #" ++ show n)
+          [ fmap (counterexample ("failure on timeout test #" ++ show n))
             <$> singleTimeoutExperiment intendedTimeoutDuration
                                         intendedActionDuration
           | ((intendedTimeoutDuration,
               intendedActionDuration), n) <- zip times [1 :: Int ..] ]
+
+    maxFailures = 0
+
+    conjoin' :: [WithSanityCheck Property] -> Property
+    conjoin' props =
+           conjoin (ignoreSanityCheck `map` props)
+      .&&. let numFailures = length (filter isSanityCheckIgnored props)
+           in counterexample
+               ("too many failures: " ++ show numFailures ++ " ≰ " ++ show maxFailures)
+               (numFailures <= maxFailures)
 
 --
 -- MonadMask properties

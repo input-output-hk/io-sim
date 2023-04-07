@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -11,6 +12,10 @@ module Test.Control.Monad.IOSim
   ( tests
   , TestThreadGraph (..)
     -- * Timeout tests
+  , WithSanityCheck (..)
+  , withSanityCheck
+  , ignoreSanityCheck
+  , isSanityCheckIgnored
   , TimeoutConstraints
   , TimeoutDuration
   , ActionDuration
@@ -46,7 +51,6 @@ import           Test.Tasty hiding (after)
 import           Test.Tasty.QuickCheck
 
 import           GHC.Conc (ThreadStatus(..))
-
 
 tests :: TestTree
 tests =
@@ -1033,6 +1037,8 @@ type TimeoutConstraints m =
       , MonadTimer m
       , MonadMask  m
       , MonadThrow (STM m)
+      , MonadSay   m
+      , MonadMaskingState m
       )
 
 instance Arbitrary DiffTime where
@@ -1053,7 +1059,7 @@ singleTimeoutExperiment
     :: TimeoutConstraints m
     => TimeoutDuration
     -> ActionDuration
-    -> m Property
+    -> m (WithSanityCheck Property)
 singleTimeoutExperiment intendedTimeoutDuration
                         intendedActionDuration = do
 
@@ -1062,6 +1068,7 @@ singleTimeoutExperiment intendedTimeoutDuration
               -- Allow the action to run for intendedTimeoutDuration
     result <- timeout intendedTimeoutDuration $ do
 
+                  getMaskingState >>= say . show
                   -- Simulate an action that should take intendedActionDuration
                   threadDelay intendedActionDuration
 
@@ -1074,12 +1081,33 @@ singleTimeoutExperiment intendedTimeoutDuration
                               intendedActionDuration
                               before after result
 
+data WithSanityCheck prop
+  = WithSanityCheck        prop
+
+  -- | The first one represents the property without sanity check, the other one
+  -- sanity check (which failed). It is kept to keep its `counterexample`s.
+  | WithSanityCheckFailure prop prop
+  deriving (Functor)
+
+ignoreSanityCheck :: WithSanityCheck prop -> prop
+ignoreSanityCheck (WithSanityCheck    prop)       = prop
+ignoreSanityCheck (WithSanityCheckFailure prop _) = prop
+
+withSanityCheck :: WithSanityCheck Property -> Property
+withSanityCheck (WithSanityCheck        prop)             = prop
+withSanityCheck (WithSanityCheckFailure prop sanityCheck) = prop .&&. sanityCheck
+
+isSanityCheckIgnored :: WithSanityCheck prop -> Bool
+isSanityCheckIgnored WithSanityCheck{}         = False
+isSanityCheckIgnored WithSanityCheckFailure {} = True
+
+
 experimentResult :: TimeoutDuration
                  -> ActionDuration
                  -> Time
                  -> Time
                  -> Maybe Time
-                 -> Property
+                 -> WithSanityCheck Property
 experimentResult intendedTimeoutDuration
                  intendedActionDuration
                  before after result =
@@ -1087,29 +1115,46 @@ experimentResult intendedTimeoutDuration
       [ "intendedTimeoutDuration: " ++ show intendedTimeoutDuration
       , "intendedActionDuration:  " ++ show intendedActionDuration
       , "actualOverallDuration:   " ++ show actualOverallDuration
-      ] $ timeoutCheck
+      ] <$>
+      if ignoredSanityCheck
+        then WithSanityCheckFailure timeoutCheck sanityCheck
+        else WithSanityCheck $ sanityCheck .&&. timeoutCheck
   where
     actualOverallDuration   = diffTime after before
+    intendedOverallDuration = min intendedTimeoutDuration intendedActionDuration
+
+    ignoredSanityCheck =
+         actualOverallDuration < intendedOverallDuration
+      || actualOverallDuration > intendedOverallDuration
+
+    sanityCheck = counterexample "sanityCheckLow"  sanityCheckLow
+             .&&. counterexample "sanityCheckHigh" sanityCheckHigh
+
+    sanityCheckLow =
+      actualOverallDuration >= intendedOverallDuration
+
+    sanityCheckHigh =
+      actualOverallDuration <= intendedOverallDuration
 
     timeoutCheck =
       case result of
         Nothing ->
           counterexamples
-            [ "timeout fired"
+            [ "timeout fired (but should not have)"
             , "violation of timeout property:\n" ++
-              "  actualOverallDuration == intendedTimeoutDuration"
+              "  actualOverallDuration >= intendedTimeoutDuration"
             ] $
-          actualOverallDuration === intendedTimeoutDuration
+          actualOverallDuration >= intendedTimeoutDuration
 
         Just afterAction ->
           let actualActionDuration = diffTime afterAction before in
           counterexamples
             [ "actualActionDuration:  " ++ show actualActionDuration
-            , "timeout did not fire"
+            , "timeout did not fire (but should not have)"
             , "violation of timeout property:\n" ++
-              "  actualActionDuration == intendedTimeoutDuration"
+              "  actualActionDuration <= intendedTimeoutDuration"
             ] $
-          actualActionDuration === intendedActionDuration
+          actualActionDuration <= intendedActionDuration
 
 
 prop_timeout
@@ -1117,19 +1162,39 @@ prop_timeout
     -> ActionDuration
     -> Property
 prop_timeout intendedTimeoutDuration intendedActionDuration = 
-    runSimOrThrow (singleTimeoutExperiment intendedTimeoutDuration intendedActionDuration)
+    runSimOrThrow (withSanityCheck <$>
+                    singleTimeoutExperiment
+                      intendedTimeoutDuration
+                      intendedActionDuration)
+
 
 prop_timeouts
     :: [(TimeoutDuration, ActionDuration)]
     -> Property
-prop_timeouts times = runSimOrThrow $
-      conjoin <$>
-      sequence
-        [ counterexample ("failure on timeout test #" ++ show n)
-          <$> singleTimeoutExperiment intendedTimeoutDuration
-                                      intendedActionDuration
-        | ((intendedTimeoutDuration,
-            intendedActionDuration), n) <- zip times [1 :: Int ..] ]
+prop_timeouts times =
+    counterexample (ppTrace_ trace) $
+    either (\e -> counterexample (show e) False) id $
+    traceResult False trace
+  where
+    trace =
+      runSimTrace $
+        conjoin' <$>
+        sequence
+          [ fmap (counterexample ("failure on timeout test #" ++ show n))
+            <$> singleTimeoutExperiment intendedTimeoutDuration
+                                        intendedActionDuration
+          | ((intendedTimeoutDuration,
+              intendedActionDuration), n) <- zip times [1 :: Int ..] ]
+
+    maxFailures = 0
+
+    conjoin' :: [WithSanityCheck Property] -> Property
+    conjoin' props =
+           conjoin (ignoreSanityCheck `map` props)
+      .&&. let numFailures = length (filter isSanityCheckIgnored props)
+           in counterexample
+               ("too many failures: " ++ show numFailures ++ " ≰ " ++ show maxFailures)
+               (numFailures <= maxFailures)
 
 --
 -- MonadMask properties
