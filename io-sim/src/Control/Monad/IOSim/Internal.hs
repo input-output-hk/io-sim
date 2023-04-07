@@ -266,14 +266,12 @@ schedule !thread@Thread{
           NotLocked -> do
             -- Acquire lock
             writeSTRef isLockedRef (Locked tid)
-
-                -- Remove the timer from the queue
-            let timers' = PSQ.delete tmid timers
+            let -- Remove the timer from the queue
+                timers' = PSQ.delete tmid timers
                 -- Run the continuation
                 thread' = thread { threadControl = ThreadControl (k (Just x)) ctl' }
+            schedule thread' simstate { timers = timers' }
 
-            schedule thread' simstate { timers = timers'
-                                      }
     Throw thrower e -> {-# SCC "schedule.Throw" #-}
                case unwindControlStack e thread of
       -- Found a CatchFrame
