@@ -1165,62 +1165,66 @@ forkTimeoutInterruptThreads :: forall s a.
                                [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
                             -> SimState s a
                             -> ST s (SimState s a)
-forkTimeoutInterruptThreads timeoutExpired simState@SimState {threads} =
+forkTimeoutInterruptThreads timeoutExpired simState =
   foldlM (\st@SimState{ runqueue = runqueue,
                         threads  = threads'
                       }
-           (t0, t1, isLockedRef)
+           (t, isLockedRef)
           -> do
-            let threads'' = Map.insert (threadId t0) t0
-                          . Map.insert (threadId t1) t1
+            let threads'' = Map.insert (threadId t) t
                           $ threads'
-                runqueue' = insertThread t1 runqueue
-            writeSTRef isLockedRef (Locked (threadId t1))
+                runqueue' = insertThread t runqueue
+            writeSTRef isLockedRef (Locked (threadId t))
 
             return st { runqueue = runqueue',
                         threads  = threads''
                       })
-          simState
+          simState'
           throwToThread
 
   where
     -- can only throw exception if the thread exists and if the mutually
     -- exclusive lock exists and is still 'NotLocked'
-    toThrow = [ (tid, tmid, ref, t)
-              | (tid, tmid, ref, locked) <- timeoutExpired
-              , Just t <- [Map.lookup tid threads]
-              , NotLocked <- [locked]
-              ]
+    toThrow :: [(ThreadId, TimeoutId, STRef s IsLocked)]
+    toThrow  = [ (tid, tmid, ref)
+               | (tid, tmid, ref, NotLocked) <- timeoutExpired ]
+
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, Thread s a, STRef s IsLocked)]
-    throwToThread =
-      [ let nextId   = threadNextTId t
-            tid'     = childThreadId tid nextId
-         in ( t { threadNextTId = nextId + 1 }
-            , Thread { threadId      = tid',
-                       threadControl =
-                        ThreadControl
-                          (ThrowTo (toException (TimeoutException tmid))
-                                    tid
-                                    (Return ()))
-                          ForkFrame,
-                       threadBlocked = False,
-                       threadDone    = False,
-                       threadMasking = Unmasked,
-                       threadThrowTo = [],
-                       threadClockId = threadClockId t,
-                       threadLabel   = Just "timeout-forked-thread",
-                       threadNextTId = 1,
-                       threadStep    = 0,
-                       threadVClock  = insertVClock tid' 0
-                                     $ threadVClock t,
-                       threadEffect  = mempty,
-                       threadRacy    = threadRacy t
-                     }
-            , ref)
-      | (tid, tmid, ref, t) <- toThrow
-      ]
+    throwToThread :: [(Thread s a, STRef s IsLocked)]
+    (simState', throwToThread) = List.mapAccumR fn simState toThrow
+      where
+        fn :: SimState s a
+           -> (ThreadId, TimeoutId, STRef s IsLocked)
+           -> (SimState s a, (Thread s a, STRef s IsLocked))
+        fn state@SimState { threads } (tid, tmid, ref) =
+          let t        = threads Map.! tid
+              nextId   = threadNextTId t
+              tid'     = childThreadId tid nextId
+           in ( state { threads = Map.insert tid t { threadNextTId = succ nextId } threads }
+              , ( Thread { threadId      = tid',
+                           threadControl =
+                            ThreadControl
+                              (ThrowTo (toException (TimeoutException tmid))
+                                        tid
+                                        (Return ()))
+                              ForkFrame,
+                           threadBlocked = False,
+                           threadDone    = False,
+                           threadMasking = Unmasked,
+                           threadThrowTo = [],
+                           threadClockId = threadClockId t,
+                           threadLabel   = Just "timeout-forked-thread",
+                           threadNextTId = 1,
+                           threadStep    = 0,
+                           threadVClock  = insertVClock tid' 0
+                                         $ threadVClock t,
+                           threadEffect  = mempty,
+                           threadRacy    = threadRacy t
+                         }
+                , ref )
+              )
+       
 
 -- | Iterate through the control stack to find an enclosing exception handler
 -- of the right type, or unwind all the way to the top level for the thread.
@@ -1267,10 +1271,9 @@ unwindControlStack e thread =
     unwind maskst (TimeoutFrame tmid isLockedRef k ctl) =
       case fromException e of
         -- Exception came from timeout expiring
-        Just (TimeoutException tmid') ->
-          assert (tmid == tmid')
+        Just (TimeoutException tmid')  | tmid == tmid' ->
           Right thread { threadControl = ThreadControl (k Nothing) ctl }
-        -- Exception came from a different exception
+          -- Exception came from a different exception
         _ -> unwind maskst ctl
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState

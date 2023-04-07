@@ -66,6 +66,7 @@ tests =
                                             prop_timeout_no_deadlock_IO
   , testProperty "prop_timeout"             prop_timeout
   , testProperty "prop_timeouts"            prop_timeouts
+  , testProperty "prop_stacked_timeouts"    prop_stacked_timeouts
   , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
   , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
   , testProperty "order (IO)"               (expectFailure prop_fork_order_IO)
@@ -1195,6 +1196,32 @@ prop_timeouts times =
            in counterexample
                ("too many failures: " ++ show numFailures ++ " ≰ " ++ show maxFailures)
                (numFailures <= maxFailures)
+
+
+prop_stacked_timeouts :: TimeoutDuration
+                      -> TimeoutDuration
+                      -> ActionDuration
+                      -> Property
+prop_stacked_timeouts timeout0 timeout1 actionDuration =
+    runSimOrThrow experiment === predicted
+  where
+    experiment :: IOSim s (Maybe (Maybe ()))
+    experiment = timeout timeout0 (timeout timeout1 (threadDelay actionDuration))
+
+    predicted | timeout0 == 0
+              = Nothing
+
+              | timeout1 == 0
+              = Just Nothing
+
+              | actionDuration <= min timeout0 timeout1
+              = Just (Just ())
+
+              | timeout0 < timeout1
+              = Nothing
+
+              | otherwise -- i.e. timeout0 >= timeout1
+              = Just Nothing
 
 --
 -- MonadMask properties
