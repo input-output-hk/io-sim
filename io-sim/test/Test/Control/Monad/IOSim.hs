@@ -28,7 +28,7 @@ import           Data.Foldable (foldl')
 import           Data.Functor (($>))
 import           Data.Time.Clock (picosecondsToDiffTime)
 
-import           Control.Exception (ArithException (..))
+import           Control.Exception (ArithException (..), AsyncException)
 import           Control.Monad
 import           Control.Monad.Fix
 import           System.IO.Error (ioeGetErrorString, isUserError)
@@ -57,16 +57,19 @@ tests =
   testGroup "IO simulator"
   [ testProperty "read/write graph (IO)"    prop_stm_graph_io
   , testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
-  , testProperty "timers (IOSim)"           (withMaxSuccess 1000 prop_timers_ST)
-  -- fails since we just use `threadDelay` to schedule timers in `IO`.
-  , testProperty "timers (IO)"              (expectFailure prop_timers_IO)
-  , testProperty "timeout (IOSim): no deadlock"
-                                            prop_timeout_no_deadlock_Sim
-  , testProperty "timeout (IO): no deadlock"
-                                            prop_timeout_no_deadlock_IO
-  , testProperty "prop_timeout"             prop_timeout
-  , testProperty "prop_timeouts"            prop_timeouts
-  , testProperty "prop_stacked_timeouts"    prop_stacked_timeouts
+  , testGroup "timeouts"
+    [ testProperty "IOSim"                  (withMaxSuccess 1000 prop_timers_ST)
+    -- fails since we just use `threadDelay` to schedule timers in `IO`.
+    , testProperty "IO"                     (expectFailure prop_timers_IO)
+    , testProperty "IOSim: no deadlock"     prop_timeout_no_deadlock_Sim
+    , testProperty "IO: no deadlock"        prop_timeout_no_deadlock_IO
+    , testProperty "timeout"                prop_timeout
+    , testProperty "timeouts"               prop_timeouts
+    , testProperty "stacked timeouts"       prop_stacked_timeouts
+    , testProperty "async exceptions 1"     unit_timeouts_and_async_exceptions_1
+    , testProperty "async exceptions 2"     unit_timeouts_and_async_exceptions_2
+    , testProperty "async exceptions 3"     unit_timeouts_and_async_exceptions_3
+    ]
   , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
   , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
   , testProperty "order (IO)"               (expectFailure prop_fork_order_IO)
@@ -1222,6 +1225,69 @@ prop_stacked_timeouts timeout0 timeout1 actionDuration =
 
               | otherwise -- i.e. timeout0 >= timeout1
               = Just Nothing
+
+
+unit_timeouts_and_async_exceptions_1 :: Property
+unit_timeouts_and_async_exceptions_1 =
+    let trace = runSimTrace experiment in
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    delay = 1
+
+    experiment :: IOSim s Property
+    experiment = do
+      tid <- forkIO $ void $
+        timeout delay (atomically retry)
+
+      threadDelay (delay / 2)
+      killThread tid
+      threadDelay 1
+      return $ property True 
+
+
+unit_timeouts_and_async_exceptions_2 :: Property
+unit_timeouts_and_async_exceptions_2 =
+    let trace = runSimTrace experiment in
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    delay = 1
+
+    experiment :: IOSim s Property
+    experiment = do
+      tid <- forkIO $ void $
+        timeout delay (atomically retry) `catch` (\(_ :: AsyncException) -> return Nothing)
+
+      threadDelay (delay / 2)
+      killThread tid
+      threadDelay 1
+      return $ property True 
+
+
+unit_timeouts_and_async_exceptions_3 :: Property
+unit_timeouts_and_async_exceptions_3 =
+    let trace = runSimTrace experiment in
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    delay = 1
+
+    experiment :: IOSim s Property
+    experiment = do
+      tid <- forkIO $ void $
+        timeout delay (atomically retry `catch` (\(_ :: AsyncException) -> return ()))
+
+      threadDelay (delay / 2)
+      killThread tid
+      threadDelay 1
+      return $ property True 
 
 --
 -- MonadMask properties

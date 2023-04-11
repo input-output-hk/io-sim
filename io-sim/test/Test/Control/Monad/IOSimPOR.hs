@@ -21,7 +21,7 @@ import           System.Exit
 import           System.IO.Error (ioeGetErrorString, isUserError)
 import           System.IO.Unsafe
 
-import           Control.Exception (ArithException (..))
+import           Control.Exception (ArithException (..), AsyncException)
 import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Parallel
@@ -56,12 +56,13 @@ tests =
   -- , testProperty "propPermutations" propPermutations
   , testGroup "IO simulator properties"
     [ testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
-    , testProperty "timers (IOSim)"           (withMaxSuccess 1000 prop_timers_ST)
-    , testProperty "timeout (IOSim): no deadlock"
-                                              prop_timeout_no_deadlock_Sim
-    , testProperty "prop_timeout"             prop_timeout
-    , testProperty "prop_timeouts"            prop_timeouts
-    , testProperty "prop_stacked_timeouts"    prop_stacked_timeouts
+    , testGroup "timeouts"
+      [ testProperty "IOSim"                  (withMaxSuccess 1000 prop_timers_ST)
+      , testProperty "IOSim: no deadlock"     prop_timeout_no_deadlock_Sim
+      , testProperty "timeout"                prop_timeout
+      , testProperty "timeouts"               prop_timeouts
+      , testProperty "stacked timeouts"       prop_stacked_timeouts
+      ]
     , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
     , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
     , testGroup "throw/catch unit tests"
@@ -920,6 +921,71 @@ prop_stacked_timeouts timeout0 timeout1 actionDuration =
 
               | otherwise -- i.e. timeout0 >= timeout1
               = Just Nothing
+
+unit_timeouts_and_async_exceptions_1 :: Property
+unit_timeouts_and_async_exceptions_1 =
+    exploreSimTrace id experiment $ \_ trace ->
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    delay = 1
+
+    experiment :: IOSim s Property
+    experiment = do
+      exploreRaces
+      tid <- forkIO $ void $
+        timeout delay (atomically retry)
+
+      threadDelay (delay / 2)
+      killThread tid
+      threadDelay 1
+      return $ property True 
+
+
+unit_timeouts_and_async_exceptions_2 :: Property
+unit_timeouts_and_async_exceptions_2 =
+    exploreSimTrace id experiment $ \_ trace ->
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    delay = 1
+
+    experiment :: IOSim s Property
+    experiment = do
+      exploreRaces
+      tid <- forkIO $ void $
+        timeout delay (atomically retry) `catch` (\(_ :: AsyncException) -> return Nothing)
+
+      threadDelay (delay / 2)
+      killThread tid
+      threadDelay 1
+      return $ property True 
+
+
+unit_timeouts_and_async_exceptions_3 :: Property
+unit_timeouts_and_async_exceptions_3 =
+    exploreSimTrace id experiment $ \_ trace ->
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    delay = 1
+
+    experiment :: IOSim s Property
+    experiment = do
+      exploreRaces
+      tid <- forkIO $ void $
+        timeout delay (atomically retry `catch` (\(_ :: AsyncException) -> return ()))
+
+      threadDelay (delay / 2)
+      killThread tid
+      threadDelay 1
+      return $ property True 
 
 --
 -- MonadMask properties

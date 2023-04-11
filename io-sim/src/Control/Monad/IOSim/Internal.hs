@@ -128,6 +128,9 @@ data TimerCompletionInfo s =
      -- ^ `timeout` timer run by `ThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
 
+
+type Timeouts s = OrdPSQ TimeoutId Time (TimerCompletionInfo s)
+
 -- | Internal state.
 --
 data SimState s a = SimState {
@@ -140,7 +143,7 @@ data SimState s a = SimState {
        -- | current time
        curTime  :: !Time,
        -- | ordered list of timers and timeouts
-       timers   :: !(OrdPSQ TimeoutId Time (TimerCompletionInfo s)),
+       timers   :: !(Timeouts s),
        -- | list of clocks
        clocks   :: !(Map ClockId UTCTime),
        nextVid  :: !TVarId,     -- ^ next unused 'TVarId'
@@ -279,15 +282,15 @@ schedule !thread@Thread{
             schedule thread' simstate { timers = timers' }
 
     Throw thrower e -> {-# SCC "schedule.Throw" #-}
-               case unwindControlStack e thread of
+               case unwindControlStack e thread timers' of
       -- Found a CatchFrame
-      Right thread'@Thread { threadMasking = maskst' } -> do
+      (Right thread'@Thread { threadMasking = maskst' }, timers'') -> do
         -- We found a suitable exception handler, continue with that
-        trace <- schedule thread' simstate { timers = timers' }
+        trace <- schedule thread' simstate { timers = timers'' }
         return (SimTrace time tid tlbl (EventThrow e) $
                 SimTrace time tid tlbl (EventMask maskst') trace)
 
-      Left isMain
+      (Left isMain, timers'')
         -- We unwound and did not find any suitable exception handler, so we
         -- have an unhandled exception at the top level of the thread.
         | isMain ->
@@ -300,7 +303,7 @@ schedule !thread@Thread{
           -- An unhandled exception in any other thread terminates the thread
           let reason | ThrowSelf <- thrower = FinishedNormally
                      | otherwise            = FinishedDied
-          !trace <- deschedule (Terminated reason) thread simstate { timers = timers' }
+          !trace <- deschedule (Terminated reason) thread simstate { timers = timers'' }
           return $ SimTrace time tid tlbl (EventThrow e)
                  $ SimTrace time tid tlbl (EventThreadUnhandled e)
                  $ SimTrace time tid tlbl (EventDeschedule $ Terminated reason)
@@ -309,6 +312,12 @@ schedule !thread@Thread{
         -- When we throw an exception we need to cancel thread delay action
         -- which could be blocking the current thread.  This is important for
         -- `TimeoutException` or any other asynchronous exceptions.
+        --
+        -- Note: we treat `TimerThreadDelay` different than `TimerTimeout`s.
+        -- The first one cannot be stacked (there's not corresponding frame), so
+        -- it's fine to just remove scheduled thread delay (there can be at most
+        -- one).  `TimerTimeout` however is different and we need to remove them
+        -- as we unwind the stack frames in `unwindControlStack`.
         timers' = PSQ.fromList
                 . filter (\(_,_,info) -> case info of
                             TimerThreadDelay tid' _
@@ -977,7 +986,9 @@ forkTimeoutInterruptThreads timeoutExpired simState =
            -> (ThreadId, TimeoutId, STRef s IsLocked)
            -> (SimState s a, (Thread s a, STRef s IsLocked))
         fn state@SimState { threads } (tid, tmid, ref) =
-          let t        = threads Map.! tid
+          let t = case tid `Map.lookup` threads of
+                    Just t' -> t'
+                    Nothing -> error ("IOSim: internal error: unknown thread " ++ show tid)
               nextId   = threadNextTId t
           in ( state { threads = Map.insert tid t { threadNextTId = succ nextId } threads }
              , ( Thread { threadId      = childThreadId tid nextId,
@@ -1003,49 +1014,59 @@ forkTimeoutInterruptThreads timeoutExpired simState =
 -- Also return if it's the main thread or a forked thread since we handle the
 -- cases differently.
 --
+-- Also remove timeouts associated to frames we unwind.
+--
 unwindControlStack :: forall s a.
                       SomeException
                    -> Thread s a
-                   -> Either Bool (Thread s a)
-unwindControlStack e thread =
+                   -> Timeouts s
+                   -> ( Either Bool (Thread s a)
+                      , Timeouts s
+                      )
+unwindControlStack e thread timers0 =
     case threadControl thread of
-      ThreadControl _ ctl -> unwind (threadMasking thread) ctl
+      ThreadControl _ ctl -> unwind (threadMasking thread) ctl timers0
   where
     unwind :: forall s' c. MaskingState
            -> ControlStack s' c a
-           -> Either Bool (Thread s' a)
-    unwind _  MainFrame                 = Left True
-    unwind _  ForkFrame                 = Left False
-    unwind _ (MaskFrame _k maskst' ctl) = unwind maskst' ctl
+           -> OrdPSQ TimeoutId Time (TimerCompletionInfo s)
+           -> (Either Bool (Thread s' a), OrdPSQ TimeoutId Time (TimerCompletionInfo s))
+    unwind _  MainFrame                 timers = (Left True, timers)
+    unwind _  ForkFrame                 timers = (Left False, timers)
+    unwind _ (MaskFrame _k maskst' ctl) timers = unwind maskst' ctl timers
 
-    unwind maskst (CatchFrame handler k ctl) =
+    unwind maskst (CatchFrame handler k ctl) timers =
       case fromException e of
         -- not the right type, unwind to the next containing handler
-        Nothing -> unwind maskst ctl
+        Nothing -> unwind maskst ctl timers
 
         -- Ok! We will be able to continue the thread with the handler
         -- followed by the continuation after the catch
-        Just e' -> Right ( thread {
-                      -- As per async exception rules, the handler is run
-                      -- masked
-                     threadControl = ThreadControl (handler e')
-                                                   (MaskFrame k maskst ctl),
-                     threadMasking = atLeastInterruptibleMask maskst
-                   }
-                )
+        Just e' -> ( Right thread {
+                              -- As per async exception rules, the handler is run
+                              -- masked
+                             threadControl = ThreadControl (handler e')
+                                                           (MaskFrame k maskst ctl),
+                             threadMasking = atLeastInterruptibleMask maskst
+                           }
+                   , timers
+                   )
 
     -- Either Timeout fired or the action threw an exception.
     -- - If Timeout fired, then it was possibly during this thread's execution
     --   so we need to run the continuation with a Nothing value.
     -- - If the timeout action threw an exception we need to keep unwinding the
     --   control stack looking for a handler to this exception.
-    unwind maskst (TimeoutFrame tmid _ k ctl) =
-      case fromException e of
-        -- Exception came from timeout expiring
-        Just (TimeoutException tmid') | tmid == tmid' ->
-          Right thread { threadControl = ThreadControl (k Nothing) ctl }
-        -- Exception came from a different exception
-        _ -> unwind maskst ctl
+    unwind maskst (TimeoutFrame tmid _ k ctl) timers =
+        case fromException e of
+          -- Exception came from timeout expiring
+          Just (TimeoutException tmid') | tmid == tmid' ->
+            (Right thread { threadControl = ThreadControl (k Nothing) ctl }, timers')
+          -- Exception came from a different exception
+          _ -> unwind maskst ctl timers'
+      where
+        -- Remove the timeout associated with the 'TimeoutFrame'.
+        timers' = PSQ.delete tmid timers
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState
     atLeastInterruptibleMask Unmasked = MaskedInterruptible
