@@ -67,4 +67,3 @@ data ControlStackDash =
 
 data IsLocked = NotLocked | Locked !ThreadId
   deriving (Eq, Show)
-

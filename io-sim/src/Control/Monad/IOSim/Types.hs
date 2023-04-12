@@ -113,7 +113,7 @@ import           Control.Monad.IOSim.CommonTypes
 import           Control.Monad.IOSim.STM
 import           Control.Monad.IOSimPOR.Types
 
-import           GHC.Conc (ThreadStatus)
+import qualified GHC.Conc as GHC (ThreadStatus)
 
 
 import qualified System.IO.Error as IO.Error (userError)
@@ -166,7 +166,7 @@ data SimA s a where
   Fork         :: IOSim s () -> (ThreadId -> SimA s b) -> SimA s b
   GetThreadId  :: (ThreadId -> SimA s b) -> SimA s b
   LabelThread  :: ThreadId -> String -> SimA s b -> SimA s b
-  ThreadStatus :: ThreadId -> (ThreadStatus -> SimA s b) -> SimA s b
+  ThreadStatus :: ThreadId -> (GHC.ThreadStatus -> SimA s b) -> SimA s b
 
   Atomically   :: STM  s a -> (a -> SimA s b) -> SimA s b
 

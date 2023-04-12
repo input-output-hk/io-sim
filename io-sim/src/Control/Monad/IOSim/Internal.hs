@@ -64,7 +64,7 @@ import           Deque.Strict (Deque)
 import qualified Deque.Strict as Deque
 
 import           GHC.Exts (fromList)
-import           GHC.Conc (ThreadStatus(..), BlockReason(..))
+import qualified GHC.Conc as GHC (ThreadStatus(..))
 
 import           Control.Exception (AsyncException (..), NonTermination (..),
                      assert, throw)
@@ -91,7 +91,7 @@ import           Control.Monad.IOSim.Types (SimEvent)
 data Thread s a = Thread {
     threadId      :: !ThreadId,
     threadControl :: !(ThreadControl s a),
-    threadBlocked :: !Bool,
+    threadStatus  :: !ThreadStatus,
     threadMasking :: !MaskingState,
     -- other threads blocked in a ThrowTo to us because we are or were masked
     threadThrowTo :: ![(SomeException, Labelled ThreadId)],
@@ -99,6 +99,11 @@ data Thread s a = Thread {
     threadLabel   ::  Maybe ThreadLabel,
     threadNextTId :: !Int
   }
+
+isThreadBlocked :: Thread s a -> Bool
+isThreadBlocked t = case threadStatus t of
+    ThreadBlocked {} -> True
+    _                -> False
 
 labelledTVarId :: TVar s a -> ST s (Labelled TVarId)
 labelledTVarId TVar { tvarId, tvarLabel } = (Labelled tvarId) <$> readSTRef tvarLabel
@@ -168,7 +173,7 @@ initialState =
 invariant :: Maybe (Thread s a) -> SimState s a -> x -> x
 
 invariant (Just running) simstate@SimState{runqueue,threads,clocks} =
-   assert (not (threadBlocked running))
+   assert (not (isThreadBlocked running))
  . assert (threadId running `Map.notMember` threads)
  . assert (threadId running `List.notElem` runqueue)
  . assert (threadClockId running `Map.member` clocks)
@@ -176,7 +181,7 @@ invariant (Just running) simstate@SimState{runqueue,threads,clocks} =
 
 invariant Nothing SimState{runqueue,threads,clocks} =
    assert (all (`Map.member` threads) runqueue)
- . assert (and [ threadBlocked t == (threadId t `notElem` runqueue)
+ . assert (and [ isThreadBlocked t == (threadId t `notElem` runqueue)
                | t <- Map.elems threads ])
  . assert (toList runqueue == List.nub (toList runqueue))
  . assert (and [ threadClockId t `Map.member` clocks
@@ -455,8 +460,8 @@ schedule !thread@Thread{
       let !expiry  = d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           !thread' = thread { threadControl = ThreadControl k ctl }
-      !trace <- deschedule Blocked thread' simstate { timers   = timers'
-                                                    , nextTmid = succ nextTmid }
+      !trace <- deschedule (Blocked BlockedOnOther) thread' simstate { timers   = timers'
+                                                                     , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) trace)
 
     -- we treat negative timers as cancelled ones; for the record we put
@@ -521,7 +526,7 @@ schedule !thread@Thread{
       (wakeup, wokeby) <- threadsUnblockedByWrites written
       mapM_ (\(SomeTVar var) -> unblockAllThreadsFromTVar var) written
       let (unblocked,
-           simstate') = unblockThreads wakeup simstate
+           simstate') = unblockThreads True wakeup simstate
       trace <- schedule thread' simstate' { timers = timers' }
       return $ SimTrace time tid tlbl (EventTimerCancelled tmid)
              $ traceMany
@@ -547,7 +552,7 @@ schedule !thread@Thread{
           !thread'' = Thread { threadId      = tid'
                              , threadControl = ThreadControl (runIOSim a)
                                                              ForkFrame
-                             , threadBlocked = False
+                             , threadStatus  = ThreadRunning
                              , threadMasking = threadMasking thread
                              , threadThrowTo = []
                              , threadClockId = threadClockId thread
@@ -568,7 +573,7 @@ schedule !thread@Thread{
           !_ <- mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
           let thread'     = thread { threadControl = ThreadControl (k x) ctl }
               (unblocked,
-               simstate') = unblockThreads wakeup simstate
+               simstate') = unblockThreads True wakeup simstate
           written' <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) written
           created' <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) created
               -- We don't interrupt runnable threads to provide fairness
@@ -605,9 +610,9 @@ schedule !thread@Thread{
         StmTxBlocked read -> do
           !_ <- mapM_ (\(SomeTVar tvar) -> blockThreadOnTVar tid tvar) read
           vids <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) read
-          !trace <- deschedule Blocked thread simstate
+          !trace <- deschedule (Blocked BlockedOnSTM) thread simstate
           return $ SimTrace time tid tlbl (EventTxBlocked vids Nothing)
-                 $ SimTrace time tid tlbl (EventDeschedule Blocked)
+                 $ SimTrace time tid tlbl (EventDeschedule (Blocked BlockedOnSTM))
                  $ trace
 
     GetThreadId k ->
@@ -630,12 +635,10 @@ schedule !thread@Thread{
     ThreadStatus tid' k ->
       {-# SCC "schedule.ThreadStatus" #-} do
       let result | Just r <- Map.lookup tid' finished = reasonToStatus r
-                 | Just t <- Map.lookup tid' threads  = threadStatus t
+                 | Just t <- Map.lookup tid' threads  = ghcThreadStatus (threadStatus t)
                  | otherwise                          = error "The impossible happened - tried to loookup thread in state."
-          reasonToStatus FinishedNormally  = ThreadFinished
-          reasonToStatus FinishedDied      = ThreadDied
-          threadStatus t | threadBlocked t = ThreadBlocked BlockedOnOther
-                         | otherwise       = ThreadRunning
+          reasonToStatus FinishedNormally    = GHC.ThreadFinished
+          reasonToStatus FinishedDied        = GHC.ThreadDied
 
           thread' = thread { threadControl = ThreadControl (k result) ctl }
       schedule thread' simstate
@@ -680,10 +683,10 @@ schedule !thread@Thread{
           -- exception and the source thread id to the pending async exceptions.
           let adjustTarget t = t { threadThrowTo = (e, Labelled tid tlbl) : threadThrowTo t }
               threads'       = Map.adjust adjustTarget tid' threads
-          !trace <- deschedule Blocked thread' simstate { threads = threads' }
+          !trace <- deschedule (Blocked BlockedOnOther) thread' simstate { threads = threads' }
           return $ SimTrace time tid tlbl (EventThrowTo e tid')
                  $ SimTrace time tid tlbl EventThrowToBlocked
-                 $ SimTrace time tid tlbl (EventDeschedule Blocked)
+                 $ SimTrace time tid tlbl (EventDeschedule (Blocked BlockedOnOther))
                  $ trace
         else do
           -- The target thread has async exceptions unmasked, or is masked but
@@ -699,10 +702,10 @@ schedule !thread@Thread{
                           _             -> ThrowSelf
               adjustTarget t@Thread{ threadControl = ThreadControl _ ctl' } =
                 t { threadControl = ThreadControl (Throw thrower e) ctl'
-                  , threadBlocked = False
+                  , threadStatus  = ThreadRunning
                   }
               simstate'@SimState { threads = threads' }
-                         = snd (unblockThreads [tid'] simstate)
+                         = snd (unblockThreads False [tid'] simstate)
               threads''  = Map.adjust adjustTarget tid' threads'
               simstate'' = simstate' { threads = threads'' }
 
@@ -732,11 +735,11 @@ schedule !thread@Thread{
 threadInterruptible :: Thread s a -> Bool
 threadInterruptible thread =
     case threadMasking thread of
-      Unmasked                 -> True
+      Unmasked                   -> True
       MaskedInterruptible
-        | threadBlocked thread -> True  -- blocking operations are interruptible
-        | otherwise            -> False
-      MaskedUninterruptible    -> False
+        | isThreadBlocked thread -> True  -- blocking operations are interruptible
+        | otherwise              -> False
+      MaskedUninterruptible      -> False
 
 deschedule :: Deschedule -> Thread s a -> SimState s a -> ST s (SimTrace a)
 deschedule Yield !thread !simstate@SimState{runqueue, threads} =
@@ -771,7 +774,7 @@ deschedule Interruptable !thread@Thread {
                          , threadMasking = MaskedInterruptible
                          , threadThrowTo = etids }
         (unblocked,
-         simstate') = unblockThreads [l_labelled tid'] simstate
+         simstate') = unblockThreads False [l_labelled tid'] simstate
     in do
     trace <- schedule thread' simstate'
     return $ SimTrace time tid tlbl (EventThrowToUnmasked tid')
@@ -786,8 +789,8 @@ deschedule Interruptable !thread !simstate =
     {-# SCC "deschedule.Interruptable.Masked" #-}
     schedule thread simstate
 
-deschedule Blocked !thread@Thread { threadThrowTo = _ : _
-                                  , threadMasking = maskst } !simstate
+deschedule (Blocked _blockedReason) !thread@Thread { threadThrowTo = _ : _
+                                                   , threadMasking = maskst } !simstate
     | maskst /= MaskedUninterruptible =
     -- We're doing a blocking operation, which is an interrupt point even if
     -- we have async exceptions masked, and there are pending blocked async
@@ -796,9 +799,9 @@ deschedule Blocked !thread@Thread { threadThrowTo = _ : _
     {-# SCC "deschedule.Interruptable.Blocked.1" #-}
     deschedule Interruptable thread { threadMasking = Unmasked } simstate
 
-deschedule Blocked !thread !simstate@SimState{threads} =
+deschedule (Blocked blockedReason) !thread !simstate@SimState{threads} =
     {-# SCC "deschedule.Interruptable.Blocked.2" #-}
-    let thread'  = thread { threadBlocked = True }
+    let thread'  = thread { threadStatus = ThreadBlocked blockedReason }
         threads' = Map.insert (threadId thread') thread' threads in
     reschedule simstate { threads = threads' }
 
@@ -808,7 +811,7 @@ deschedule (Terminated reason) !thread !simstate@SimState{ curTime = time, threa
     {-# SCC "deschedule.Terminated" #-}
     let !wakeup      = map (l_labelled . snd) (reverse (threadThrowTo thread))
         (unblocked,
-         !simstate') = unblockThreads wakeup
+         !simstate') = unblockThreads False wakeup
                         simstate { finished = Map.insert (threadId thread)
                                                          reason
                                                          (finished simstate) }
@@ -829,8 +832,6 @@ reschedule :: SimState s a -> ST s (SimTrace a)
 reschedule !simstate@SimState{ runqueue, threads }
   | Just (!tid, runqueue') <- Deque.uncons runqueue =
     {-# SCC "reschedule.Just" #-}
-    invariant Nothing simstate $
-
     let thread = threads Map.! tid in
     schedule thread simstate { runqueue = runqueue'
                              , threads  = Map.delete tid threads }
@@ -839,14 +840,12 @@ reschedule !simstate@SimState{ runqueue, threads }
 -- timer event, or stop.
 reschedule !simstate@SimState{ threads, timers, curTime = time } =
     {-# SCC "reschedule.Nothing" #-}
-    invariant Nothing simstate $
 
     -- important to get all events that expire at this time
     case removeMinimums timers of
       Nothing -> return (TraceDeadlock time (labelledThreads threads))
 
       Just (tmids, !time', !fired, !timers') -> assert (time' >= time) $ do
-
         -- Reuse the STM functionality here to write all the timer TVars.
         -- Simplify to a special case that only reads and writes TVars.
         !written <- execAtomically' (runSTM $ mapM_ timeoutSTMAction fired)
@@ -856,7 +855,7 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
             -- Check all fired threadDelays
         let wakeupThreadDelay = [ (tid, tmid) | TimerThreadDelay tid tmid <- fired ]
             wakeup            = fst `fmap` wakeupThreadDelay ++ wakeupSTM
-            (_, !simstate')   = unblockThreads wakeup simstate
+            (_, !simstate')   = unblockThreads False wakeup simstate
 
             -- For each 'timeout' action where the timeout has fired, start a
             -- new thread to execute throwTo to interrupt the action.
@@ -909,9 +908,9 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
     timeoutSTMAction TimerThreadDelay{}       = return ()
     timeoutSTMAction TimerTimeout{}           = return ()
 
-unblockThreads :: [ThreadId] -> SimState s a -> ([ThreadId], SimState s a)
-unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
-    -- To preserve our invariants (that threadBlocked is correct)
+unblockThreads :: Bool -> [ThreadId] -> SimState s a -> ([ThreadId], SimState s a)
+unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads} =
+    -- To preserve our invariants (that threadStatus is correct)
     -- we update the runqueue and threads together here
     (unblocked, simstate {
                   runqueue = runqueue <> fromList unblocked,
@@ -922,12 +921,15 @@ unblockThreads !wakeup !simstate@SimState {runqueue, threads} =
     !unblocked = [ tid
                  | tid <- wakeup
                  , case Map.lookup tid threads of
-                        Just Thread { threadBlocked = True } -> True
-                        _                                    -> False
+                    Just Thread { threadStatus = ThreadBlocked BlockedOnOther }
+                      -> not onlySTM
+                    Just Thread { threadStatus = ThreadBlocked BlockedOnSTM }
+                      -> True
+                    _ -> False
                  ]
     -- and in which case we mark them as now running
     !threads'  = List.foldl'
-                   (flip (Map.adjust (\t -> t { threadBlocked = False })))
+                   (flip (Map.adjust (\t -> t { threadStatus = ThreadRunning })))
                    threads
                    unblocked
 
@@ -998,7 +1000,7 @@ forkTimeoutInterruptThreads timeoutExpired simState =
                                       tid
                                       (Return ()))
                              ForkFrame,
-                          threadBlocked = False,
+                          threadStatus  = ThreadRunning,
                           threadMasking = Unmasked,
                           threadThrowTo = [],
                           threadClockId = threadClockId t,
@@ -1109,7 +1111,7 @@ runSimTraceST mainAction = schedule mainThread initialState
       Thread {
         threadId      = ThreadId [],
         threadControl = ThreadControl (runIOSim mainAction) MainFrame,
-        threadBlocked = False,
+        threadStatus  = ThreadRunning,
         threadMasking = Unmasked,
         threadThrowTo = [],
         threadClockId = ClockId [],

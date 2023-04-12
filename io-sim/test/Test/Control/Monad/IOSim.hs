@@ -69,6 +69,8 @@ tests =
     , testProperty "async exceptions 1"     unit_timeouts_and_async_exceptions_1
     , testProperty "async exceptions 2"     unit_timeouts_and_async_exceptions_2
     , testProperty "async exceptions 3"     unit_timeouts_and_async_exceptions_3
+    , testProperty "threadDelay and STM"    unit_threadDelay_and_stm
+    , testProperty "throwTo and STM"        unit_throwTo_and_stm
     ]
   , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
   , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
@@ -1288,6 +1290,72 @@ unit_timeouts_and_async_exceptions_3 =
       killThread tid
       threadDelay 1
       return $ property True 
+
+
+-- | Verify that a thread blocked on `threadDelay` is not unblocked by an STM
+-- transaction.
+--
+unit_threadDelay_and_stm :: Property
+unit_threadDelay_and_stm =
+    let trace = runSimTrace experiment in
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    experiment :: IOSim s Property
+    experiment = do
+      v0 <- newTVarIO False
+      v1 <- newTVarIO False
+
+      _ <- forkIO $ do
+        threadDelay 1
+        atomically $ writeTVar v0 True
+      atomically $ (readTVar v1 >>= check) `orElse` (readTVar v0 >>= check)
+
+      let delay = 2
+      t0 <- getMonotonicTime
+      _ <- forkIO $ do
+        threadDelay 1
+        atomically $ writeTVar v1 True
+      threadDelay delay
+      t1 <- getMonotonicTime
+
+      return (t1 `diffTime` t0 === delay)
+
+
+-- | Verify that a thread blocked on `throwTo` is not unblocked by an STM
+-- transaction.
+--
+unit_throwTo_and_stm :: Property
+unit_throwTo_and_stm =
+    let trace = runSimTrace experiment in
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    experiment :: IOSim s Property
+    experiment = do
+      v0 <- newTVarIO False
+      v1 <- newTVarIO False
+
+      _ <- forkIO $ do
+        threadDelay 1
+        atomically $ writeTVar v0 True
+      atomically $ (readTVar v1 >>= check) `orElse` (readTVar v0 >>= check)
+
+      let delay = 2
+      t0 <- getMonotonicTime
+      _ <- forkIO $ do
+        threadDelay 1
+        atomically $ writeTVar v1 True
+      tid <- forkIO $ uninterruptibleMask_ (threadDelay 2)
+      threadDelay 0.1 -- make sure the other thread masks exceptions
+      killThread tid
+      t1 <- getMonotonicTime
+
+      return (t1 `diffTime` t0 === delay)
 
 --
 -- MonadMask properties
