@@ -499,32 +499,6 @@ schedule thread@Thread{
           simstate' = simstate { clocks = Map.insert clockid' clockoff clocks }
       schedule thread' simstate'
 
-    -- we treat negative timers as cancelled ones; for the record we put
-    -- `EventTimerCreated` and `EventTimerCancelled` in the trace; This differs
-    -- from `GHC.Event` behaviour.
-    NewTimeout d k | d < 0 -> do
-      let t       = NegativeTimeout nextTmid
-          expiry  = d `addTime` time
-          thread' = thread { threadControl = ThreadControl (k t) ctl }
-      trace <- schedule thread' simstate { nextTmid = succ nextTmid }
-      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) $
-              SimPORTrace time tid tstep tlbl (EventTimerCancelled nextTmid) $
-              trace)
-
-    NewTimeout d k -> do
-      tvar  <- execNewTVar nextVid
-                           (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
-                           TimeoutPending
-      modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
-      let expiry  = d `addTime` time
-          t       = Timeout tvar nextTmid
-          timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
-          thread' = thread { threadControl = ThreadControl (k t) ctl }
-      trace <- schedule thread' simstate { timers   = timers'
-                                          , nextVid  = succ (succ nextVid)
-                                          , nextTmid = succ nextTmid }
-      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
-
     -- This case is guarded by checks in 'timeout' itself.
     StartTimeout d _ _ | d <= 0 ->
       error "schedule: StartTimeout: Impossible happened"
@@ -583,6 +557,32 @@ schedule thread@Thread{
       trace <- deschedule Blocked thread' simstate { timers   = timers'
                                                    , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventThreadDelay nextTmid expiry) trace)
+
+    -- we treat negative timers as cancelled ones; for the record we put
+    -- `EventTimerCreated` and `EventTimerCancelled` in the trace; This differs
+    -- from `GHC.Event` behaviour.
+    NewTimeout d k | d < 0 -> do
+      let t       = NegativeTimeout nextTmid
+          expiry  = d `addTime` time
+          thread' = thread { threadControl = ThreadControl (k t) ctl }
+      trace <- schedule thread' simstate { nextTmid = succ nextTmid }
+      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) $
+              SimPORTrace time tid tstep tlbl (EventTimerCancelled nextTmid) $
+              trace)
+
+    NewTimeout d k -> do
+      tvar  <- execNewTVar nextVid
+                           (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
+                           TimeoutPending
+      modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
+      let expiry  = d `addTime` time
+          t       = Timeout tvar nextTmid
+          timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
+          thread' = thread { threadControl = ThreadControl (k t) ctl }
+      trace <- schedule thread' simstate { timers   = timers'
+                                          , nextVid  = succ (succ nextVid)
+                                          , nextTmid = succ nextTmid }
+      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
 
     -- we do not follow `GHC.Event` behaviour here; updating a timer to the past
     -- effectively cancels it.
