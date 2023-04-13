@@ -148,7 +148,8 @@ data SimA s a where
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
 
-  StartTimeout :: DiffTime -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
+  StartTimeout      :: DiffTime -> SimA s a -> (Maybe a -> SimA s b) -> SimA s b
+  UnregisterTimeout :: TimeoutId -> SimA s a -> SimA s a
 
   RegisterDelay :: DiffTime -> (TVar s Bool -> SimA s b) -> SimA s b
 

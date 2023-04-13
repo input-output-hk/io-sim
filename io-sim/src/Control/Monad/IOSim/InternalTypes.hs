@@ -8,13 +8,16 @@ module Control.Monad.IOSim.InternalTypes
   ( ThreadControl (..)
   , ControlStack (..)
   , IsLocked (..)
+  , unsafeUnregisterTimeout
   ) where
 
 import           Control.Exception (Exception)
+import           Control.Concurrent.Class.MonadSTM
 import           Control.Monad.Class.MonadThrow (MaskingState (..))
-import           Data.STRef.Lazy (STRef)
 
-import           Control.Monad.IOSim.Types (SimA, ThreadId, TimeoutId)
+import           Control.Monad.IOSim.Types (IOSim (..), SimA (..), ThreadId, TimeoutId)
+
+import           GHC.Exts (oneShot)
 
 -- We hide the type @b@ here, so it's useful to bundle these two parts together,
 -- rather than having Thread have an existential type, which makes record
@@ -40,7 +43,7 @@ data ControlStack s b a where
              -> !(ControlStack s c a)
              -> ControlStack s b a
   TimeoutFrame :: TimeoutId
-               -> STRef s IsLocked
+               -> TMVar (IOSim s) ThreadId
                -> (Maybe b -> SimA s c)
                -> !(ControlStack s c a)
                -> ControlStack s b a
@@ -67,3 +70,16 @@ data ControlStackDash =
 
 data IsLocked = NotLocked | Locked !ThreadId
   deriving (Eq, Show)
+
+-- | Unsafe method which removes a timeout.
+--
+-- It's not part of public API, and it might cause deadlocks when used in
+-- a wrong context.
+--
+-- It is defined here rather so that it's not exposed to the user, even tough
+-- one could define it oneself.
+--
+-- TODO: `SimA` constructors should be defined here.
+--
+unsafeUnregisterTimeout :: TimeoutId -> IOSim s ()
+unsafeUnregisterTimeout tmid = IOSim $ oneShot $ \k -> UnregisterTimeout tmid (k ())
