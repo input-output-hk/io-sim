@@ -1000,10 +1000,10 @@ unwindControlStack :: forall s a.
                    -> ( Either Bool (Thread s a)
                       , Timeouts s
                       )
-unwindControlStack e thread timers0 =
+unwindControlStack e thread = \timers ->
     case threadControl thread of
       ThreadControl _ ctl ->
-        unwind (threadMasking thread) ctl timers0
+        unwind (threadMasking thread) ctl timers
   where
     unwind :: forall s' c. MaskingState
            -> ControlStack s' c a

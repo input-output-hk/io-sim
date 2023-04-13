@@ -1237,9 +1237,9 @@ unwindControlStack :: forall s a.
                    -> ( Either Bool (Thread s a)
                       , Timeouts s
                       )
-unwindControlStack e thread timeouts0 =
+unwindControlStack e thread = \timeouts ->
     case threadControl thread of
-      ThreadControl _ ctl -> unwind (threadMasking thread) ctl timeouts0
+      ThreadControl _ ctl -> unwind (threadMasking thread) ctl timeouts
   where
     unwind :: forall s' c. MaskingState
            -> ControlStack s' c a
