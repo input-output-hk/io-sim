@@ -601,7 +601,7 @@ instance MonadTimer (IOSim s) where
 newtype TimeoutException = TimeoutException TimeoutId deriving Eq
 
 instance Show TimeoutException where
-    show _ = "<<timeout>>"
+    show (TimeoutException tmid) = "<<timeout " ++ show tmid ++ " >>"
 
 instance Exception TimeoutException where
   toException   = asyncExceptionToException
