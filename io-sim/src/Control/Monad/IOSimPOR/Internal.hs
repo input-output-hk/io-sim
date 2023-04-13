@@ -63,15 +63,18 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
 
-import           Control.Exception (AsyncException (..), NonTermination (..),
+import           Control.Exception (NonTermination (..),
                      assert, throw)
 import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import           Data.STRef.Lazy
 
+import           Control.Concurrent.Class.MonadSTM.TMVar
 import           Control.Concurrent.Class.MonadSTM.TVar hiding (TVar)
+import           Control.Monad.Class.MonadFork (killThread, myThreadId, throwTo)
 import           Control.Monad.Class.MonadSTM hiding (STM)
+import           Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
 import           Control.Monad.Class.MonadThrow as MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
@@ -173,7 +176,7 @@ data TimerCompletionInfo s =
      | TimerThreadDelay !ThreadId !TimeoutId
      -- ^ `threadDelay` timer run by `ThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
-     | TimerTimeout !ThreadId !TimeoutId !(STRef s IsLocked)
+     | TimerTimeout !ThreadId !TimeoutId !(TMVar (IOSim s) ThreadId)
      -- ^ `timeout` timer run by `ThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
 
@@ -264,7 +267,7 @@ insertThread Thread { threadId } = PSQ.insert (Down threadId) (Down threadId) ()
 
 -- | Schedule / run a thread.
 --
-schedule :: Thread s a -> SimState s a -> ST s (SimTrace a)
+schedule :: forall s a. Thread s a -> SimState s a -> ST s (SimTrace a)
 schedule thread@Thread{
            threadId      = tid,
            threadControl = ThreadControl action ctl,
@@ -352,48 +355,28 @@ schedule thread@Thread{
         let thread' = thread { threadControl = ThreadControl (k x) ctl' }
         schedule thread' simstate
 
-      TimeoutFrame tmid isLockedRef k ctl' -> do
+      TimeoutFrame tmid lock k ctl' -> do
         -- It could happen that the timeout action finished at the same time
         -- as the timeout expired, this will be a race condition. That's why
         -- we have the locks to solve this.
-        --
-        -- The lock starts 'NotLocked' and when the timeout fires the lock is
-        -- locked and asynchronously an assassin thread is coming to interrupt
-        -- this one. If the lock is locked when the timeout is fired then nothing
-        -- happens.
-        --
-        -- Knowing this, if we reached this point in the code and the lock is
-        -- 'Locked', then it means that this thread still hasn't received the
-        -- 'TimeoutException', so we need to kill the thread that is responsible
-        -- for doing that (the assassin one, we need to defend ourselves!)
-        -- and run our continuation successfully and peacefully. We will do that
-        -- by uninterruptibly-masking ourselves so we can not receive any
-        -- exception and kill the assassin thread behind its back.
-        -- If the lock is 'NotLocked' then it means we can just acquire it and
-        -- carry on with the success case.
-        locked <- readSTRef isLockedRef
-        case locked of
-          Locked etid -> do
-            let -- Kill the assassin throwing thread then unmask exceptions and
-                -- carry on the continuation
-                thread' =
-                  thread { threadControl =
-                            ThreadControl (ThrowTo (toException ThreadKilled)
-                                                   etid
-                                                   (Return ()))
-                                          (MaskFrame (\_ -> k (Just x)) maskst ctl')
-                         , threadMasking = MaskedUninterruptible
-                         }
-            schedule thread' simstate
 
-          NotLocked -> do
-            -- Acquire lock
-            writeSTRef isLockedRef (Locked tid)
-            let -- Remove the timer from the queue
-                timers' = PSQ.delete tmid timers
-                -- Run the continuation successfully
-                thread' = thread { threadControl = ThreadControl (k (Just x)) ctl' }
-            schedule thread' simstate { timers = timers' }
+        -- We cannot do `tryPutMVar` in the `treadAction`, because we need to
+        -- know if the `lock` is empty right now when we still have the frame.
+        v <- execTryPutTMVar lock undefined
+        let -- Kill the assassin throwing thread then unmask exceptions and
+            -- carry on the continuation
+            threadAction :: IOSim s ()
+            threadAction =
+              if v then unsafeUnregisterTimeout tmid
+                   else atomically (takeTMVar lock) >>= killThread
+
+            thread' =
+              thread { threadControl =
+                        ThreadControl (case threadAction of
+                                        IOSim k' -> k' (\() -> k (Just x)))
+                                      ctl'
+                     }
+        schedule thread' simstate
 
     Throw thrower e -> case unwindControlStack e thread timers' of
       -- Found a CatchFrame
@@ -514,16 +497,20 @@ schedule thread@Thread{
       error "schedule: StartTimeout: Impossible happened"
 
     StartTimeout d action' k -> do
-      isLockedRef <- newSTRef NotLocked
+      lock <- TMVar <$> execNewTVar nextVid (Just $ "lock-" ++ show nextTmid) Nothing
       let expiry    = d `addTime` time
-          timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid isLockedRef) timers
+          timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           thread'   = thread { threadControl =
                                  ThreadControl action'
-                                               (TimeoutFrame nextTmid isLockedRef k ctl)
+                                               (TimeoutFrame nextTmid lock k ctl)
                               }
       trace <- deschedule Yield thread' simstate { timers   = timers'
                                                   , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
+
+    UnregisterTimeout tmid k -> do
+      let thread' = thread { threadControl = ThreadControl k ctl }
+      schedule thread' simstate { timers = PSQ.delete tmid timers }
 
     RegisterDelay d k | d < 0 -> do
       tvar <- execNewTVar nextVid
@@ -1075,18 +1062,11 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
 
             -- For each 'timeout' action where the timeout has fired, start a
             -- new thread to execute throwTo to interrupt the action.
-            !timeoutExpired = [ (tid, tmid, isLockedRef)
-                              | TimerTimeout tid tmid isLockedRef <- fired ]
-
-        -- Get the isLockedRef values
-        timeoutExpired' <- traverse (\(tid, tmid, isLockedRef) -> do
-                                        locked <- readSTRef isLockedRef
-                                        return (tid, tmid, isLockedRef, locked)
-                                     )
-                                     timeoutExpired
+            !timeoutExpired = [ (tid, tmid, lock)
+                              | TimerTimeout tid tmid lock <- fired ]
 
         -- all open races will be completed and reported at this time
-        !simstate'' <- forkTimeoutInterruptThreads timeoutExpired'
+        !simstate'' <- forkTimeoutInterruptThreads timeoutExpired
                                                    simstate' { races = noRaces }
         !trace <- reschedule simstate'' { curTime = time'
                                         , timers  = timers' }
@@ -1106,10 +1086,10 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
                      | (tid, tmid) <- wakeupThreadDelay ]
                   ++ [ ( time', tid, -1, Just "timeout timer"
                        , EventTimeoutFired tmid)
-                     | (tid, tmid, _, _) <- timeoutExpired' ]
+                     | (tid, tmid, _) <- timeoutExpired ]
                   ++ [ ( time', tid, -1, Just "forked thread"
                        , EventThreadForked tid)
-                     | (tid, _, _, _) <- timeoutExpired' ]
+                     | (tid, _, _) <- timeoutExpired ]
 
         return $
           traceFinalRacesFound simstate $
@@ -1184,42 +1164,34 @@ unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
 -- receive a 'ThreadKilled' exception.
 --
 forkTimeoutInterruptThreads :: forall s a.
-                               [(ThreadId, TimeoutId, STRef s IsLocked, IsLocked)]
+                               [(ThreadId, TimeoutId, TMVar (IOSim s) ThreadId)]
                             -> SimState s a
                             -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState =
-  foldlM (\st@SimState{ runqueue = runqueue,
-                        threads  = threads'
-                      }
-           (t, isLockedRef)
+  foldlM (\st@SimState{ runqueue, threads }
+           (t, TMVar lock)
           -> do
-            let threads'' = Map.insert (threadId t) t
-                          $ threads'
-                runqueue' = insertThread t runqueue
-            writeSTRef isLockedRef (Locked (threadId t))
-
-            return st { runqueue = runqueue',
-                        threads  = threads''
-                      })
+            v <- execReadTVar lock
+            return $ case v of
+              Nothing -> st { runqueue = insertThread t runqueue,
+                              threads  = Map.insert (threadId t) t threads
+                            }
+              Just _  -> st
+          )
           simState'
           throwToThread
 
   where
-    -- can only throw exception if the thread exists and if the mutually
-    -- exclusive lock exists and is still 'NotLocked'
-    toThrow :: [(ThreadId, TimeoutId, STRef s IsLocked)]
-    toThrow  = [ (tid, tmid, ref)
-               | (tid, tmid, ref, NotLocked) <- timeoutExpired ]
-
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, STRef s IsLocked)]
-    (simState', throwToThread) = List.mapAccumR fn simState toThrow
+    throwToThread :: [(Thread s a, TMVar (IOSim s) ThreadId)] 
+
+    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
         fn :: SimState s a
-           -> (ThreadId, TimeoutId, STRef s IsLocked)
-           -> (SimState s a, (Thread s a, STRef s IsLocked))
-        fn state@SimState { threads } (tid, tmid, ref) =
+           -> (ThreadId, TimeoutId, TMVar (IOSim s) ThreadId)
+           -> (SimState s a, (Thread s a, TMVar (IOSim s) ThreadId))
+        fn state@SimState { threads } (tid, tmid, lock) =
           let t = case tid `Map.lookup` threads of
                     Just t' -> t'
                     Nothing -> error ("IOSimPOR: internal error: unknown thread " ++ show tid)
@@ -1229,9 +1201,11 @@ forkTimeoutInterruptThreads timeoutExpired simState =
               , ( Thread { threadId      = tid',
                            threadControl =
                             ThreadControl
-                              (ThrowTo (toException (TimeoutException tmid))
-                                        tid
-                                        (Return ()))
+                              (runIOSim $ do
+                                 mtid <- myThreadId
+                                 v2 <- atomically $ tryPutTMVar lock mtid
+                                 when v2 $
+                                   throwTo tid (toException (TimeoutException tmid)))
                               ForkFrame,
                            threadStatus  = ThreadRunning,
                            threadMasking = Unmasked,
@@ -1245,7 +1219,8 @@ forkTimeoutInterruptThreads timeoutExpired simState =
                            threadEffect  = mempty,
                            threadRacy    = threadRacy t
                          }
-                , ref )
+                , lock
+                )
               )
        
 
@@ -1622,6 +1597,15 @@ execReadTVar TVar{tvarCurrent} = readSTRef tvarCurrent
 execWriteTVar :: TVar s a -> a -> ST s ()
 execWriteTVar TVar{tvarCurrent} = writeSTRef tvarCurrent
 {-# INLINE execWriteTVar #-}
+
+execTryPutTMVar :: TMVar (IOSim s) a -> a -> ST s Bool
+execTryPutTMVar (TMVar var) a = do
+    v <- execReadTVar var
+    case v of
+      Nothing -> execWriteTVar var (Just a)
+              >> return True
+      Just _  -> return False
+{-# INLINE execTryPutTMVar #-}
 
 saveTVar :: TVar s a -> ST s ()
 saveTVar TVar{tvarCurrent, tvarUndo} = do

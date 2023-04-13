@@ -1208,7 +1208,9 @@ prop_stacked_timeouts :: TimeoutDuration
                       -> ActionDuration
                       -> Property
 prop_stacked_timeouts timeout0 timeout1 actionDuration =
-    runSimOrThrow experiment === predicted
+    let trace = runSimTrace experiment in
+    counterexample (ppTrace_ trace) $
+    either (\e -> counterexample (show e) False) (=== predicted) (traceResult False trace)
   where
     experiment :: IOSim s (Maybe (Maybe ()))
     experiment = timeout timeout0 (timeout timeout1 (threadDelay actionDuration))
