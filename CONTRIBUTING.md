@@ -30,6 +30,34 @@ The `typed-protocols-examples` package contains two simple protocols `PingPong`
 cabal run typed-protocols-examples:test
 ```
 
+If you contribute a more complex feature, it might be a good idea to run the
+tests suites from the `ouroboros-network` repository, especially:
+
+* `network-mux:test`
+* `ouroboros-network-framework:test`
+* `ouroboros-network:test`
+
+If you've been working on `IOSimPOR`, please enable the `nightly` cabal flag in
+the `ouroboros-network-testing` framework.  To configure `ouroboros-network`
+repository with the right `io-sim` you can include the following snippet in
+`cabal.project.local` file:
+```
+source-repository-package
+  type: git
+  location: <local .git directory; ssh or http url>
+  tag: <hash of the commit, branch name, etc>
+  subdir:
+    io-classes
+    io-classes-mtl
+    io-sim
+    si-timers
+    strict-stm
+    strict-mvar
+
+package ouroboros-network-testing
+  flags: +nightly
+```
+
 # Code Style
 
 Please follow local style.  For a more detailed style guide see
@@ -72,6 +100,29 @@ The drawback is that if you declare `io-classes ^>= 0.x` then you will need to
 bump it when new version of `io-sim` is published (even if there are no changes
 in `io-classes`).  The con is that you just need to declare version of
 `io-classes` to have a consistent ecosystem of the three packages.
+
+# Tips
+
+## `ppTrace` is strict
+
+Both `ppTrace` and `ppTrace_` are strict.  They evaluate the trace before they
+produce any result, thus they are not useful when your trace diverges.  This
+can happen if evaluation encounters unhandled exception e.g. one of assertion
+fires (either internal or otherwise).  In that case, instead of `ppTrace` you
+can use `Data.Trace.toList` and simply `traverse print` the list.  This will
+give you the trace up to the point of failure.
+
+## `IOSim` and `STMSim` monads are based on lazy `ST` monad
+
+This means that any action is forced only when the result is needed.  This is
+more lazy than `IO` monad.  Thus if you want to use `Debug.Trace.traceM` inside
+`schedule` function you need to:
+```hs
+    ...
+    !_ <- Debug.Trace.traceM "hello"
+    ...
+```
+
 
 
 [CHaP]: https://github.com/input-output-hk/cardano-haskell-packages/
