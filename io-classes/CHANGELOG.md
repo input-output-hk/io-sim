@@ -2,6 +2,8 @@
 
 ## next version
 
+## 1.0.0.0
+
 ### Breaking changes
 
 * `MonadMonotonicTime` morphed into `MonadMonotonicTimeNSec` which supports

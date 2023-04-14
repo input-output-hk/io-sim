@@ -1,6 +1,6 @@
 cabal-version:       3.4
 name:                io-classes
-version:             0.6.0.0
+version:             1.0.0.0
 synopsis:            Type classes for concurrency with STM, ST and timing
 license:             Apache-2.0
 license-files:

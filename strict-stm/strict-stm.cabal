@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                strict-stm
-version:             0.6.0.0
+version:             1.0.0.0
 synopsis:            Strict STM interface polymorphic over stm implementation.
 license:             Apache-2.0
 license-files:
@@ -54,7 +54,7 @@ library
                        array,
                        stm         >= 2.5 && <2.6,
 
-                       io-classes  ^>= 0.6
+                       io-classes  ^>= 1.0
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
                        -Wcompat

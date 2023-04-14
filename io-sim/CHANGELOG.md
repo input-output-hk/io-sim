@@ -2,6 +2,8 @@
 
 ## next version
 
+## 1.0.0.0
+
 ### Breaking changes
 
 * Support refactored `MonadTimer`, and new `MonadTimerFancy`, `MonadTimeNSec`
