@@ -271,6 +271,11 @@ data Failure =
        -- alive, and strict shutdown checking was requested.
        -- See 'runSimStrictShutdown'
      | FailureSloppyShutdown [Labelled ThreadId]
+
+       -- | An exception was thrown while evaluation the trace.
+       -- This could be an internal assertion failure of `io-sim` or an
+       -- unhandled exception in the simulation.
+     | FailureEvaluation SomeException
   deriving Show
 
 instance Exception Failure where
@@ -285,6 +290,8 @@ instance Exception Failure where
              , intercalate ", " (show `map` threads)
              , ">>"
              ]
+    displayException (FailureEvaluation err) = "evaluation error:" ++ displayException  err
+    
 
 -- | 'IOSim' is a pure monad.
 --
@@ -308,16 +315,24 @@ runSimStrictShutdown :: forall a. (forall s. IOSim s a) -> Either Failure a
 runSimStrictShutdown mainAction = traceResult True (runSimTrace mainAction)
 
 traceResult :: Bool -> SimTrace a -> Either Failure a
-traceResult strict = go
+traceResult strict = unsafePerformIO . eval
   where
-    go (SimTrace _ _ _ _ t)             = go t
-    go (SimPORTrace _ _ _ _ _ t)        = go t
-    go (TraceRacesFound _ t)            = go t
+    eval :: SimTrace a -> IO (Either Failure a)
+    eval a = do
+      r <- try (evaluate a)
+      case r of
+        Left e  -> return (Left (FailureEvaluation e))
+        Right _ -> go a
+
+    go :: SimTrace a -> IO (Either Failure a)
+    go (SimTrace _ _ _ _ t)             = eval t
+    go (SimPORTrace _ _ _ _ _ t)        = eval t
+    go (TraceRacesFound _ t)            = eval t
     go (TraceMainReturn _ _ tids@(_:_))
-                               | strict = Left (FailureSloppyShutdown tids)
-    go (TraceMainReturn _ x _)          = Right x
-    go (TraceMainException _ e _)       = Left (FailureException e)
-    go (TraceDeadlock   _   threads)    = Left (FailureDeadlock threads)
+                               | strict = pure $ Left (FailureSloppyShutdown tids)
+    go (TraceMainReturn _ x _)          = pure $ Right x
+    go (TraceMainException _ e _)       = pure $ Left (FailureException e)
+    go (TraceDeadlock   _   threads)    = pure $ Left (FailureDeadlock threads)
     go TraceLoop{}                      = error "Impossible: traceResult TraceLoop{}"
 
 traceEvents :: SimTrace a -> [(Time, ThreadId, Maybe ThreadLabel, SimEventType)]
