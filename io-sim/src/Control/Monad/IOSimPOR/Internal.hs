@@ -666,7 +666,6 @@ schedule thread@Thread{
                          <> readEffects read
                          <> writeEffects written
                          <> wakeupEffects unblocked
-                         <> statusWriteEffects unblocked
               thread'     = thread { threadControl = ThreadControl (k x) ctl,
                                      threadVClock  = vClock',
                                      threadEffect  = effect' }
@@ -713,6 +712,7 @@ schedule thread@Thread{
           vids <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) read
           vClockRead <- leastUpperBoundTVarVClocks read
           let effect' = effect <> readEffects read
+                               <> statusWriteEffects [tid]
               thread' = thread { threadVClock  = vClock `leastUpperBoundVClock` vClockRead,
                                  threadEffect  = effect' }
           !trace <- deschedule Blocked thread' simstate
