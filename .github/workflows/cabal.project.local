@@ -8,7 +8,6 @@ package io-classes
 
 package strict-mvar
   ghc-options: -Werror
-  flags: +asserts +checkmvarinvariant
 
 package strict-stm
   ghc-options: -Werror

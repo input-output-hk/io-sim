@@ -24,16 +24,6 @@ source-repository head
   location: https://github.com/input-output-hk/io-sim
   subdir:   strict-mvar
 
-flag checkmvarinvariant
-  Description: Enable runtime invariant checks on StrictMVar
-  Manual: True
-  Default: False
-
-flag asserts
-  description: Enable assertions
-  manual:      False
-  default:     False
-
 library
   hs-source-dirs:      src
 
@@ -49,12 +39,6 @@ library
                        -Wincomplete-record-updates
                        -Wpartial-fields
                        -Widentities
-
-  if flag(asserts)
-    ghc-options: -fno-ignore-asserts
-
-  if flag(checkmvarinvariant)
-    cpp-options: -DCHECK_MVAR_INVARIANT
 
 test-suite test
   type:                exitcode-stdio-1.0

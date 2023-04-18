@@ -4,11 +4,15 @@
 {-# LANGUAGE TypeFamilies  #-}
 {-# LANGUAGE TypeOperators #-}
 
--- | This module corresponds to 'Control.Concurrent.MVar' in "base" package
+-- | This module corresponds to "Control.Concurrent.MVar" in the @base@ package.
 --
+-- Use "Control.Concurrent.Class.MonadMVar.Strict" as a drop-in replacement for
+-- the current module in case you do /not/ want to check invariants on the
+-- values inside 'StrictMVar's.
 module Control.Concurrent.Class.MonadMVar.Strict.Checked
   ( -- * StrictMVar
     StrictMVar
+  , LazyMVar
   , castStrictMVar
   , toLazyMVar
   , fromLazyMVar
@@ -87,17 +91,18 @@ fromLazyMVar = StrictMVar (const Nothing)
 newEmptyMVar :: MonadMVar m => m (StrictMVar m a)
 newEmptyMVar = fromLazyMVar <$> Lazy.newEmptyMVar
 
-newEmptyMVarWithInvariant ::
-     MonadMVar m
-  => (a -> Maybe String) -> m (StrictMVar m a)
+newEmptyMVarWithInvariant :: MonadMVar m
+                          => (a -> Maybe String)
+                          -> m (StrictMVar m a)
 newEmptyMVarWithInvariant inv = StrictMVar inv <$> Lazy.newEmptyMVar
 
 newMVar :: MonadMVar m => a -> m (StrictMVar m a)
 newMVar !a = fromLazyMVar <$> Lazy.newMVar a
 
-newMVarWithInvariant ::
-     MonadMVar m
-  => (a -> Maybe String) -> a -> m (StrictMVar m a)
+newMVarWithInvariant :: MonadMVar m
+                     => (a -> Maybe String)
+                     -> a
+                     -> m (StrictMVar m a)
 newMVarWithInvariant inv !a =
   checkInvariant (inv a) $
   StrictMVar inv <$> Lazy.newMVar a
@@ -174,15 +179,10 @@ tryReadMVar v = Lazy.tryReadMVar (mvar v)
 -- Dealing with invariants
 --
 
--- | Check invariant (if enabled)
+-- | Check invariant
 --
 -- @checkInvariant mErr x@ is equal to @x@ if @mErr == Nothing@, and throws an
 -- error @err@ if @mErr == Just err@.
 checkInvariant :: HasCallStack => Maybe String -> a -> a
-
-#if CHECK_MVAR_INVARIANT
 checkInvariant Nothing    k = k
-checkInvariant (Just err) _ = error $ "Invariant violation: " ++ err
-#else
-checkInvariant _err       k = k
-#endif
+checkInvariant (Just err) _ = error $ "StrictMVar invariant violation: " ++ err

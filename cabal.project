@@ -31,8 +31,5 @@ package io-sim
 package io-classes
   flags: +asserts
 
-package strict-mvar
-  flags: +asserts
-
 package strict-stm
   flags: +asserts
