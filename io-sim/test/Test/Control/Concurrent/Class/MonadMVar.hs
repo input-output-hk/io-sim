@@ -3,11 +3,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 
-module Test.Control.Monad.Class.MonadMVar where
+module Test.Control.Concurrent.Class.MonadMVar where
 
+import           Control.Concurrent.Class.MonadMVar
 import           Control.Monad.Class.MonadAsync
 import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
 import           Data.Bifoldable (bifoldMap)
@@ -25,7 +25,7 @@ import           Test.Tasty.QuickCheck (testProperty)
 
 tests :: TestTree
 tests =
-    testGroup "Control.Monad.Class.MonadMVar"
+    testGroup "Control.Concurrent.Class.MonadMVar"
     [ testGroup "putMVar"
       [ testProperty "fairness (IOSim)" prop_putMVar_fairness_sim
       , testCase "blocks on a full MVar (IOSim)"

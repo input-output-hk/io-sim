@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators          #-}
 
-module Control.Monad.Class.MonadMVar (MonadMVar (..)) where
+module Control.Concurrent.Class.MonadMVar (MonadMVar (..)) where
 
 import qualified Control.Concurrent.MVar as IO
 import           Control.Monad.Class.MonadThrow
