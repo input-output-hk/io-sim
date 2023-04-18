@@ -2,6 +2,11 @@ cabal-version:       3.0
 name:                strict-stm
 version:             1.0.0.0
 synopsis:            Strict STM interface polymorphic over stm implementation.
+description:
+  Strict STM interface provided on top of
+  [io-classes](https://hackage.haskell.org/package/io-classes) and thus
+  compatible with [stm](https://hackage.haskell.org/package/stm)
+  & [io-sim](https://hackage.haskell.org/package/io-sim).
 license:             Apache-2.0
 license-files:
   LICENSE
@@ -67,4 +72,4 @@ library
     ghc-options: -fno-ignore-asserts
 
   if flag(checktvarinvariant)
-    cpp-options: -DCHECK_TVAR_INVARIANT
+    cpp-options: -DCHECK_TVAR_INVARIAN

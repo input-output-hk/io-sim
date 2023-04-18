@@ -1,8 +1,10 @@
 cabal-version:       3.0
 name:                si-timers
 version:             1.0.0.0
-synopsis:            Timers using SI units (seconds) which are safe on 32-bit
-                     platforms.
+synopsis:            timers using SI units (seconds)
+description:
+  Timers using SI units (seconds) which are safe on 32-bit platforms and
+  compatible with [io-sim](https://hackage.haskell.org/package/io-sim).
 license:             Apache-2.0
 license-files:
   LICENSE

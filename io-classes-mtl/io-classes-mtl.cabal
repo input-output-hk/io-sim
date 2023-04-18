@@ -2,6 +2,10 @@ cabal-version:      3.0
 name:               io-classes-mtl
 version:            0.1.0.0
 synopsis:           Experimental MTL instances for io-classes
+description:
+    MTL instances for
+    [io-classes](https://hackage.hasekll.org/package/io-classes) package.
+    Some of the instances are novel and some are still experimental.
 license:            Apache-2.0
 license-files:
   LICENSE

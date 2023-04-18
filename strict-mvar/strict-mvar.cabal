@@ -1,8 +1,11 @@
 cabal-version:       3.0
 name:                strict-mvar
 version:             1.0.0.0
-synopsis:            Strict MVars for implementations of the `io-classes` MVar interface
-description:         Strict MVars for implementations of the `io-classes` MVar interface.
+synopsis:            Strict MVars for IO and IOSim
+description:
+  Strict @MVar@ interface compatible with
+  [IO](https://hackage.haskell.org/package/base-4.18.0.0/docs/Prelude.html#t:IO)
+  & [io-sim](https://hackage.haskell.org/package/io-sim).
 license:             Apache-2.0
 license-files:
   LICENSE
@@ -12,6 +15,8 @@ author:              IOHK Engineering Team
 maintainer:          operations@iohk.io
 category:            Control
 build-type:          Simple
+extra-source-files:  CHANGELOG.md
+                     README.md
 tested-with:         GHC == { 8.10.7, 9.2.5, 9.4.4 }
 
 source-repository head

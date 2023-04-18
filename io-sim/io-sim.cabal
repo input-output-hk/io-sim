@@ -1,7 +1,11 @@
 cabal-version:       3.0
 name:                io-sim
 version:             1.0.0.0
-synopsis:            A pure simulator for monadic concurrency with STM
+synopsis:            A pure simulator for monadic concurrency with STM.
+description:
+  A pure simulator monad with support of concurency (base, async), stm,
+  synchronous and asynchronous exceptions, timeouts & delays, dynamic traces,
+  and more.
 license:             Apache-2.0
 license-files:
   LICENSE

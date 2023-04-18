@@ -13,6 +13,9 @@ very efficient but for other platforms (e.g.  `Windows`), it might not be the
 right API for low latency timeouts needed for example for low level networking
 code, because it relies on `GHC`'s `RTS` thread scheduling.
 
+`si-timers` are compatible with `io-sim`.
+
 The `SI` comes from the [International System of Units][SI].
 
 [SI]: https://www.wikiwand.com/en/International_System_of_Units
+[`io-sim`]: https://hackage.haskell.org/package/io-sim
