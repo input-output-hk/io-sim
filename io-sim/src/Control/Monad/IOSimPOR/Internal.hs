@@ -594,7 +594,6 @@ schedule thread@Thread{
       let effect' = effect
                  <> writeEffects written
                  <> wakeupEffects wakeup
-                 <> statusWriteEffects unblocked
           thread' = thread { threadControl = ThreadControl k ctl
                            , threadEffect  = effect'
                            }
