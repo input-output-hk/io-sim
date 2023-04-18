@@ -84,6 +84,7 @@ import           Control.Monad.IOSimPOR.Timeout (unsafeTimeout)
 import           Control.Monad.IOSimPOR.Types
 
 import           GHC.Conc (ThreadStatus(..), BlockReason(..))
+import qualified Debug.Trace as Debug
 
 --
 -- Simulation interpreter
@@ -750,6 +751,8 @@ schedule thread@Thread{
 
           thread' = thread { threadControl = ThreadControl (k result) ctl
                            , threadVClock  = vClock `leastUpperBoundVClock` otherVClock
+                           -- NOTE: commenting the next line avoids the wrong
+                           -- schedule
                            , threadEffect  = effect <> statusReadEffects [tid']
                            }
       trace <- schedule thread' simstate
@@ -973,7 +976,7 @@ deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect }
     -- this one to sleep without recording a step.
 
     let thread' = thread { threadEffect = effect <> statusWriteEffect tid }
-        runqueue' = insertThread thread runqueue
+        runqueue' = insertThread thread' runqueue
         threads'  = Map.insert tid thread' threads in
     reschedule simstate { runqueue = runqueue', threads  = threads' }
 
@@ -1756,6 +1759,14 @@ updateRacesInSimState thread SimState{ control, threads, races } =
   where
     step = currentStep thread
 
+
+traceIf :: Bool -> String -> b -> b
+traceIf True  a = Debug.trace a
+traceIf False _ = id
+
+traceShowIf :: Show a => Bool -> a -> b -> b
+traceShowIf a b = traceIf a (show b)
+
 -- | 'updateRaces' turns a current 'Step' into 'StepInfo', and updates all
 -- 'activeRaces'.
 --
@@ -1773,18 +1784,27 @@ updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
   let justBlocking :: Bool
       justBlocking = blocking && onlyReadEffect newEffect
 
+      traceIt32 :: Bool
+      traceIt32 = let a = (tid, stepStep newStep)
+                  in a == (RacyThreadId [3], 2) && False
+
+      traceIt42 = let a = (tid, stepStep newStep)
+                  in a == (RacyThreadId [4], 2) && False
+
       -- a new step cannot race with any threads that it just woke up
       new :: [StepInfo]
       !new | isNotRacyThreadId tid  = []  -- non-racy threads do not race
            | Set.null newConcurrent = []  -- cannot race with anything
            | justBlocking           = []  -- no need to defer a blocking transaction
            | otherwise              =
-               [StepInfo { stepInfoStep       = newStep,
+              let stepInfo = StepInfo { stepInfoStep       = newStep,
                            stepInfoControl    = control,
                            stepInfoConcurrent = newConcurrent,
                            stepInfoNonDep     = [],
                            stepInfoRaces      = []
-                         }]
+                         }
+              in traceShowIf traceIt32 ("STEP: activeRaces", stepInfo, newConcurrent, justBlocking)
+                 [stepInfo]
         where
           newConcurrent :: Set ThreadId
           newConcurrent = foldr Set.delete newConcurrent0 (effectWakeup newEffect)
@@ -1793,12 +1813,18 @@ updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
       !activeRaces' =
         [ -- if this step depends on the previous step, or is not concurrent,
           -- then any threads that it wakes up become non-concurrent also.
-          let !lessConcurrent = foldr Set.delete concurrent (effectWakeup newEffect) in
+          let !lessConcurrent = foldr Set.delete concurrent (effectWakeup newEffect)
+              traceItBase :: Bool
+              traceItBase = (stepThreadId step, stepStep step) == (RacyThreadId [8], 1) in
           if tid `elem` concurrent then
+
             let theseStepsRace = isRacyThreadId tid && racingSteps step newStep
                 happensBefore  = step `happensBeforeStep` newStep
-                !nondep' | happensBefore = nondep
-                         | otherwise     = newStep : nondep
+                !nondep' | happensBefore = traceIf traceItBase ("\nSTEP: ~nondep:\n" ++ unlines ((('\t':)) <$> [show newStep, show step, show nondep])) $
+                                           nondep
+                         | otherwise     = traceIf traceItBase  ("\nSTEP:  nondep: " ++ show theseStepsRace ++ "\n" ++ unlines ((('\t':)) <$>
+                                                                [show newStep, show step, show nondep, show concurrent'])) $
+                                           newStep : nondep
                 -- We will only record the first race with each thread---reversing
                 -- the first race makes the next race detectable. Thus we remove a
                 -- thread from the concurrent set after the first race.
@@ -1810,7 +1836,8 @@ updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
                 -- to avoid finding the same race in different parts of the search space.
                 !stepRaces' | (control == ControlDefault ||
                                control == ControlFollow [] []) &&
-                              theseStepsRace  = newStep : stepRaces
+                              theseStepsRace  = traceShowIf traceIt32 ("STEP: stepRaces", newStep) $
+                                                 newStep : stepRaces
                             | otherwise       = stepRaces
 
             in stepInfo { stepInfoConcurrent = effectForks newEffect
@@ -1819,7 +1846,8 @@ updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
                           stepInfoRaces      = stepRaces'
                         }
 
-          else stepInfo { stepInfoConcurrent = lessConcurrent }
+          else traceIf traceItBase ("\nSTEP: nonconcurrent\n" ++ unlines ((('\t':)) <$> [show newStep, show step, show concurrent, show lessConcurrent])) $
+               stepInfo { stepInfoConcurrent = lessConcurrent }
 
         | !stepInfo@StepInfo { stepInfoStep       = step,
                                stepInfoConcurrent = concurrent,
@@ -1827,7 +1855,8 @@ updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
                                stepInfoRaces      = stepRaces
                             }
             <- activeRaces ]
-  in normalizeRaces $ races { activeRaces = new ++ activeRaces' }
+  in traceIf traceIt42 ("STEP: considering: \n\t" ++ show newStep ++ "\n\t" ++ show new ++ "\n\t" ++ show activeRaces') $
+     normalizeRaces $ races { activeRaces = new ++ activeRaces' }
 
 -- When a thread terminates, we remove it from the concurrent thread
 -- sets of active races.

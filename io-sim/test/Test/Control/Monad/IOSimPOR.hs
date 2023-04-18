@@ -33,7 +33,8 @@ import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTime
 import           Control.Monad.Class.MonadTimer
-import           Control.Monad.IOSim
+import           Control.Monad.IOSim hiding (ThreadId (..))
+import qualified Control.Monad.IOSim as Sim
 
 import           GHC.Generics
 
@@ -43,6 +44,8 @@ import           Test.Control.Monad.STM
 import           Test.QuickCheck
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck
+import qualified Data.List.Trace as Trace
+import qualified Debug.Trace as Debug
 
 tests :: TestTree
 tests =
@@ -258,6 +261,7 @@ sortTasks []             = []
 
 interpret :: forall s. TVar (IOSim s) Int -> TVar (IOSim s) [ThreadId (IOSim s)] -> Task -> IOSim s (ThreadId (IOSim s))
 interpret r t (Task steps) = forkIO $ do
+    say (show steps)
     context <- atomically $ do
       ts <- readTVar t
       when (null ts) retry
@@ -310,13 +314,56 @@ propExploration (Tasks tasks) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
     traceNoDuplicates $ \addTrace ->
     --traceCounter $ \addTrace ->
-    exploreSimTrace id (runTasks tasks) $ \_ trace ->
-    --Debug.trace (("\nTrace:\n"++) . splitTrace . noExceptions $ show trace) $
-    addTrace trace $
-    counterexample (splitTrace . noExceptions $ show trace) $
-    case traceResult False trace of
-      Right (m,a) -> property $ m>=a
-      Left e      -> counterexample (show e) False
+    -- exploreSimTrace id (runTasks tasks) $ \_ trace ->
+    let trace = controlSimTrace Nothing 
+                  ControlDefault
+                  {--
+                    - (ControlAwait [ScheduleMod
+                    -                 (Sim.RacyThreadId [5],1)
+                    -                 ControlDefault
+                    -                 [(Sim.RacyThreadId [4],0),
+                    -                  (Sim.RacyThreadId [4],1),
+                    -                  (Sim.RacyThreadId [3],0),
+                    -                  (Sim.RacyThreadId [3],1),
+                    -                  (Sim.RacyThreadId [2],0),
+                    -                  (Sim.RacyThreadId [2],1),
+                    -                  (Sim.RacyThreadId [3],2),
+                    -                  (Sim.RacyThreadId [1],0)]
+                    -               ])
+                    --}
+                  {--
+                    - (ControlAwait [ScheduleMod (Sim.RacyThreadId [8],1) ControlDefault
+                    -               [(Sim.RacyThreadId [7],0),
+                    -                (Sim.RacyThreadId [7],1),
+                    -                (Sim.RacyThreadId [5],0),
+                    -                (Sim.RacyThreadId [5],1),
+                    -                (Sim.RacyThreadId [5],2),
+                    -                (Sim.RacyThreadId [4],0),
+                    -                (Sim.RacyThreadId [3],0),
+                    -                (Sim.RacyThreadId [3],1),
+                    -                (Sim.RacyThreadId [3],2),
+                    -                (Sim.RacyThreadId [2],0),
+                    -                (Sim.RacyThreadId [2],1),
+                    -                (Sim.RacyThreadId [1],0),
+                    -                (Sim.RacyThreadId [1],1),
+                    -                (Sim.RacyThreadId [1],2),
+                    -                (Sim.RacyThreadId [6],0)]]
+                    - )
+                    --}
+                  (runTasks tasks)
+    in 
+      --Debug.trace (("\nTrace:\n"++) . splitTrace . unlines $ noExceptions . show <$> Trace.toList trace) $
+      {- counterexample -}
+     seq (unsafePerformIO $ do
+                        print "TRACE START"
+                        _ <- traverse print (Trace.toList trace)
+                        return "") $
+      addTrace trace $
+      --counterexample (splitTrace . unlines $ noExceptions . show <$> Trace.toList trace) $
+      --counterexample (splitTrace . unlines $ show . noExceptions' <$> Trace.toList trace) $ 
+      case traceResult False trace of
+        Right (m,a) -> property $ m>=a
+        Left e      -> counterexample (show e) False
 
 -- Testing propPermutations n should collect every permutation of [1..n] once only.
 -- Test manually, and supply a small value of n.
@@ -346,6 +393,9 @@ noExceptions xs = unsafePerformIO $ try (evaluate xs) >>= \case
   Right (x:ys) -> return (x:noExceptions ys)
   Left e       -> return ("\n"++show (e :: SomeException))
 
+noExceptions' :: a -> Either SomeException a
+noExceptions' = unsafePerformIO . try . evaluate
+
 splitTrace :: [Char] -> [Char]
 splitTrace [] = []
 splitTrace (x:xs) | begins "(Trace" = "\n(" ++ splitTrace xs
@@ -365,10 +415,14 @@ traceCounter k = r `pseq` (k addTrace .&&.
 traceNoDuplicates :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
 traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
   where
-    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
+    r :: IORef (Map String Int)
+    r = unsafePerformIO $ newIORef Map.empty
+
     addTrace t x = unsafePerformIO $ do
       atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
       return x
+
+    traceCounts :: () -> [Int]
     traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
 
 --
@@ -379,13 +433,29 @@ traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
 --
 prop_unit_76 :: Property
 prop_unit_76 =
-  propExploration (Tasks [Task [WhenSet 9 0],Task [WhenSet 0 0],Task [WhenSet 10 10,WhenSet 10 9],Task [WhenSet 0 0]])
-  .&&.
-  propExploration (Tasks [Task [],Task [ThrowTo 4],Task [WhenSet 19 18,ThrowTo 0],Task [WhenSet 18 0,ThrowTo 2],Task [WhenSet 0 0]])
-  .&&.
-  propExploration (Tasks [Task [WhenSet 4 0],Task [WhenSet 0 0],Task [WhenSet 5 5,WhenSet 5 4],Task [WhenSet 0 0]])
-  .&&.
-  propExploration (Tasks [Task [WhenSet 4 0],Task [WhenSet 0 0],Task [WhenSet 5 5,WhenSet 5 4],Task [CheckStatus 0,WhenSet 0 0]])
+  {--
+    - propExploration (Tasks [Task [WhenSet 9 0],Task [WhenSet 0 0],Task [WhenSet 10 10,WhenSet 10 9],Task [WhenSet 0 0]])
+    - .&&.
+    - propExploration (Tasks [Task [],Task [ThrowTo 4],Task [WhenSet 19 18,ThrowTo 0],Task [WhenSet 18 0,ThrowTo 2],Task [WhenSet 0 0]])
+    - .&&.
+    --}
+  -- propExploration (Tasks [Task [WhenSet 4 0],Task [WhenSet 0 0],Task [WhenSet 5 5,WhenSet 5 4],Task [WhenSet 0 0]])
+  {--
+    - .&&.
+    - propExploration (Tasks [Task [WhenSet 4 0],Task [WhenSet 0 0],Task [WhenSet 5 5,WhenSet 5 4],Task [CheckStatus 0,WhenSet 0 0]])
+    --}
+  -- propExploration (Tasks [Task [],Task [WhenSet 0 0],Task [WhenSet 1 0],Task [WhenSet 2 2,WhenSet 2 0],Task [CheckStatus 4,ThrowTo 0,WhenSet 1 0]])
+  -- propExploration $ Tasks [Task [ThrowTo 3,ThrowTo 2],Task [WhenSet 0 0],Task [ThrowTo 1],Task [Delay 0],Task []]
+  propExploration $ Tasks [Task [WhenSet 14 0],                          -- ThreadId [1]
+                           Task [],                                      -- ThreadId [2]
+                           Task [WhenSet 20 17],                         -- ThreadId [3]
+                           Task [WhenSet 18 6],
+                           Task [ThrowTo 3,ThrowTo 4],                   -- ThreadId [5]
+                           Task [WhenSet 19 0,WhenSet 0 0],              -- 
+                           Task [WhenSet 17 14,WhenSet 9 6,ThrowTo 1],   -- ThreadId [7]
+                           Task [CheckStatus 6,ThrowTo 5]                -- ThreadId [8]
+                          ]
+
 
 --
 -- Read/Write graph

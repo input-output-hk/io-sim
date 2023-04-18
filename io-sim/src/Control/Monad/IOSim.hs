@@ -73,6 +73,7 @@ module Control.Monad.IOSim
   , SimM
   , SimSTM
   , TraceEvent
+  , ThreadId (..)
   ) where
 
 import           Prelude
@@ -162,7 +163,7 @@ detachTraceRaces trace = unsafePerformIO $ do
                         return t
   let go (SimTrace a b c d trace)      = SimTrace a b c d $ go trace
       go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e $ go trace
-      go (TraceRacesFound r trace)     = saveRaces r $ go trace
+      go (TraceRacesFound r trace)     = saveRaces r $ TraceRacesFound r $ go trace
       go t                             = t
   return (readRaces,go trace)
 
