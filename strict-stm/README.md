@@ -6,7 +6,7 @@ for both [`stm`] as well as [`io-sim`].
 
 # Novel testing / space-leak elimination approach
 
-The strict interface provides a novel way of testing / eliminating space-leaks
+The strict interface provides a novel way of testing/eliminating space-leaks
 which might lurk in `stm` shared mutable variables.  Together with the
 [`nothunks`] library it was successfully used to eliminate and keep a large
 system ([`cardano-node`]) space leak free.

@@ -1,4 +1,4 @@
-# Strict mutable variables
+# Strict Mutable Variables
 
 The `strict-mvar` package provides a strict interface to mutable variables
 (`MVar`). It builds on top of `io-classes`, and thus it provides the interface
