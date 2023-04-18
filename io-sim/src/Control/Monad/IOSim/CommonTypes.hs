@@ -13,8 +13,6 @@ import           Data.Map (Map)
 import           Data.STRef.Lazy
 import           Data.Set (Set)
 
-import qualified GHC.Conc as GHC
-
 data ThreadId = RacyThreadId [Int]
               | ThreadId     [Int]    -- non racy threads have higher priority
   deriving (Eq, Ord, Show)
@@ -81,37 +79,18 @@ instance Eq (TVar s a) where
 data SomeTVar s where
   SomeTVar :: !(TVar s a) -> SomeTVar s
 
--- | The reason a thread finished running
-data FinishedReason = FinishedNormally
-                    | FinishedDied
-                    deriving (Ord, Eq, Show, Enum, Bounded)
-
 data Deschedule = Yield
                 | Interruptable
                 | Blocked BlockedReason
-                | Terminated FinishedReason
+                | Terminated
                 | Sleep
   deriving Show
 
--- TODO: we should track threads which died and finished as the
--- `GHC.ThreadStatus` does (`IOSim` does not track this information).
---
 data ThreadStatus = ThreadRunning
                   | ThreadBlocked BlockedReason
-                  | ThreadFinished
-                  | ThreadDied
+                  | ThreadDone
   deriving (Eq, Show)
 
 data BlockedReason = BlockedOnSTM
                    | BlockedOnOther
   deriving (Eq, Show)
-
-ghcThreadStatus :: ThreadStatus -> GHC.ThreadStatus
-ghcThreadStatus ThreadRunning  = GHC.ThreadRunning
-ghcThreadStatus (ThreadBlocked reason) =
-    case reason of
-      BlockedOnSTM   -> GHC.ThreadBlocked GHC.BlockedOnSTM
-      BlockedOnOther -> GHC.ThreadBlocked GHC.BlockedOnOther
-ghcThreadStatus ThreadFinished = GHC.ThreadFinished
-ghcThreadStatus ThreadDied     = GHC.ThreadDied
-

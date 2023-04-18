@@ -16,8 +16,7 @@ import qualified Control.Concurrent as IO
 import           Control.Exception (AsyncException (ThreadKilled), Exception)
 import           Control.Monad.Reader (ReaderT (..), lift)
 import           Data.Kind (Type)
-import           GHC.Conc (ThreadStatus)
-import qualified GHC.Conc.Sync as IO (labelThread, threadStatus)
+import qualified GHC.Conc.Sync as IO (labelThread)
 
 
 class (Monad m, Eq   (ThreadId m),
@@ -28,7 +27,6 @@ class (Monad m, Eq   (ThreadId m),
 
   myThreadId     :: m (ThreadId m)
   labelThread    :: ThreadId m -> String -> m ()
-  threadStatus   :: ThreadId m -> m ThreadStatus
 
 
 class MonadThread m => MonadFork m where
@@ -56,7 +54,6 @@ instance MonadThread IO where
   type ThreadId IO = IO.ThreadId
   myThreadId   = IO.myThreadId
   labelThread  = IO.labelThread
-  threadStatus = IO.threadStatus
 
 instance MonadFork IO where
   forkIO           = IO.forkIO
@@ -70,7 +67,6 @@ instance MonadThread m => MonadThread (ReaderT r m) where
   type ThreadId (ReaderT r m) = ThreadId m
   myThreadId      = lift myThreadId
   labelThread t l = lift (labelThread t l)
-  threadStatus t  = lift (threadStatus t)
 
 instance MonadFork m => MonadFork (ReaderT e m) where
   forkIO (ReaderT f)   = ReaderT $ \e -> forkIO (f e)
