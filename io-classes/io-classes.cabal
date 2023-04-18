@@ -46,7 +46,8 @@ library
 
   -- At this experiment/prototype stage everything is exposed.
   -- This has to be tidied up once the design becomes clear.
-  exposed-modules:     Control.Concurrent.Class.MonadSTM
+  exposed-modules:     Control.Concurrent.Class.MonadMVar
+                       Control.Concurrent.Class.MonadSTM
                        Control.Concurrent.Class.MonadSTM.TArray
                        Control.Concurrent.Class.MonadSTM.TBQueue
                        Control.Concurrent.Class.MonadSTM.TChan
@@ -57,7 +58,6 @@ library
                        Control.Monad.Class.MonadAsync
                        Control.Monad.Class.MonadEventlog
                        Control.Monad.Class.MonadFork
-                       Control.Monad.Class.MonadMVar
                        Control.Monad.Class.MonadSay
                        Control.Monad.Class.MonadST
                        Control.Monad.Class.MonadSTM

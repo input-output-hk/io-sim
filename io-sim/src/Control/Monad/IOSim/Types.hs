@@ -75,6 +75,7 @@ import           Control.Exception (ErrorCall (..), asyncExceptionFromException,
 import           Control.Monad
 import           Control.Monad.Fix (MonadFix (..))
 
+import           Control.Concurrent.Class.MonadMVar
 import           Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar as StrictTVar
 import           Control.Monad.Class.MonadAsync hiding (Async)
@@ -82,7 +83,6 @@ import qualified Control.Monad.Class.MonadAsync as MonadAsync
 import           Control.Monad.Class.MonadEventlog
 import           Control.Monad.Class.MonadFork hiding (ThreadId)
 import qualified Control.Monad.Class.MonadFork as MonadFork
-import           Control.Monad.Class.MonadMVar
 import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
@@ -942,7 +942,7 @@ data SimEventType
                        [Labelled TVarId] -- ^ and created these
                        (Maybe Effect)    -- ^ effect performed (only for `IOSimPOR`)
   -- | aborted an STM transaction (by an exception)
-  -- 
+  --
   -- For /IOSimPOR/ it also holds performed effect.
   | EventTxAborted     (Maybe Effect)
   -- | STM transaction blocked (due to `retry`)
@@ -984,7 +984,7 @@ data SimEventType
   --
   -- threadStatus
   --
-  
+
   -- | event traced when `threadStatus` is executed
   | EventThreadStatus  ThreadId -- ^ current thread
                        ThreadId -- ^ queried thread

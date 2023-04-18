@@ -30,8 +30,8 @@ module Control.Concurrent.Class.MonadMVar.Strict
   , MonadMVar
   ) where
 
-import           Control.Monad.Class.MonadMVar (MonadMVar)
-import qualified Control.Monad.Class.MonadMVar as Lazy
+import           Control.Concurrent.Class.MonadMVar (MonadMVar)
+import qualified Control.Concurrent.Class.MonadMVar as Lazy
 
 --
 -- StrictMVar
