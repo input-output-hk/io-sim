@@ -47,6 +47,10 @@ data ControlStack s b a where
                -> (Maybe b -> SimA s c)
                -> !(ControlStack s c a)
                -> ControlStack s b a
+  DelayFrame   :: TimeoutId
+               -> SimA s c
+               -> ControlStack s c a
+               -> ControlStack s b a
 
 instance Show (ControlStack s b a) where
   show = show . dash
@@ -57,6 +61,7 @@ instance Show (ControlStack s b a) where
       dash (MaskFrame _ m cs)         = MaskFrame' m (dash cs)
       dash (CatchFrame _ _ cs)        = CatchFrame' (dash cs)
       dash (TimeoutFrame tmid _ _ cs) = TimeoutFrame' tmid (dash cs)
+      dash (DelayFrame tmid _ cs)     = DelayFrame' tmid (dash cs)
 
 data ControlStackDash =
     MainFrame'
@@ -66,6 +71,7 @@ data ControlStackDash =
   -- TODO: Figure out a better way to include IsLocked here
   | TimeoutFrame' TimeoutId ControlStackDash
   | ThreadDelayFrame' TimeoutId ControlStackDash
+  | DelayFrame' TimeoutId ControlStackDash
   deriving Show
 
 data IsLocked = NotLocked | Locked !ThreadId

@@ -263,8 +263,13 @@ schedule !thread@Thread{
                      }
         schedule thread' simstate
 
+      DelayFrame tmid k ctl' -> do
+        let thread' = thread { threadControl = ThreadControl k ctl' }
+            timers' = PSQ.delete tmid timers
+        schedule thread' simstate { timers = timers' }
+
     Throw e -> {-# SCC "schedule.Throw" #-}
-               case unwindControlStack e thread timers' of
+               case unwindControlStack e thread timers of
       -- Found a CatchFrame
       (Right thread'@Thread { threadMasking = maskst' }, timers'') -> do
         -- We found a suitable exception handler, continue with that
@@ -288,23 +293,6 @@ schedule !thread@Thread{
                  $ SimTrace time tid tlbl (EventThreadUnhandled e)
                  $ SimTrace time tid tlbl (EventDeschedule Terminated)
                  $ trace
-      where
-        -- When we throw an exception we need to cancel thread delay action
-        -- which could be blocking the current thread.  This is important for
-        -- `TimeoutException` or any other asynchronous exceptions.
-        --
-        -- Note: we treat `TimerThreadDelay` different than `TimerTimeout`s.
-        -- The first one cannot be stacked (there's not corresponding frame), so
-        -- it's fine to just remove scheduled thread delay (there can be at most
-        -- one).  `TimerTimeout` however is different and we need to remove them
-        -- as we unwind the stack frames in `unwindControlStack`.
-        timers' = PSQ.fromList
-                . filter (\(_,_,info) -> case info of
-                            TimerThreadDelay tid' _
-                              -> tid' /= tid
-                            _ -> True)
-                . PSQ.toAscList
-                $ timers
 
     Catch action' handler k ->
       {-# SCC "schedule.Catch" #-} do
@@ -430,7 +418,7 @@ schedule !thread@Thread{
     ThreadDelay d k | d < 0 ->
       {-# SCC "schedule.NewThreadDelay" #-} do
       let !expiry    = d `addTime` time
-          !thread'   = thread { threadControl = ThreadControl k ctl }
+          !thread'   = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
           !simstate' = simstate { nextTmid = succ nextTmid }
       trace <- schedule thread' simstate'
       return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) $
@@ -441,7 +429,7 @@ schedule !thread@Thread{
       {-# SCC "schedule.NewThreadDelay" #-} do
       let !expiry  = d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
-          !thread' = thread { threadControl = ThreadControl k ctl }
+          !thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
       !trace <- deschedule (Blocked BlockedOnOther) thread' simstate { timers   = timers'
                                                                      , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) trace)
@@ -994,6 +982,13 @@ unwindControlStack e thread = \timers ->
       where
         -- Remove the timeout associated with the 'TimeoutFrame'.
         timers' = PSQ.delete tmid timers
+
+    unwind maskst (DelayFrame tmid _k ctl) timers =
+        unwind maskst ctl timers'
+      where
+        -- Remove the timeout associated with the 'DelayFrame'.
+        timers' = PSQ.delete tmid timers
+
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState
     atLeastInterruptibleMask Unmasked = MaskedInterruptible
