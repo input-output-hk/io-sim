@@ -2,6 +2,10 @@ cabal-version:       3.0
 name:                io-classes
 version:             1.0.0.0
 synopsis:            Type classes for concurrency with STM, ST and timing
+description:
+  IO Monad class hierarchy compatible with
+  [io-sim](https://hackage.haskell.org/package/io-sim), 'base', 'async',
+  'stm', 'exceptions' & 'time' packages.
 license:             Apache-2.0
 license-files:
   LICENSE
