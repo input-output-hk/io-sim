@@ -73,8 +73,6 @@ can update other packages from this repository in a subsequent commit.
 
 Please use a draft PR if the work is still in progress.
 
-We require all commits to be signed, see [this guide][gh-signing-commits].
-
 If your pull requests resolve an existing issue, please link your PR to the
 issue, see [GitHub documentation][gh-link-issue].
 
