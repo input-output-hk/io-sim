@@ -133,7 +133,6 @@ data Step =
   | ThrowTo Int
   | Delay Int
   | Timeout TimeoutStep
-  | CheckStatus Int
   deriving (Eq, Ord, Show)
 
 data TimeoutStep =
@@ -150,14 +149,11 @@ instance Arbitrary Step where
                                return $ ThrowTo i),
                          (1,do Positive i <- arbitrary
                                return $ Delay i),
-                         (1,do NonNegative i <- arbitrary
-                               return $ CheckStatus i),
                          (1,Timeout <$> arbitrary)]
 
   shrink (WhenSet m n) = map (WhenSet m) (shrink n) ++
                          map (`WhenSet` n) (filter (>=n) (shrink m))
   shrink (ThrowTo i) = map ThrowTo (shrink i)
-  shrink (CheckStatus i) = map CheckStatus (shrink i)
   shrink (Delay i)   = map Delay (shrink i)
   shrink (Timeout t) = map Timeout (shrink t)
 
@@ -248,7 +244,6 @@ mapSymThreadIds :: (Int -> Int) -> [Task] -> [Task]
 mapSymThreadIds f tasks = map mapTask tasks
   where mapTask (Task steps) = Task (map mapStep steps)
         mapStep (ThrowTo i) = ThrowTo (f i)
-        mapStep (CheckStatus i) = CheckStatus (f i)
         mapStep s           = s
 
 mapThrowTos :: (Int -> Int) -> [Task] -> [Task]
@@ -275,7 +270,6 @@ interpret r t (Task steps) = forkIO $ do
           when (a/=m) retry
           writeTVar r n
         interpretStep (ts,_) (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
-        interpretStep (ts,_) (CheckStatus i) = void $ threadStatus (ts !! i)
         interpretStep _      (Delay i)   = threadDelay (fromIntegral i)
         interpretStep (_,timer) (Timeout tstep) = do
           timerVal <- atomically $ readTVar timer
