@@ -195,22 +195,16 @@ tests =
     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_died
     , testProperty "thread status died_own (IOSim)"
     $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_died_own
--- TODO: issue input-output-hk/io-sim#28
-#if !defined(mingw32_HOST_OS)
     , testProperty "thread status died_own (IO)"
     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_died_own
-#endif
     , testProperty "thread status yield (IOSim)"
     $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_yield
     , testProperty "thread status yield (IO)"
     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_yield
     , testProperty "thread status mask (IOSim)"
     $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_mask
--- TODO: issue input-output-hk/io-sim#28
-#if !defined(mingw32_HOST_OS)
     , testProperty "thread status mask (IO)"
     $ withMaxSuccess 1 $ ioProperty    prop_thread_status_mask
-#endif
     , testProperty "thread status mask blocked (IOSim)"
     $ withMaxSuccess 1 $ runSimOrThrow prop_thread_status_mask_blocked
     , testProperty "thread status mask blocked (IO)"
