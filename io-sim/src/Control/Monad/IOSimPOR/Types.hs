@@ -82,9 +82,11 @@ racingEffects e e' =
    || effectReads  e       `intersects`  effectWrites e'
    || effectWrites e       `intersects`  effectReads  e'
    || effectWrites e       `intersects`  effectWrites e'
-   || effectStatusReads e  `intersectsL` effectStatusWrites e'
-   || effectStatusWrites e `intersectsL` effectStatusReads  e'
-   || effectStatusWrites e `intersectsL` effectStatusWrites e'
+   {--
+     - || effectStatusReads e  `intersectsL` effectStatusWrites e'
+     - || effectStatusWrites e `intersectsL` effectStatusReads  e'
+     - || effectStatusWrites e `intersectsL` effectStatusWrites e'
+     --}
   where
     intersects :: Ord a => Set a -> Set a -> Bool
     intersects a b = not $ a `Set.disjoint` b
