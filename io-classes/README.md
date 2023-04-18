@@ -1,74 +1,72 @@
 # IO Monad Class Hierarchy
 
-This package provides a monad class hierarchy which is an interface for both the
-[`io-sim`] and [`IO`] monads.  It was developed with the following constraints
-in mind:
+This package provides a monad class hierarchy which is an interface for both
+the [`io-sim`] and [`IO`] monads.  It was developed with the following
+constraints in mind:
 
-* be a drop in replacement for `IO` monad;
+* be a drop-in replacement for `IO` monad;
 * `IO` instances do not alter its original semantics, providing a shallow
-  bindings to [`async`], [`base`], [`stm`] and [`exceptions`] packages as well
-  as timer api;
-* provide zero cost abstractions.
+  bindings to [`async`], [`base`], [`stm`], and [`exceptions`] packages as well
+  as timer API;
+* provide zero-cost abstractions.
 
-We provde also non standard extensions of this api:
+We provide also non-standard extensions of this API:
 
 * [`strict-stm`]: strict `TVar`'s, and other mutable `STM` variables, with
-  suport of the [`nothunks`] library;
+  support of the [`nothunks`] library;
 * [`si-timers`]: timers api:
     - 32-bit safe API using `DiffTime` measured in seconds (rather than time in
       microseconds represented as `Int` as in `base`)
-    - cancellble timeouts.
+    - cancellable timeouts.
 
-[`strict-stm`] and [`nothunks`] were successfuly used in large code base to
+[`strict-stm`] and [`nothunks`] were successfully used in a large code base to
 eliminate space leaks and keep that property over long development cycles.
 
 ## Exception Class Hierarchy
 
 This package provides an alternative class hierarchy giving access to
-exceptions api.  The [`exception`] package class hierarchy is also supported by
+exceptions API.  The [`exception`] package class hierarchy is also supported by
 [`io-sim`], so you can also use either one.
 
-The `MonadThrow` defined in this package allows to work with exceptions without
+The `MonadThrow` defined in this package allows working with exceptions without
 having explicit access to `catch` or `mask`.  It only provides access to
-`throwIO`, `bracket`, `bracket_` and `finally`.  `MonadCatch` class provides
-api which allows to work with exceptions, e.g. `catch` or `bracketOnError`, and
-`MonadMask` gives access to low level `mask` and friends.   This division makes
+`throwIO`, `bracket`, `bracket_`, and `finally`.  `MonadCatch` class provides
+API which allows working with exceptions, e.g. `catch` or `bracketOnError`, and
+`MonadMask` gives access to low-level `mask` and friends.   This division makes
 code review process somewhat easier.  Using only `MonadThrow` constraint, the
-reviewer can be sure that no low level exception api is used, which usually
-requires more care.  Still `MonadThrow` is general enough to to do resource
+reviewer can be sure that no low-level exception API is used, which usually
+requires more care.  Still `MonadThrow` is general enough to do resource
 handling right.
 
 ## Time and Timer APIs
 
 The time and timer APIs of this package follows closely the API exposed by
-[`base`] and [`time`] packages.  We separately packaged a more conveneint API
-in [`si-timers`] (ref [SI]), which provides monoidal action of `DiffTime` on
+[`base`] and [`time`] packages.  We separately packaged a more convenient API
+in [`si-timers`] (ref [SI]), which provides a monoidal action of `DiffTime` on
 monotonic time as well as exposes 32-bit safe timer API (on 32-bit systems time
-in microseconds represented as an `Int` can only holds timeouts of ~35
-minutes).
+in microseconds represented as an `Int` can only hold timeouts of ~35 minutes).
 
-`Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` provides a low level
-timeout abstraction.  On systems which support native timer manager it's used
-to implement its API, which is very efficient even for low latency timeouts.
+`Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` provides a low-level
+timeout abstraction.  On systems that support a native timer manager, it's used
+to implement its API, which is very efficient even for low-latency timeouts.
 On other platforms (e.g. `Windows`), it's good enough for subsecond timeouts
-but it's not good enough for fine grained timeouts (e.g. sub milliseconds) as
-it relays on GHC thread scheduler.  We support `MonadTimeout` on `Linux`,
-`MacOS`, `Windows` and `IOSim` (and unofficially on `GHCJS`).
+but it's not good enough for fine-grained timeouts (e.g. sub milliseconds) as
+it relays on the GHC thread scheduler.  We support `MonadTimeout` on `Linux`,
+`MacOS`, `Windows`, and `IOSim` (and unofficially on `GHCJS`).
 
-`MonadDelay` and `MonadTimer` classes provide the well established interface to
+`MonadDelay` and `MonadTimer` classes provide a well-established interface to
 delays & timers.
 
 
 ## Software Transactional Memory API
 
-We provide two interfaces to `stm` api: lazy, included in `io-classes`; and
+We provide two interfaces to `stm` API: lazy, included in `io-classes`; and
 strict one provided by [`strict-stm`].
 
 
 ## Threads API
 
-We draw a line between `base` api and `async` api.  The former one is provided
-by
+We draw a line between `base` API and `async` API.  The former is provided by
 [MonadFork](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadFork.html#t:MonadFork)
 the latter by
 [MonadAsync](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadFork.html#t:MonadAsync).
@@ -78,33 +76,30 @@ packages.
 
 ## Some other APIs
 
-* [MonadEventlog](https://hackage.haskell.org/package/io-sim-classes/docs/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog):
-  provides an API to the
-  [Debug.Trace](https://hackage.haskell.org/package/base/docs/Debug-Trace.html)
-  eventlog interface.
-* [MonadST](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadST.html#t:MonadST): provides a way to lift `ST`-computations.
-* [MonadSay](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadSay.html#t:MonadSay): dummy debugging interface
+* [MonadEventlog]: provides an API to the [Debug.Trace] event log interface.
+* [MonadST]: provides a way to lift `ST`-computations.
+* [MonadSay]: dummy debugging interface
 
 
 ## Debuging & Insepction
 
-We provide quite extended debuging & insepction api.  This proved to be
+We provide quite extended debugging & inspection API.  This proved to be
 extremely helpful when analysing complex deadlocks or livelocks or writing
 complex quickcheck properties of a highly concurrent system.  Some of this is
-only possible because we can control execution environment of [`io-sim`].
+only possible because we can control the execution environment of [`io-sim`].
 
 * `labelThread` as part of `MonadThread` ([`IO`], [`io-sim`], which is also
   part of `GHC` API, ref [`labelThread`][labelThread-base]);
-* `MonadLabelledSTM` which allows to label various `STM` mutable variables,
+* `MonadLabelledSTM` which allows to label of various `STM` mutable variables,
   e.g. `TVar`, `MVar`, etc. ([`io-sim`], not provided by `GHC`);
-* `MonadInspectSTM` which allows to inspect values of `STM` mutable variables
-  when they are commited. ([`io-sim`], not provided by `GHC`).
+* `MonadInspectSTM` which allows inspecting values of `STM` mutable variables
+  when they are committed. ([`io-sim`], not provided by `GHC`).
 
 
-## Monad transformers
+## Monad Transformers
 
 We provide support for monad transformers (although at this stage it might have
-its limitations and so there might be some rought edges.  PRs are welcomed,
+its limitations and so there might be some rough edges.  PRs are welcomed,
 [contributing]).
 
 [SI]: https://www.wikiwand.com/en/International_System_of_Units 
@@ -122,3 +117,8 @@ its limitations and so there might be some rought edges.  PRs are welcomed,
 [contributing]: https://www.github.com/input-output-hk/io-sim/tree/master/CONTRIBUTING.md
 [`nothunks`]: https://hackage.haskell.org/package/nothunks
 [labelThread-base]: https://hackage.haskell.org/package/base-4.17.0.0/docs/GHC-Conc-Sync.html#v:labelThread
+
+[MonadEventlog]: https://hackage.haskell.org/package/io-sim-classes/docs/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
+[Debug.Trace]: https://hackage.haskell.org/package/base/docs/Debug-Trace.html
+[MonadST]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadST.html#t:MonadST
+[MonadSay]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadSay.html#t:MonadSay

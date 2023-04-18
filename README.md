@@ -3,33 +3,32 @@
 
 # io-sim
 
-
-`IOSim` is an simulator monad which supports:
+`IOSim` is a simulator monad that supports:
 
 * asynchronous exceptions
 * simulated time
 * timeout API
 * software transaction memory (STM)
-* concurrency: both low level `forkIO` as well as `async` style
+* concurrency: both low-level `forkIO` as well as `async` style
 * strict STM
 * access to lazy ST
 * schedule discovery (see [IOSimPOR][io-sim-por-how-to])
-* eventlog
+* event log
 * dynamic tracing
 * tracing committed changes to `TVar`, `TMVar`s, etc.
-* labelling of threads, `TVar`'s, etc.
+* labeling of threads, `TVar`'s, etc.
 
-`io-classes` provides an interface, which allows to write code which can be run
+`io-classes` provides an interface, which allows writing code that can be run
 in both real `IO` and `IOSim`.  It is a drop-in replacement for `IO`, and
-supports interfaces commonly known from `base`, `exceptions`, `stm`, `async` or
-`time` packages.
+supports interfaces commonly known from `base`, `exceptions`, `stm`, `async`,
+or `time` packages.
 
 One of the principles of `io-classes` was to stay as close to `IO` as possible,
-thus most of the `IO` instances are directly referring to `base` or `async` api.
-However we made some distinctions, which are reported below.
+thus most of the `IO` instances are directly referring to `base` or `async`
+API.  However, we made some distinctions, which are reported below.
 
-`io-classes` supports a novel hierarchy for error handling monads as well more
-familiar `exception` style.  The new hierarchy provides `bracket` and
+`io-classes` supports a novel hierarchy for error-handling monads as well as
+more familiar `exception` style.  The new hierarchy provides `bracket` and
 `finally` functions in the `MonadThrow` class, while `catch` style operators
 are provided by a super-class `MonadCatch`.  Both `bracket` and `finally` are
 the most common functions used to write code with robust exception handling,
@@ -37,12 +36,12 @@ exposing them through the more basic `MonadThrow` class informs the reader
 / reviewer that no tricky error handling is done in that section of the code
 base.
 
-`IOSim` exposes a detailed trace, which can be enhanced by labelling threads,
-or mutable variables, tracing `Dynamic` values (which can be recovered from the
-trace) or simple `String` based tracing.  Although its agnostic with respect to
+`IOSim` exposes a detailed trace, which can be enhanced by labeling threads, or
+mutable variables, tracing `Dynamic` values (which can be recovered from the
+trace), or simple `String` based tracing.  Although it's agnostic concerning
 the logging framework, it worked for us particularly well using
-[contra-tracer][contra-tracer].  It has been used to develop, test and debug
-a complex, highly-concurrent, distributed system
+[contra-tracer][contra-tracer].  It has been used to develop, test, and debug
+a complex, highly concurrent, distributed system
 ([ouroboros-network][ouroboros-network]), in particular
 
 * write network simulations, to verify a complex networking stack;
@@ -61,10 +60,10 @@ a complex, highly-concurrent, distributed system
 * `io-classes`: class bases interface, which allows to to abstract over the
     monad
 * `strict-stm`: strict STM operations
-* `si-timers`: non standard timers API
+* `si-timers`: non-standard timers API
 
 
-## Differences from `base`, `async` or `exceptions` packages
+## Differences from `base`, `async`, or `exceptions` packages
 
 ### Major differences
 
@@ -83,11 +82,11 @@ type Async :: (Type -> Type) -> Type -> Type
 ```
 
 The first type of kind `Type -> Type` describes the monad which could be
-instantiated to `IO`, `IOSim` or some other monad stack build with monad
+instantiated to `IO`, `IOSim` or some other monad stacks built with monad
 transformers.  The same applies to many other types, e.g. `TVar`, `TMVar`.
 
 The following types although similar to the originals are not the same as the
-ones that come from `base`, `async`, or `excpetions` packages:
+ones that come from `base`, `async`, or `exceptions` packages:
 
 * `Handler` (origin: `base`)
 * `MaskingState` (origin: `base`)

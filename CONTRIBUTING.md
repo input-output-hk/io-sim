@@ -1,12 +1,12 @@
 # Building
 
-The project is build with `cabal-install`.  You might need to run `cabal
+The project is built with `cabal-install`.  You might need to run `cabal
 update` after cloning the repository.
 
 # Design Principles
 
 We designed `io-classes` to be as close as possible to what `base` package
-provides.  Almost all `IO` instances instantiate with api provided by one of
+provides.  Almost all `IO` instances instantiate with API provided by one of
 the core packages, see
 [example](https://github.com/input-output-hk/io-sim/blob/main/io-classes/src/Control/Monad/Class/MonadSTM.hs?plain=1#L410-L446).
 Please keep this in mind when adding new functionality.
@@ -54,13 +54,13 @@ package ouroboros-network-testing
 
 # Code Style
 
-Please follow local style.  For a more detailed style guide see
+Please follow the local style.  For a more detailed style guide see
 [link](https://github.com/input-output-hk/ouroboros-network/blob/master/docs/StyleGuide.md).
 
 # Pull Requests
 
-Each commit shall be small and preferably address one thing at a time.  Well
-organised & documented commits make it much easier for the maintainers to
+Each commit shall be small and preferably address one thing at a time.
+Well-organised & documented commits make it much easier for the maintainers to
 review them.  Hacking sessions are great, but please take your time to organise
 your work, this usually improves the quality too!
 
@@ -75,22 +75,22 @@ Please use a draft PR if the work is still in progress.
 
 We require all commits to be signed, see [this guide][gh-signing-commits].
 
-If your pull requests resolves an existing issue, please link your PR to that
+If your pull requests resolve an existing issue, please link your PR to the
 issue, see [GitHub documentation][gh-link-issue].
 
-Please include your changes in `CHANGELOG.md` files (per package).
+Please include your changes in the `CHANGELOG.md` files (per package).
 
-We prefer to avoid merging commits, rebasing a well organised PR is usually
+We prefer to avoid merging commits, rebasing a well-organised PR is usually
 quite simple.
 
 ## Code Style
 
-Please follow local style.  For a more detailed style guide see
+Please follow the local style.  For a more detailed style guide see
 [link](https://github.com/input-output-hk/ouroboros-network/blob/master/docs/StyleGuide.md).
 
 ## MonadSTM features
 
-If you are adding a new functionality to `MonadSTM`, don't forget to support it
+If you are adding new functionality to `MonadSTM`, don't forget to support it
 in `strict-stm` package.
 
 ## CI
@@ -100,14 +100,14 @@ We run CI using [GitHub actions][ci].
 # Releases
 
 The major version of `io-sim`, `io-classes`, `strict-stm` and `si-timers`
-packages are kept in sync.  This means that if any of the packages introduces
-a breaking change all major version SHOULD be bumped.  The minor versions are
+packages are kept in sync.  This means that if any of the packages introduce
+a breaking change all major versions SHOULD be bumped.  The minor versions are
 kept independent.  The `io-classes-mtl` is still experimental and thus it's not
 following that principle.
 
 The drawback is that if you declare `io-classes ^>= 0.x` then you will need to
-bump it when new version of `io-sim` is published (even if there are no changes
-in `io-classes`).  The con is that you just need to declare version of
+bump it when a new version of `io-sim` is published (even if there are no changes
+in `io-classes`).  The con is that you just need to declare the version of
 `io-classes` to have a consistent ecosystem of the four packages.
 
 # Tips
@@ -116,7 +116,7 @@ in `io-classes`).  The con is that you just need to declare version of
 
 Both `ppTrace` and `ppTrace_` are strict.  They evaluate the trace before they
 produce any result, thus they are not useful when your trace diverges.  This
-can happen if evaluation encounters unhandled exception e.g. one of assertion
+can happen if the evaluation encounters an unhandled exception e.g. an assertion
 fires (either internal or otherwise).  In that case, instead of `ppTrace` you
 can use `Data.Trace.toList` and simply `traverse print` the list.  This will
 give you the trace up to the point of failure.
@@ -124,7 +124,7 @@ give you the trace up to the point of failure.
 ## `IOSim` and `STMSim` monads are based on lazy `ST` monad
 
 This means that any action is forced only when the result is needed.  This is
-more lazy than `IO` monad.  Thus if you want to use `Debug.Trace.traceM` inside
+lazier than `IO` monad.  Thus if you want to use `Debug.Trace.traceM` inside
 `schedule` function you need to:
 ```hs
     ...
@@ -138,3 +138,4 @@ more lazy than `IO` monad.  Thus if you want to use `Debug.Trace.traceM` inside
 [gh-link-issue]: https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue
 [gh-signing-commits]: https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits
 [ci]: https://github.com/input-output-hk/io-sim/actions
+
