@@ -626,7 +626,6 @@ schedule thread@Thread{
                               threadEffect  = effect
                                            <> forkEffect tid'
                                            <> statusWriteEffect tid'
-                                           <> statusWriteEffect tid
                               }
           thread'' = Thread { threadId      = tid'
                             , threadControl = ThreadControl (runIOSim a)
