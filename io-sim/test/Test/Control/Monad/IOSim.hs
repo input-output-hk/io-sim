@@ -172,15 +172,9 @@ tests =
   -- scheduler works the way it does.
   , testGroup "MonadTimerCancellable"
     [ testProperty "registerDelayCancellable (IOSim impl)"
-        (prop_registerDelayCancellable registerDelayCancellable)
+        prop_registerDelayCancellable_IOSim
     , testProperty "registerDelayCancellable (IO impl)"
-        (prop_registerDelayCancellable $
-          defaultRegisterDelayCancellable
-            (newTimeout . microsecondsAsIntToDiffTime)
-            readTimeout
-            cancelTimeout
-            awaitTimeout
-        )
+        prop_registerDelayCancellable_IO
     ]
   ]
 
@@ -1334,6 +1328,25 @@ prop_registerDelayCancellable registerDelayCancellableImpl
                 | delay == cancelDelay -> (Just tv, tv == TimeoutFired
                                                  || tv == TimeoutCancelled)
                 | otherwise            -> (Just tv, tv == TimeoutCancelled)
+
+
+
+-- | Both tests run in `IOSim`, they only differ with the implementation of
+-- `registerDelayCancellable`
+--
+prop_registerDelayCancellable_IOSim, prop_registerDelayCancellable_IO
+    :: DelayWithCancel -> Property
+
+prop_registerDelayCancellable_IOSim =
+    prop_registerDelayCancellable registerDelayCancellable
+
+prop_registerDelayCancellable_IO =
+    prop_registerDelayCancellable  $
+      defaultRegisterDelayCancellable
+        (newTimeout . microsecondsAsIntToDiffTime)
+        readTimeout
+        cancelTimeout
+        awaitTimeout
 
 --
 -- Utils
