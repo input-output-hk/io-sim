@@ -1296,7 +1296,7 @@ prop_registerDelayCancellable registerDelayCancellableImpl
                               (DelayWithCancel delay mbCancel) =
       -- 'within' covers the case where `registerDelayCancellable` would not
       -- make progress awaiting for the timeout (a live lock).
-      within 1000 $
+      within 50_000 $ -- 50ms
       let trace = runSimTrace sim
       in case traceResult True trace of
         Left  err    -> counterexample (ppTrace trace)
