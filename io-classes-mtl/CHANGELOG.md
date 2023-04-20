@@ -1,6 +1,6 @@
 # Revision history for io-classes-mtl
 
-## next version
+## 0.1.0.1
 
 ### Non breaking changes
 

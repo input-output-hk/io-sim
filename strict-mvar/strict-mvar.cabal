@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                strict-mvar
-version:             1.0.0.0
+version:             1.0.0.1
 synopsis:            Strict MVars for IO and IOSim
 description:
   Strict @MVar@ interface compatible with
