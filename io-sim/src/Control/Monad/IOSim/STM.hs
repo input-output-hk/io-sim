@@ -21,8 +21,8 @@ import           Control.Monad.Class.MonadThrow
 
 import           Numeric.Natural (Natural)
 
-import           Deque.Strict (Deque)
-import qualified Deque.Strict as Deque
+import           Data.Deque.Strict (Deque)
+import qualified Data.Deque.Strict as Deque
 
 --
 -- Default TQueue implementation in terms of a 'TVar' (used by sim)

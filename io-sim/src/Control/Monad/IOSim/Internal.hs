@@ -55,10 +55,8 @@ import qualified Data.OrdPSQ as PSQ
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
-import           Deque.Strict (Deque)
-import qualified Deque.Strict as Deque
-
-import           GHC.Exts (fromList)
+import           Data.Deque.Strict (Deque)
+import qualified Data.Deque.Strict as Deque
 
 import           Control.Exception (NonTermination (..), assert, throw)
 import           Control.Monad (join, when)
@@ -828,7 +826,7 @@ unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
     (unblocked, simstate {
-                  runqueue = runqueue <> fromList unblocked,
+                  runqueue = runqueue <> Deque.fromList unblocked,
                   threads  = threads'
                 })
   where
