@@ -1,5 +1,11 @@
 # Changelog
 
+## next version
+
+### Breaking changes
+
+* Removed deprecated API
+
 ## 1.0.0.1
 
 ### Non breaking changes

@@ -24,9 +24,6 @@ module Control.Concurrent.Class.MonadSTM.Strict.TMVar
   , tryReadTMVar
   , swapTMVar
   , isEmptyTMVar
-    -- * deprecated api
-  , newTMVarM
-  , newEmptyTMVarM
     -- * MonadLabelledSTM
   , labelTMVar
   , labelTMVarIO
@@ -81,19 +78,11 @@ newTMVar !a = StrictTMVar <$> Lazy.newTMVar a
 newTMVarIO :: MonadSTM m => a -> m (StrictTMVar m a)
 newTMVarIO !a = StrictTMVar <$> Lazy.newTMVarIO a
 
-newTMVarM :: MonadSTM m => a -> m (StrictTMVar m a)
-newTMVarM = newTMVarIO
-{-# DEPRECATED newTMVarM "Use newTVarIO" #-}
-
 newEmptyTMVar :: MonadSTM m => STM m (StrictTMVar m a)
 newEmptyTMVar = StrictTMVar <$> Lazy.newEmptyTMVar
 
 newEmptyTMVarIO :: MonadSTM m => m (StrictTMVar m a)
 newEmptyTMVarIO = StrictTMVar <$> Lazy.newEmptyTMVarIO
-
-newEmptyTMVarM :: MonadSTM m => m (StrictTMVar m a)
-newEmptyTMVarM = newEmptyTMVarIO
-{-# DEPRECATED newEmptyTMVarM "Use newEmptyTMVarIO" #-}
 
 takeTMVar :: MonadSTM m => StrictTMVar m a -> STM m a
 takeTMVar (StrictTMVar tmvar) = Lazy.takeTMVar tmvar

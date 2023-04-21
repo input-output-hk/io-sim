@@ -27,10 +27,6 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar
   , check
     -- ** Low-level API
   , checkInvariant
-    -- ** deprecated API
-  , updateTVar
-  , newTVarM
-  , newTVarWithInvariantM
     -- * MonadLabelSTM
   , labelTVar
   , labelTVarIO
@@ -107,10 +103,6 @@ newTVar !a = (\tvar -> mkStrictTVar (const Nothing) tvar)
 newTVarIO :: MonadSTM m => a -> m (StrictTVar m a)
 newTVarIO = newTVarWithInvariantIO (const Nothing)
 
-newTVarM :: MonadSTM m => a -> m (StrictTVar m a)
-newTVarM = newTVarIO
-{-# DEPRECATED newTVarM "Use newTVarIO" #-}
-
 newTVarWithInvariant :: (MonadSTM m, HasCallStack)
                      => (a -> Maybe String) -- ^ Invariant (expect 'Nothing')
                      -> a
@@ -128,13 +120,6 @@ newTVarWithInvariantIO  invariant !a =
         checkInvariant (invariant a) $
         (\tvar -> mkStrictTVar invariant tvar)
     <$> Lazy.newTVarIO a
-
-newTVarWithInvariantM :: (MonadSTM m, HasCallStack)
-                      => (a -> Maybe String) -- ^ Invariant (expect 'Nothing')
-                      -> a
-                      -> m (StrictTVar m a)
-newTVarWithInvariantM = newTVarWithInvariantIO
-{-# DEPRECATED newTVarWithInvariantM "Use newTVarWithInvariantIO" #-}
 
 readTVar :: MonadSTM m => StrictTVar m a -> STM m a
 readTVar StrictTVar { tvar } = Lazy.readTVar tvar
@@ -162,11 +147,6 @@ swapTVar v a' = do
     a <- readTVar v
     writeTVar v a'
     return a
-
-
-updateTVar :: MonadSTM m => StrictTVar m s -> (s -> (a, s)) -> STM m a
-updateTVar = stateTVar
-{-# DEPRECATED updateTVar "Use stateTVar" #-}
 
 
 {-------------------------------------------------------------------------------
