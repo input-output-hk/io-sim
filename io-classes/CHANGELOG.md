@@ -1,5 +1,12 @@
 # Revsion history of io-classes
 
+## Next version
+
+### Breaking changes
+
+* `Control.Monad.Class.MonadMVar` is now deprecated in favour of
+  `Control.Concurrent.Class.MonadMVar`.
+
 ## 1.0.0.1
 
 ### Non breaking changes
