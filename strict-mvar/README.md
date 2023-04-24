@@ -45,6 +45,7 @@ are distinct types.
 Although all functions that modify a checked `StrictMVar` will check the
 invariant, we do *not* guarantee that the value inside the `StrictMVar` always
 satisfies the invariant. Instead, we *do* guarantee that if the `StrictMVar` is
-updated with a value that does not satisfy the invariant, an exception is
-thrown. The reason for this weaker guarantee is that leaving an `MVar` empty can
-lead to very hard to debug "blocked indefinitely" problems.
+updated with a value that does not satisfy the invariant, an exception is thrown
+*after* the new value is written to the `StrictMVar`. The reason for this weaker
+guarantee is that leaving an `MVar` empty can lead to very hard to debug
+"blocked indefinitely" problems.
