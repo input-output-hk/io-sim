@@ -1,11 +1,15 @@
 # Revsion history of io-classes
 
-## Next version
+## 1.1.0.0
 
 ### Breaking changes
 
 * `Control.Monad.Class.MonadMVar` is now deprecated in favour of
   `Control.Concurrent.Class.MonadMVar`.
+
+### Non breaking changes
+
+* Fixed building haddocks with `ghc-8.10`.
 
 ## 1.0.0.1
 

@@ -1,10 +1,14 @@
 # Changelog
 
-## next version
+## 1.1.0.0
 
 ### Breaking changes
 
 * Removed deprecated API
+
+### Non breaking changes
+
+* `io-classes-1.1.0.0`
 
 ## 1.0.0.1
 
