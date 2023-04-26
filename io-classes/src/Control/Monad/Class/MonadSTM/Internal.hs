@@ -99,12 +99,6 @@ module Control.Monad.Class.MonadSTM.Internal
   , labelTChanDefault
   ) where
 
--- $default-implementations
---
--- The default implementations are based on a `TVar` defined in the class.  They
--- are tailored towards `IOSim` rather than instances which would like to derive
--- from `IO` or monad transformers.
-
 import           Prelude hiding (read)
 
 import qualified Control.Concurrent.STM.TArray as STM
@@ -134,6 +128,13 @@ import           Data.Proxy (Proxy (..))
 import           Data.Typeable (Typeable)
 import           GHC.Stack
 import           Numeric.Natural (Natural)
+
+
+-- $default-implementations
+--
+-- The default implementations are based on a `TVar` defined in the class.  They
+-- are tailored towards `IOSim` rather than instances which would like to derive
+-- from `IO` or monad transformers.
 
 
 -- | The STM primitives parametrised by a monad `m`.
