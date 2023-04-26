@@ -41,7 +41,7 @@ jobs:
       run: echo "CACHE_VERSION=pu4Aevoo_v1" >> $GITHUB_ENV
 
     - name: "LINUX: Setup Haskell"
-      uses: haskell/actions/setup@v1
+      uses: haskell/actions/setup@v2
       if: runner.os != 'Windows'
       id: setup-haskell
       with:
@@ -144,7 +144,7 @@ jobs:
         sudo apt-get -y install fd-find
 
     - name: "Setup Haskell"
-      uses: haskell/actions/setup@v1
+      uses: haskell/actions/setup@v2
       id: setup-haskell
       with:
         ghc-version: 9.2.7
