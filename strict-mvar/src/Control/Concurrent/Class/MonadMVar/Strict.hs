@@ -2,16 +2,22 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
--- | This module corresponds to 'Control.Concurrent.MVar' in "base" package
+-- | This module corresponds to "Control.Concurrent.MVar" in the @base@ package.
 --
+-- Use "Control.Concurrent.Class.MonadMVar.Strict.Checked" as a drop-in
+-- replacement for the current module in case you want to check invariants on
+-- the values inside 'StrictMVar's.
 module Control.Concurrent.Class.MonadMVar.Strict
   ( -- * StrictMVar
     StrictMVar
+  , LazyMVar
   , castStrictMVar
   , toLazyMVar
   , fromLazyMVar
   , newEmptyMVar
+  , newEmptyMVarWithInvariant
   , newMVar
+  , newMVarWithInvariant
   , takeMVar
   , putMVar
   , readMVar
@@ -65,8 +71,27 @@ fromLazyMVar = StrictMVar
 newEmptyMVar :: MonadMVar m => m (StrictMVar m a)
 newEmptyMVar = fromLazyMVar <$> Lazy.newEmptyMVar
 
+-- | The given invariant will never be checked. 'newEmptyMVarWithInvariant' is a
+-- light wrapper around 'newEmptyMVar', and is only included here to ensure that
+-- the current module and "Control.Concurrent.Class.MonadMVar.Strict.Checked"
+-- are drop-in replacements for one another.
+newEmptyMVarWithInvariant :: MonadMVar m
+                          => (a -> Maybe String)
+                          -> m (StrictMVar m a)
+newEmptyMVarWithInvariant _inv = StrictMVar <$> Lazy.newEmptyMVar
+
 newMVar :: MonadMVar m => a -> m (StrictMVar m a)
 newMVar !a = fromLazyMVar <$> Lazy.newMVar a
+
+-- | The given invariant will never be checked. 'newMVarWithInvariant' is a
+-- light wrapper around 'newMVar', and is only included here to ensure that the
+-- current module and "Control.Concurrent.Class.MonadMVar.Strict.Checked" are
+-- drop-in replacements for one another.
+newMVarWithInvariant :: MonadMVar m
+                     => (a -> Maybe String)
+                     -> a
+                     -> m (StrictMVar m a)
+newMVarWithInvariant _inv !a = StrictMVar <$> Lazy.newMVar a
 
 takeMVar :: MonadMVar m => StrictMVar m a -> m a
 takeMVar = Lazy.takeMVar . mvar
