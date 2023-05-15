@@ -31,9 +31,6 @@ class (MonadDelay m, MonadSTM m) => MonadTimer m where
 -- Instances for IO
 --
 
--- | With 'threadDelay' one can use arbitrary large 'DiffTime's, which is an
--- advantage over 'IO.threadDelay'.
---
 instance MonadDelay IO where
   threadDelay = IO.threadDelay
 
