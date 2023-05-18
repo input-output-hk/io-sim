@@ -70,4 +70,4 @@ library
     ghc-options: -fno-ignore-asserts
 
   if flag(checktvarinvariant)
-    cpp-options: -DCHECK_TVAR_INVARIAN
+    cpp-options: -DCHECK_TVAR_INVARIANT
