@@ -6,16 +6,14 @@ description:
   Timers using SI units (seconds) which are safe on 32-bit platforms and
   compatible with [io-sim](https://hackage.haskell.org/package/io-sim).
 license:             Apache-2.0
-license-files:
-  LICENSE
-  NOTICE
+license-files:       LICENSE NOTICE
 copyright:           2022-2023 Input Output Global Inc (IOG)
 author:              Duncan Coutts, Neil Davis, Marcin Szamotulski
 maintainer:          Duncan Coutts duncan@well-typed.com, Marcin Szamotulski coot@coot.me
-category:            Control
+category:            Time
 build-type:          Simple
-extra-source-files:  CHANGELOG.md
-                     README.md
+extra-doc-files:     CHANGELOG.md README.md
+bug-reports:         https://github.com/input-output-hk/io-sim/issues
 tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6 }
 
 flag asserts
