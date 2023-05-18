@@ -7,16 +7,14 @@ description:
   [IO](https://hackage.haskell.org/package/base-4.18.0.0/docs/Prelude.html#t:IO)
   & [io-sim](https://hackage.haskell.org/package/io-sim).
 license:             Apache-2.0
-license-files:
-  LICENSE
-  NOTICE
+license-files:       LICENSE NOTICE
 copyright:           2019-2023 Input Output Global Inc (IOG).
 author:              IOG Engineering Team
 maintainer:          operations@iohk.io
-category:            Control
+category:            Concurrency
 build-type:          Simple
-extra-source-files:  CHANGELOG.md
-                     README.md
+extra-doc-files:     CHANGELOG.md README.md
+bug-reports:         https://github.com/input-output-hk/io-sim/issues
 tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6 }
 
 source-repository head

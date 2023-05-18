@@ -7,17 +7,15 @@ description:
     [io-classes](https://hackage.hasekll.org/package/io-classes) package.
     Some of the instances are novel and some are still experimental.
 license:            Apache-2.0
-license-files:
-  LICENSE
-  NOTICE
+license-files:      LICENSE NOTICE
 author:             Duncan Coutts, Marcin Szamotulski
 maintainer:         Marcin Szamotulski coot@coot.me
 copyright:          2022-2023 Input Output Global Inc (IOG)
 category:           Control
 build-type:         Simple
-extra-doc-files:    README.md
-                    CHANGELOG.md
-tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6 }
+extra-doc-files:    README.md CHANGELOG.md
+bug-reports:        https://github.com/input-output-hk/io-sim/issues
+tested-with:        GHC == { 8.10, 9.2, 9.4, 9.6 }
 
 common warnings
     ghc-options: -Wall
