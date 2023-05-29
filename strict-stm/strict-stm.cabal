@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                strict-stm
-version:             1.1.0.0
+version:             1.1.0.1
 synopsis:            Strict STM interface polymorphic over stm implementation.
 description:
   Strict STM interface provided on top of
