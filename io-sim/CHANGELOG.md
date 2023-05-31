@@ -1,5 +1,11 @@
 # Revsion history of io-sim
 
+## next version
+
+### Non breaking changes
+
+* Provide `MonadInspectMVar` instance for `IOSim`.
+
 ## 1.1.0.0
 
 ### Non breaking changes

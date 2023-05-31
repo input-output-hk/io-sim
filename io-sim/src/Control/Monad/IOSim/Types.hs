@@ -567,6 +567,14 @@ instance MonadMVar (IOSim s) where
   tryReadMVar  = tryReadMVarDefault
   isEmptyMVar  = isEmptyMVarDefault
 
+instance MonadInspectMVar (IOSim s) where
+  type InspectMVarMonad (IOSim s) = ST s
+  inspectMVar p (MVar tvar) = do
+      st <- inspectTVar p tvar
+      case st of
+        MVarEmpty _ _ -> pure Nothing
+        MVarFull x _  -> pure (Just x)
+
 data Async s a = Async !ThreadId (STM s (Either SomeException a))
 
 instance Eq (Async s a) where
