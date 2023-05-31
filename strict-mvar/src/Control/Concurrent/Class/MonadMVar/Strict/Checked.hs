@@ -99,7 +99,7 @@ newEmptyMVarWithInvariant inv = StrictMVar inv <$> Lazy.newEmptyMVar
 newMVar :: MonadMVar m => a -> m (StrictMVar m a)
 newMVar !a = fromLazyMVar <$> Lazy.newMVar a
 
-newMVarWithInvariant :: MonadMVar m
+newMVarWithInvariant :: (HasCallStack, MonadMVar m)
                      => (a -> Maybe String)
                      -> a
                      -> m (StrictMVar m a)
@@ -110,7 +110,7 @@ newMVarWithInvariant inv !a =
 takeMVar :: MonadMVar m => StrictMVar m a -> m a
 takeMVar = Lazy.takeMVar . mvar
 
-putMVar :: MonadMVar m => StrictMVar m a -> a -> m ()
+putMVar :: (HasCallStack, MonadMVar m) => StrictMVar m a -> a -> m ()
 putMVar v !a = do
   Lazy.putMVar (mvar v) a
   checkInvariant (invariant v a) $ pure ()
@@ -118,7 +118,7 @@ putMVar v !a = do
 readMVar :: MonadMVar m => StrictMVar m a -> m a
 readMVar v = Lazy.readMVar (mvar v)
 
-swapMVar :: MonadMVar m => StrictMVar m a -> a -> m a
+swapMVar :: (HasCallStack, MonadMVar m) => StrictMVar m a -> a -> m a
 swapMVar v !a = do
   oldValue <- Lazy.swapMVar (mvar v) a
   checkInvariant (invariant v a) $ pure oldValue
@@ -126,7 +126,7 @@ swapMVar v !a = do
 tryTakeMVar :: MonadMVar m => StrictMVar m a -> m (Maybe a)
 tryTakeMVar v = Lazy.tryTakeMVar (mvar v)
 
-tryPutMVar :: MonadMVar m => StrictMVar m a -> a -> m Bool
+tryPutMVar :: (HasCallStack, MonadMVar m) => StrictMVar m a -> a -> m Bool
 tryPutMVar v !a = do
   didPut <- Lazy.tryPutMVar (mvar v) a
   checkInvariant (invariant v a) $ pure didPut
@@ -141,11 +141,17 @@ withMVarMasked :: MonadMVar m => StrictMVar m a -> (a -> m b) -> m b
 withMVarMasked v = Lazy.withMVarMasked (mvar v)
 
 -- | 'modifyMVar_' is defined in terms of 'modifyMVar'.
-modifyMVar_ :: MonadMVar m => StrictMVar m a -> (a -> m a) -> m ()
+modifyMVar_ :: (HasCallStack, MonadMVar m)
+            => StrictMVar m a
+            -> (a -> m a)
+            -> m ()
 modifyMVar_ v io = modifyMVar v io'
   where io' a = (,()) <$> io a
 
-modifyMVar :: MonadMVar m => StrictMVar m a -> (a -> m (a,b)) -> m b
+modifyMVar :: (HasCallStack, MonadMVar m)
+           => StrictMVar m a
+           -> (a -> m (a,b))
+           -> m b
 modifyMVar v io = do
     (a', b) <- Lazy.modifyMVar (mvar v) io'
     checkInvariant (invariant v a') $ pure b
@@ -157,11 +163,17 @@ modifyMVar v io = do
       pure (a' , (a', b))
 
 -- | 'modifyMVarMasked_' is defined in terms of 'modifyMVarMasked'.
-modifyMVarMasked_ :: MonadMVar m => StrictMVar m a -> (a -> m a) -> m ()
+modifyMVarMasked_ :: (HasCallStack, MonadMVar m)
+                  => StrictMVar m a
+                  -> (a -> m a)
+                  -> m ()
 modifyMVarMasked_ v io = modifyMVar v io'
   where io' a = (,()) <$> io a
 
-modifyMVarMasked :: MonadMVar m => StrictMVar m a -> (a -> m (a,b)) -> m b
+modifyMVarMasked :: (HasCallStack, MonadMVar m)
+                 => StrictMVar m a
+                 -> (a -> m (a,b))
+                 -> m b
 modifyMVarMasked v io = do
     (a', b) <- Lazy.modifyMVar (mvar v) io'
     checkInvariant (invariant v a') $ pure b
