@@ -1,9 +1,12 @@
 {-# LANGUAGE DefaultSignatures      #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE QuantifiedConstraints  #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeOperators          #-}
 
-module Control.Concurrent.Class.MonadMVar (MonadMVar (..)) where
+module Control.Concurrent.Class.MonadMVar
+  ( MonadMVar (..)
+  , MonadInspectMVar (..)
+  ) where
 
 import qualified Control.Concurrent.MVar as IO
 import           Control.Monad.Class.MonadThrow
@@ -127,6 +130,9 @@ class Monad m => MonadMVar m where
       return b
   {-# INLINE modifyMVarMasked #-}
 
+--
+-- IO instance
+--
 
 instance MonadMVar IO where
     type MVar IO      = IO.MVar
@@ -181,8 +187,22 @@ instance ( MonadMask m
     modifyMVarMasked (WrappedMVar v) f = ReaderT $ \r ->
       modifyMVarMasked v (\a -> runReaderT (f a) r)
 
+--
+-- MonadInspectMVar
+--
 
+-- | This type class is intended for
+-- ['io-sim'](https://hackage.haskell.org/package/io-sim), where one might want
+-- to access an 'MVar' in the underlying 'ST' monad.
+class (MonadMVar m, Monad (InspectMVarMonad m)) => MonadInspectMVar m where
+  type InspectMVarMonad m :: Type -> Type
+  -- | Return the value of an 'MVar' as an 'InspectMVarMonad' computation. Can
+  -- be 'Nothing' if the 'MVar' is empty.
+  inspectMVar :: proxy m -> MVar m a -> InspectMVarMonad m (Maybe a)
 
+instance MonadInspectMVar IO where
+  type InspectMVarMonad IO = IO
+  inspectMVar _ = tryReadMVar
 
 --
 -- Utilities

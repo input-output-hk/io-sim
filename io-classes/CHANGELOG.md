@@ -1,5 +1,14 @@
 # Revsion history of io-classes
 
+## next version
+
+### Non-breaking changes
+
+* Add new `MonadInspectMVar` class with an `inspectMVar` function for accessing
+  an `MVar` in an underlying monad (if applicable). This is mainly useful for
+  `io-sim`, since the underlying monad is `ST`. `IO` has no underlying monad, so
+  the provided instance for `IO` defaults `inspectMVar` to `tryReadMVar`.
+
 ## 1.1.0.0
 
 ### Breaking changes
