@@ -70,4 +70,4 @@ test-suite test
                        -fno-ignore-asserts
 
   if flag(testchecked)
-    CPP-Options: -DCHECKED
+    CPP-Options: -DTEST_CHECKED
