@@ -15,6 +15,11 @@
   `Control.Concurrent.Class.MonadMVar.Strict` now has `newMVarWithInvariant` and
   `newEmptyMVarWithInvariant` functions that ignore the invariant argument.
 
+### Patch
+
+* Functions that use invariant checking now correctly propagate `HasCallStack`
+  constraints.
+
 ## 1.1.0.0
 
 ### Non breaking changes
