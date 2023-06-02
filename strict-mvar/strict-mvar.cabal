@@ -38,15 +38,23 @@ library
                        -Wpartial-fields
                        -Widentities
 
+flag testchecked
+  description: Run tests for checked Strict MVars.
+  Default: False
+  Manual: True
+
 test-suite test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Main.hs
 
   other-modules:       Test.Control.Concurrent.Class.MonadMVar.Strict.Checked
+                       Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
+                       Test.Utils
   default-language:    Haskell2010
   build-depends:       base >=4.9 && <4.19,
                        io-sim,
+                       nothunks,
                        QuickCheck,
                        tasty,
                        tasty-quickcheck,
@@ -60,3 +68,6 @@ test-suite test
                        -Wpartial-fields
                        -Widentities
                        -fno-ignore-asserts
+
+  if flag(testchecked)
+    CPP-Options: -DTEST_CHECKED

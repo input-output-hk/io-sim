@@ -3,11 +3,10 @@
 module Test.Control.Concurrent.Class.MonadMVar.Strict.Checked where
 
 import           Control.Concurrent.Class.MonadMVar.Strict.Checked
-import           Control.Monad.IOSim
-import           Test.QuickCheck.Gen.Unsafe (Capture (..), capture)
 import           Test.QuickCheck.Monadic
 import           Test.Tasty
 import           Test.Tasty.QuickCheck
+import           Test.Utils
 
 tests :: TestTree
 tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict" [
@@ -42,15 +41,3 @@ prop_invariantShouldFail :: MonadMVar m => PropertyM m ()
 prop_invariantShouldFail = run $ do
     v <- newMVarWithInvariant invPositiveInt 0
     modifyMVar_ v (\x -> pure $ x - 1)
-
-{-------------------------------------------------------------------------------
-  Property runners (copied from "Ouroboros.Network.Testing.QuickCheck")
--------------------------------------------------------------------------------}
-
-runSimGen :: (forall s. Gen (IOSim s a)) -> Gen a
-runSimGen f = do
-    Capture eval <- capture
-    return $ runSimOrThrow (eval f)
-
-monadicSim :: Testable a => (forall s. PropertyM (IOSim s) a) -> Property
-monadicSim m = property (runSimGen (monadic' m))
