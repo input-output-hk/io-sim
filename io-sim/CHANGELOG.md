@@ -2,6 +2,15 @@
 
 ## next version
 
+### Breaking changes
+
+* `selectTraceEvents`, `selectTraceEvents'` catpure time of events.
+* Added select function which capture the time of the trace events:
+  - `selectTraceEventsDynamicWithTime`
+  - `selectTraceEventsDynamicWithTime'`
+  - `selectTraceEventsSayWithTime`
+  - `selectTraceEventsSayWithTime'`
+
 ### Non breaking changes
 
 * Provide `MonadInspectMVar` instance for `IOSim`.

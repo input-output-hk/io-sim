@@ -2,6 +2,7 @@
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Control.Monad.IOSim
@@ -58,9 +59,13 @@ module Control.Monad.IOSim
   , selectTraceEvents
   , selectTraceEvents'
   , selectTraceEventsDynamic
+  , selectTraceEventsDynamicWithTime
   , selectTraceEventsDynamic'
+  , selectTraceEventsDynamicWithTime'
   , selectTraceEventsSay
+  , selectTraceEventsSayWithTime
   , selectTraceEventsSay'
+  , selectTraceEventsSayWithTime'
   , selectTraceRaces
     -- *** trace selectors
   , traceSelectTraceEvents
@@ -108,7 +113,7 @@ import           System.IO.Unsafe
 
 
 selectTraceEvents
-    :: (SimEventType -> Maybe b)
+    :: (Time -> SimEventType -> Maybe b)
     -> SimTrace a
     -> [b]
 selectTraceEvents fn =
@@ -124,7 +129,7 @@ selectTraceEvents fn =
     . traceSelectTraceEvents fn
 
 selectTraceEvents'
-    :: (SimEventType -> Maybe b)
+    :: (Time ->  SimEventType -> Maybe b)
     -> SimTrace a
     -> [b]
 selectTraceEvents' fn =
@@ -177,9 +182,18 @@ detachTraceRaces trace = unsafePerformIO $ do
 selectTraceEventsDynamic :: forall a b. Typeable b => SimTrace a -> [b]
 selectTraceEventsDynamic = selectTraceEvents fn
   where
-    fn :: SimEventType -> Maybe b
-    fn (EventLog dyn) = fromDynamic dyn
-    fn _              = Nothing
+    fn :: Time -> SimEventType -> Maybe b
+    fn _ (EventLog dyn) = fromDynamic dyn
+    fn _ _              = Nothing
+
+-- | Like 'selectTraceEventsDynamic' but also captures time of the trace event.
+--
+selectTraceEventsDynamicWithTime :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
+selectTraceEventsDynamicWithTime = selectTraceEvents fn
+  where
+    fn :: Time -> SimEventType -> Maybe (Time, b)
+    fn t (EventLog dyn) = (t,) <$> fromDynamic dyn
+    fn _ _              = Nothing
 
 -- | Like 'selectTraceEventsDynamic' but returns partial trace if an exception
 -- is found in it.
@@ -187,9 +201,18 @@ selectTraceEventsDynamic = selectTraceEvents fn
 selectTraceEventsDynamic' :: forall a b. Typeable b => SimTrace a -> [b]
 selectTraceEventsDynamic' = selectTraceEvents' fn
   where
-    fn :: SimEventType -> Maybe b
-    fn (EventLog dyn) = fromDynamic dyn
-    fn _              = Nothing
+    fn :: Time -> SimEventType -> Maybe b
+    fn _ (EventLog dyn) = fromDynamic dyn
+    fn _ _              = Nothing
+
+-- | Like `selectTraceEventsDynamic'` but also captures time of the trace event.
+--
+selectTraceEventsDynamicWithTime' :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
+selectTraceEventsDynamicWithTime' = selectTraceEvents' fn
+  where
+    fn :: Time -> SimEventType -> Maybe (Time, b)
+    fn t (EventLog dyn) = (t,) <$> fromDynamic dyn
+    fn _ _              = Nothing
 
 -- | Get a trace of 'EventSay'.
 --
@@ -198,9 +221,18 @@ selectTraceEventsDynamic' = selectTraceEvents' fn
 selectTraceEventsSay :: SimTrace a -> [String]
 selectTraceEventsSay = selectTraceEvents fn
   where
-    fn :: SimEventType -> Maybe String
-    fn (EventSay s) = Just s
-    fn _            = Nothing
+    fn :: Time -> SimEventType -> Maybe String
+    fn _ (EventSay s) = Just s
+    fn _ _            = Nothing
+
+-- | Like 'selectTraceEventsSay' but also captures time of the trace event.
+--
+selectTraceEventsSayWithTime :: SimTrace a -> [(Time, String)]
+selectTraceEventsSayWithTime = selectTraceEvents fn
+  where
+    fn :: Time -> SimEventType -> Maybe (Time, String)
+    fn t (EventSay s) = Just (t, s)
+    fn _ _            = Nothing
 
 -- | Like 'selectTraceEventsSay' but return partial trace if an exception is
 -- found in it.
@@ -208,9 +240,18 @@ selectTraceEventsSay = selectTraceEvents fn
 selectTraceEventsSay' :: SimTrace a -> [String]
 selectTraceEventsSay' = selectTraceEvents' fn
   where
-    fn :: SimEventType -> Maybe String
-    fn (EventSay s) = Just s
-    fn _            = Nothing
+    fn :: Time -> SimEventType -> Maybe String
+    fn _ (EventSay s) = Just s
+    fn _ _            = Nothing
+
+-- | Like `selectTraceEventsSay'` but also captures time of the trace event.
+--
+selectTraceEventsSayWithTime' :: SimTrace a -> [(Time, String)]
+selectTraceEventsSayWithTime' = selectTraceEvents' fn
+  where
+    fn :: Time -> SimEventType -> Maybe (Time, String)
+    fn t (EventSay s) = Just (t, s)
+    fn _ _            = Nothing
 
 -- | Print all 'EventSay' to the console.
 --
@@ -223,7 +264,7 @@ printTraceEventsSay = mapM_ print . selectTraceEventsSay
 -- | The most general select function.  It is a _total_ function.
 --
 traceSelectTraceEvents
-    :: (SimEventType -> Maybe b)
+    :: (Time -> SimEventType -> Maybe b)
     -> SimTrace a
     -> Trace (SimResult a) b
 traceSelectTraceEvents fn = bifoldr ( \ v _acc -> Nil v )
@@ -231,11 +272,11 @@ traceSelectTraceEvents fn = bifoldr ( \ v _acc -> Nil v )
                                      -> case eventCtx of
                                           SimRacesFound _ -> acc
                                           SimEvent{} ->
-                                            case fn (seType eventCtx) of
+                                            case fn (seTime eventCtx) (seType eventCtx) of
                                               Nothing -> acc
                                               Just b  -> Cons b acc
                                           SimPOREvent{} ->
-                                            case fn (seType eventCtx) of
+                                            case fn (seTime eventCtx) (seType eventCtx) of
                                               Nothing -> acc
                                               Just b  -> Cons b acc
                                     )
@@ -247,9 +288,9 @@ traceSelectTraceEventsDynamic :: forall a b. Typeable b
                               => SimTrace a -> Trace (SimResult a) b
 traceSelectTraceEventsDynamic = traceSelectTraceEvents fn
   where
-    fn :: SimEventType -> Maybe b
-    fn (EventLog dyn) = fromDynamic dyn
-    fn _              = Nothing
+    fn :: Time -> SimEventType -> Maybe b
+    fn _ (EventLog dyn) = fromDynamic dyn
+    fn _ _              = Nothing
 
 
 -- | Select say events.  It is a _total_ function.
@@ -257,9 +298,9 @@ traceSelectTraceEventsDynamic = traceSelectTraceEvents fn
 traceSelectTraceEventsSay :: forall a.  SimTrace a -> Trace (SimResult a) String
 traceSelectTraceEventsSay = traceSelectTraceEvents fn
   where
-    fn :: SimEventType -> Maybe String
-    fn (EventSay s) = Just s
-    fn _            = Nothing
+    fn :: Time -> SimEventType -> Maybe String
+    fn _ (EventSay s) = Just s
+    fn _ _            = Nothing
 
 -- | Simulation terminated a failure.
 --
