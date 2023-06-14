@@ -6,6 +6,14 @@
 
 * Remove the `asserts` package flag.
 
+### Non-breaking changes
+
+* Export `LazyMVar`.
+
+### Patch
+
+* Update cabal header fields like `author` and `category`.
+
 ## 1.1.0.0
 
 ### Non breaking changes
