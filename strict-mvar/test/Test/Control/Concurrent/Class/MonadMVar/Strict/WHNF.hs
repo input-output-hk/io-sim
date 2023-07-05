@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
@@ -7,11 +5,7 @@
 -- before they are put inside the 'StrictMVar'.
 module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF (tests) where
 
-#if TEST_CHECKED
-import           Control.Concurrent.Class.MonadMVar.Strict.Checked
-#else
 import           Control.Concurrent.Class.MonadMVar.Strict
-#endif
 import           Control.Monad (void)
 import           Data.Typeable (Typeable)
 import           NoThunks.Class (OnlyCheckWhnf (OnlyCheckWhnf), unsafeNoThunks)
@@ -25,21 +19,12 @@ import           Test.Utils (monadicSim)
   Main test tree
 -------------------------------------------------------------------------------}
 
-name :: String
-#if TEST_CHECKED
-name = "Strict.Checked"
-#else
-name = "Strict"
-#endif
-
 tests :: TestTree
-tests = testGroup ("Test.Control.Concurrent.Class.MonadMVar." <> name) [
+tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict" [
       testGroup "WHNF" [
           testGroup "IO" [
               testProperty "prop_newMVar" $
                 monadicIO .: prop_newMVar
-            , testProperty "prop_newMVarWithInvariant" $
-                monadicIO .: prop_newMVarWithInvariant
             , testProperty "prop_putMVar" $
                 monadicIO .: prop_putMVar
             , testProperty "prop_swapMVar" $
@@ -58,8 +43,6 @@ tests = testGroup ("Test.Control.Concurrent.Class.MonadMVar." <> name) [
         , testGroup "IOSim" [
               testProperty "prop_newMVar" $ \x f ->
                 monadicSim $ prop_newMVar x f
-            , testProperty "prop_newMVarWithInvariant" $ \x f ->
-                monadicSim $ prop_newMVarWithInvariant x f
             , testProperty "prop_putMVar" $ \x f ->
                 monadicSim $ prop_putMVar x f
             , testProperty "prop_swapMVar" $ \x f ->
@@ -106,15 +89,6 @@ prop_newMVar ::
   -> PropertyM m Bool
 prop_newMVar x f = do
     v <- run $ newMVar (applyFun f x)
-    isInWHNF v
-
-prop_newMVarWithInvariant ::
-     MonadMVar m
-  => Int
-  -> Fun Int Int
-  -> PropertyM m Bool
-prop_newMVarWithInvariant x f = do
-    v <- run $ newMVarWithInvariant (const Nothing) (applyFun f x)
     isInWHNF v
 
 prop_putMVar ::
