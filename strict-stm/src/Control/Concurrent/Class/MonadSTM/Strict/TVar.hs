@@ -34,7 +34,7 @@ import           Control.Monad.Class.MonadSTM hiding (traceTVar, traceTVarIO)
 type LazyTVar m = Lazy.TVar m
 
 newtype StrictTVar m a = StrictTVar {
-    tvar      :: LazyTVar m a
+    tvar :: LazyTVar m a
   }
 
 labelTVar :: MonadLabelledSTM m => StrictTVar m a -> String -> STM m ()
