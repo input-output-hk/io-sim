@@ -1,5 +1,11 @@
 # Changelog
 
+## next version
+
+### Breaking changes
+
+* Remove invariants for `StrictTVar`s.
+
 ## 1.1.0.1
 
 ### Non-breaking changes

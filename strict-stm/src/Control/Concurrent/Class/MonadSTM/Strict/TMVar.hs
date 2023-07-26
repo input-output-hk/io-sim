@@ -40,10 +40,6 @@ import           Control.Monad.Class.MonadSTM hiding (traceTMVar, traceTMVarIO)
 type LazyTMVar   m = Lazy.TMVar m
 
 -- | 'TMVar' that keeps its value in WHNF at all times
---
--- Does not support an invariant: if the invariant would not be satisfied,
--- we would not be able to put a value into an empty TMVar, which would lead
--- to very hard to debug bugs where code is blocked indefinitely.
 newtype StrictTMVar m a = StrictTMVar { toLazyTMVar :: LazyTMVar m a }
 
 fromLazyTMVar :: LazyTMVar m a -> StrictTMVar m a
