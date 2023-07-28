@@ -14,6 +14,7 @@
 ### Non breaking changes
 
 * Provide `MonadInspectMVar` instance for `IOSim`.
+- Added NFData & NoThunks instances for `ThreadId`
 
 ## 1.1.0.0
 
