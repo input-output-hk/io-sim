@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                io-sim
-version:             1.1.0.0
+version:             1.2.0.0
 synopsis:            A pure simulator for monadic concurrency with STM.
 description:
   A pure simulator monad with support of concurency (base, async), stm,
@@ -75,15 +75,15 @@ library
                        ScopedTypeVariables,
                        TypeFamilies
   build-depends:       base              >=4.9 && <4.19,
-                       io-classes       ^>=1.1,
+                       io-classes       ^>=1.2,
                        exceptions        >=0.10,
                        containers,
                        deepseq,
                        nothunks,
                        parallel,
                        psqueues          >=0.2 && <0.3,
-                       strict-stm        >=1.0 && <1.2,
-                       si-timers         >=1.0 && <1.2,
+                       strict-stm       ^>=1.2,
+                       si-timers        ^>=1.2,
                        time              >=1.9.1 && <1.13,
                        quiet,
                        QuickCheck,
