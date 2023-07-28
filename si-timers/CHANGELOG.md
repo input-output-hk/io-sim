@@ -1,5 +1,11 @@
 # Changelog
 
+## next
+
+## Non breaking changes
+
+- Added NFData & NoThunks instances for `Time`
+
 ## 1.1.0.0
 
 ### Non breaking changes

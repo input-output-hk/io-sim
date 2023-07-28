@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -6,12 +9,16 @@
 --
 module Control.Monad.IOSim.CommonTypes where
 
+import           Control.DeepSeq (NFData (..))
 import           Control.Monad.Class.MonadSTM (TraceValue)
 import           Control.Monad.ST.Lazy
+
+import           NoThunks.Class
 
 import           Data.Map (Map)
 import           Data.STRef.Lazy
 import           Data.Set (Set)
+import           GHC.Generics
 
 
 -- | A thread id.
@@ -23,7 +30,10 @@ import           Data.Set (Set)
 --
 data ThreadId = RacyThreadId [Int]
               | ThreadId     [Int]    -- non racy threads have higher priority
-  deriving (Eq, Ord, Show)
+  deriving stock    (Eq, Ord, Show, Generic)
+  deriving anyclass NFData
+  deriving anyclass NoThunks
+
 
 childThreadId :: ThreadId -> Int -> ThreadId
 childThreadId (RacyThreadId is) i = RacyThreadId (is ++ [i])
