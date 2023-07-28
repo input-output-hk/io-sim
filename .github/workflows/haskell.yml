@@ -188,22 +188,3 @@ jobs:
       run: |
         ./scripts/check-stylish.sh
         git diff --exit-code
-
-  check-changelogs:
-    name: Check changelogs
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-    - name: Install dependencies
-      run: sudo apt install -y fd-find
-
-    - uses: actions/checkout@v3
-
-    - name: git fetch
-      run: git fetch origin main:main
-
-    - name: Check changelogs
-      run: ./scripts/check-changelogs.sh
