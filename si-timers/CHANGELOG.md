@@ -1,6 +1,6 @@
 # Changelog
 
-## next
+## 1.2.0.0
 
 ## Non breaking changes
 

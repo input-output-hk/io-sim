@@ -1,6 +1,6 @@
 # Revsion history of io-classes
 
-## next version
+## 1.2.0.0
 
 ### Non-breaking changes
 

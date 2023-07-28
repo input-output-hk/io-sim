@@ -1,6 +1,6 @@
 # Revsion history of strict-mvar
 
-## next version
+## 1.2.0.0
 
 ### Breaking changes
 
