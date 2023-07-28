@@ -1,5 +1,8 @@
 {-# LANGUAGE DefaultSignatures  #-}
+{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NumericUnderscores #-}
 
 module Control.Monad.Class.MonadTime.SI
@@ -18,11 +21,14 @@ module Control.Monad.Class.MonadTime.SI
   ) where
 
 import           Control.Monad.Reader
+import           Control.DeepSeq (NFData (..))
 
 import           Control.Monad.Class.MonadTime ( MonadMonotonicTimeNSec,
                      MonadTime (..), NominalDiffTime, UTCTime, diffUTCTime,
                      addUTCTime)
 import qualified Control.Monad.Class.MonadTime as MonadTime
+
+import           NoThunks.Class (NoThunks (..))
 
 import           Data.Word (Word64)
 import           Data.Time.Clock (DiffTime)
@@ -37,7 +43,9 @@ import           GHC.Generics (Generic (..))
 -- program runs. It is represented as the 'DiffTime' from this arbitrary epoch.
 --
 newtype Time = Time DiffTime
-  deriving (Eq, Ord, Show, Generic)
+  deriving stock    (Eq, Ord, Show, Generic)
+  deriving newtype  NFData
+  deriving anyclass NoThunks
 
 -- | The time duration between two points in time (positive or negative).
 diffTime :: Time -> Time -> DiffTime
