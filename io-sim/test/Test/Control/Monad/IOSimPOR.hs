@@ -50,10 +50,12 @@ import           Test.Tasty.QuickCheck
 
 tests :: TestTree
 tests =
-  testGroup "IO simulator POR"
-  [ testProperty "propSimulates"    propSimulates
-  , testProperty "propExploration"  propExploration
-  -- , testProperty "propPermutations" propPermutations
+  testGroup "IOSimPOR"
+  [ testGroup "schedule exploration"
+    [ testProperty "propSimulates"    propSimulates
+    , testProperty "propExploration"  propExploration
+    -- , testProperty "propPermutations" propPermutations
+    ]
   , testGroup "IO simulator properties"
     [ testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
     , testGroup "timeouts"

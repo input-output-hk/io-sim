@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Control.Monad.IOSimPOR.QuickCheckUtils where
@@ -20,7 +22,8 @@ conjoinPar = conjoinSpeculate speculate
   speculate [] = []
   speculate (rose:roses) = roses' `par` rose' `pseq` (rose':roses')
     where rose' = case rose of
-                    MkRose result _ -> let ans = maybe True id $ ok result in ans `pseq` rose
+                    MkRose result _ -> (case ok result of { Nothing -> (); Just !_ -> (); })
+                                `pseq` rose
                     IORose _        -> rose
           roses' = speculate roses
 

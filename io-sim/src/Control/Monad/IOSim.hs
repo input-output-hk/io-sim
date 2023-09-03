@@ -161,17 +161,22 @@ selectTraceRaces = go
 -- unsafe, of course, since that function may return different results
 -- at different times.
 
-detachTraceRaces :: SimTrace a -> (() -> [ScheduleControl], SimTrace a)
+detachTraceRaces :: forall a. SimTrace a -> (() -> [ScheduleControl], SimTrace a)
 detachTraceRaces trace = unsafePerformIO $ do
   races <- newIORef []
-  let readRaces ()  = concat . reverse . unsafePerformIO $ readIORef races
-      saveRaces r t = unsafePerformIO $ do
-                        modifyIORef races (r:)
-                        return t
-  let go (SimTrace a b c d trace)      = SimTrace a b c d $ go trace
+  let readRaces :: () -> [ScheduleControl]
+      readRaces () = concat . reverse . unsafePerformIO $ readIORef races
+
+      saveRaces :: [ScheduleControl] -> x -> x
+      saveRaces rs t = unsafePerformIO $ modifyIORef races (rs:)
+                                      >> return t
+
+      go :: SimTrace a -> SimTrace a
+      go (SimTrace a b c d trace)      = SimTrace a b c d $ go trace
       go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e $ go trace
-      go (TraceRacesFound r trace)     = saveRaces r $ go trace
+      go (TraceRacesFound rs trace)    = saveRaces rs $ go trace
       go t                             = t
+
   return (readRaces, go trace)
 
 -- | Select all the traced values matching the expected type. This relies on
@@ -475,7 +480,9 @@ exploreSimTrace optsf mainAction k =
   where
     opts = optsf stdExplorationOptions
 
-    explore :: Int -> Int -> ScheduleControl -> Maybe (SimTrace a) -> Property
+    explore :: Int -- schedule bound
+            -> Int -- branching factor
+            -> ScheduleControl -> Maybe (SimTrace a) -> Property
     explore n m control passingTrace =
 
       -- ALERT!!! Impure code: readRaces must be called *after* we have
@@ -514,16 +521,15 @@ exploreSimTrace optsf mainAction k =
                 | (r,n') <- zip races (divide (n-branching) branching) ]
 
     bucket :: Int -> String
-    bucket n | n<10  = show n
-             | n>=10 = buck n 1
-             | otherwise = error "Ord Int is not a total order!"  -- GHC made me do it!
+    bucket n | n<10      = show n
+             | otherwise = buck n 1
     buck n t | n<10      = show (n*t) ++ "-" ++ show ((n+1)*t-1)
-             | n>=10     = buck (n `div` 10) (t*10)
-             | otherwise = error "Ord Int is not a total order!"  -- GHC made me do it!
+             | otherwise = buck (n `div` 10) (t*10)
 
+    -- divide n into k factors which sums up to n
     divide :: Int -> Int -> [Int]
     divide n k =
-      [ n `div` k + if i<n `mod` k then 1 else 0
+      [ n `div` k + if i < n `mod` k then 1 else 0
       | i <- [0..k-1] ]
 
     showThread :: (ThreadId,Maybe ThreadLabel) -> String
@@ -561,7 +567,6 @@ exploreSimTrace optsf mainAction k =
     cachedIO :: ScheduleControl -> IO Bool
     cachedIO m = atomicModifyIORef' cache $ \set ->
       (Set.insert m set, Set.member m set)
-
 
     cacheSizeIO :: () -> IO Int
     cacheSizeIO () = Set.size <$> readIORef cache

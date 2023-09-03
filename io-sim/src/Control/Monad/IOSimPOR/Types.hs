@@ -10,8 +10,8 @@ import           Control.Monad.IOSim.CommonTypes
 -- Effects
 --
 
--- | An `Effect` aggregates effects performed by a thread.  Only used by
--- *IOSimPOR*.
+-- | An `Effect` aggregates effects performed by a thread in a given
+-- execution step.  Only used by *IOSimPOR*.
 --
 data Effect = Effect {
     effectReads  :: !(Set TVarId),
@@ -28,6 +28,10 @@ instance Semigroup Effect where
 
 instance Monoid Effect where
   mempty = Effect Set.empty Set.empty Set.empty [] []
+
+--
+-- Effect smart constructors
+--
 
 -- readEffect :: SomeTVar s -> Effect
 -- readEffect r = mempty{effectReads = Set.singleton $ someTvarId r }
@@ -50,18 +54,33 @@ throwToEffect tid = mempty{ effectThrows = [tid] }
 wakeupEffects :: [ThreadId] -> Effect
 wakeupEffects tids = mempty{effectWakeup = tids}
 
+--
+-- Utils
+--
+
 someTvarId :: SomeTVar s -> TVarId
 someTvarId (SomeTVar r) = tvarId r
 
 onlyReadEffect :: Effect -> Bool
 onlyReadEffect e = e { effectReads = effectReads mempty } == mempty
 
+-- | Check if two effects race.  The two effects are assumed to come from
+-- different threads, from steps which do not wake one another, see
+-- `racingSteps`.
+--
 racingEffects :: Effect -> Effect -> Bool
 racingEffects e e' =
-      effectThrows e       `intersectsL` effectThrows e'
-   || effectReads  e       `intersects`  effectWrites e'
-   || effectWrites e       `intersects`  effectReads  e'
-   || effectWrites e       `intersects`  effectWrites e'
+
+       -- both effects throw to the same threads
+       effectThrows e `intersectsL` effectThrows e'
+
+       -- concurrent reads & writes of the same TVars
+    || effectReads  e `intersects`  effectWrites e'
+    || effectWrites e `intersects`  effectReads  e'
+
+       -- concurrent writes to the same TVars
+    || effectWrites e `intersects`  effectWrites e'
+
   where
     intersects :: Ord a => Set a -> Set a -> Bool
     intersects a b = not $ a `Set.disjoint` b

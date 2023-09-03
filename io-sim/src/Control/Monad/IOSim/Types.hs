@@ -34,6 +34,7 @@ module Control.Monad.IOSim.Types
   , setCurrentTime
   , unshareClock
   , ScheduleControl (..)
+  , isDefaultSchedule
   , ScheduleMod (..)
   , ExplorationOptions (..)
   , ExplorationSpec
@@ -1122,6 +1123,12 @@ data ScheduleControl = ControlDefault
                      -- modifications.  This control is set by 'followControl'
                      -- when 'controlTargets' returns true.
   deriving (Eq, Ord, Show)
+
+
+isDefaultSchedule :: ScheduleControl -> Bool
+isDefaultSchedule ControlDefault        = True
+isDefaultSchedule (ControlFollow [] []) = True
+isDefaultSchedule _                     = False
 
 -- | A schedule modification inserted at given execution step.
 --
