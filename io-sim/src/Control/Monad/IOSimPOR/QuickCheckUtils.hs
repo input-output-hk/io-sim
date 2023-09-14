@@ -5,8 +5,16 @@
 module Control.Monad.IOSimPOR.QuickCheckUtils where
 
 import           Control.Parallel
+import           Control.Monad.ST.Lazy
+import           Control.Monad.ST.Lazy.Unsafe (unsafeInterleaveST)
 import           Test.QuickCheck.Gen
 import           Test.QuickCheck.Property
+
+-- note: this only evaluates `prop` in parallel, not `ST` actions
+conjoinParST :: TestableNoCatch prop => [ST s prop] -> ST s Property
+conjoinParST sts = do
+    ps <- sequence sts
+    return $ conjoinPar ps
 
 -- Take the conjunction of several properties, in parallel This is a
 -- modification of code from Test.QuickCheck.Property, to run non-IO
@@ -30,6 +38,12 @@ conjoinPar = conjoinSpeculate speculate
 -- We also need a version of conjoin that is sequential, but does not
 -- label its result as an IO property unless one of its arguments
 -- is. Consequently it does not catch exceptions in its arguments.
+
+conjoinNoCatchST :: TestableNoCatch prop => [ST s prop] -> ST s Property
+conjoinNoCatchST sts = do
+    ps <- sequence sts
+    return $ conjoinNoCatch ps
+
 conjoinNoCatch :: TestableNoCatch prop => [prop] -> Property
 conjoinNoCatch = conjoinSpeculate id
 
@@ -107,7 +121,7 @@ instance TestableNoCatch Result where
   propertyNoCatch = MkProperty . return . MkProp . return
 
 instance TestableNoCatch Prop where
-  propertyNoCatch p = MkProperty . return $ p
+  propertyNoCatch = MkProperty . return
 
 instance TestableNoCatch prop => TestableNoCatch (Gen prop) where
   propertyNoCatch mp = MkProperty $ do p <- mp; unProperty (againNoCatch $ propertyNoCatch p)
