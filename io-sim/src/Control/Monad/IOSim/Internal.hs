@@ -834,10 +834,10 @@ unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads} =
     !unblocked = [ tid
                  | tid <- wakeup
                  , case Map.lookup tid threads of
-                    Just Thread { threadStatus = ThreadBlocked BlockedOnOther }
-                      -> not onlySTM
                     Just Thread { threadStatus = ThreadBlocked BlockedOnSTM }
                       -> True
+                    Just Thread { threadStatus = ThreadBlocked _ }
+                      -> not onlySTM
                     _ -> False
                  ]
     -- and in which case we mark them as now running

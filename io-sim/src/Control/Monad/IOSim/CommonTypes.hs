@@ -110,5 +110,6 @@ data ThreadStatus = ThreadRunning
   deriving (Eq, Show)
 
 data BlockedReason = BlockedOnSTM
-                   | BlockedOnOther
+                   | BlockedOnDelay
+                   | BlockedOnThrowTo
   deriving (Eq, Show)

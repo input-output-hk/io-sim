@@ -527,7 +527,7 @@ schedule thread@Thread{
       let expiry  = d `addTime` time
           timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
-      trace <- deschedule (Blocked BlockedOnOther) thread'
+      trace <- deschedule (Blocked BlockedOnDelay) thread'
                           simstate { timers   = timers',
                                      nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventThreadDelay nextTmid expiry) trace)
@@ -761,10 +761,10 @@ schedule thread@Thread{
           let adjustTarget t =
                 t { threadThrowTo = (e, Labelled tid tlbl, vClock) : threadThrowTo t }
               threads'       = Map.adjust adjustTarget tid' threads
-          trace <- deschedule (Blocked BlockedOnOther) thread' simstate { threads = threads' }
+          trace <- deschedule (Blocked BlockedOnThrowTo) thread' simstate { threads = threads' }
           return $ SimPORTrace time tid tstep tlbl (EventThrowTo e tid')
                  $ SimPORTrace time tid tstep tlbl EventThrowToBlocked
-                 $ SimPORTrace time tid tstep tlbl (EventDeschedule (Blocked BlockedOnOther))
+                 $ SimPORTrace time tid tstep tlbl (EventDeschedule (Blocked BlockedOnThrowTo))
                  $ trace
         else do
           -- The target thread has async exceptions unmasked, or is masked but
@@ -923,10 +923,9 @@ deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect }
 reschedule :: SimState s a -> ST s (SimTrace a)
 
 -- If we are following a controlled schedule, just do that.
-reschedule simstate@SimState{ runqueue, threads,
-                              control=control@(ControlFollow ((tid,tstep):_) _),
-                              curTime=time
-                              } =
+reschedule simstate@SimState { runqueue, threads,
+                               control = control@(ControlFollow ((tid,tstep):_) _),
+                               curTime = time } =
     fmap (SimPORTrace time tid tstep Nothing (EventReschedule control)) $
     assert (Down tid `PSQ.member` runqueue) $
     assert (tid `Map.member` threads) $
@@ -1048,14 +1047,15 @@ unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
                      case Map.lookup tid threads of
                        Just   Thread { threadStatus = ThreadRunning }
                          -> [ ]
-                       Just t@Thread { threadStatus = ThreadBlocked BlockedOnOther }
+                       Just t@Thread { threadStatus = ThreadBlocked BlockedOnSTM }
+                         -> [t]
+                       Just t@Thread { threadStatus = ThreadBlocked _ }
                          | onlySTM
                          -> [ ]
                          | otherwise
                          -> [t]
-                       Just t@Thread { threadStatus = ThreadBlocked BlockedOnSTM }
-                         -> [t]
-                       _ -> [ ]
+                       Just   Thread { threadStatus = ThreadDone } -> [ ]
+                       Nothing -> [ ]
                  ]
 
     unblockedIds :: [ThreadId]
