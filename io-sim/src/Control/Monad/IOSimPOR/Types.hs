@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 module Control.Monad.IOSimPOR.Types where
 
 import qualified Data.List as List
@@ -20,7 +21,18 @@ data Effect = Effect {
     effectThrows :: ![ThreadId],
     effectWakeup :: ![ThreadId]
   }
-  deriving (Eq, Show)
+  deriving Eq
+
+instance Show Effect where
+    show Effect { effectReads, effectWrites, effectForks, effectThrows, effectWakeup } =
+      concat $ [ "Effect { " ]
+            ++ [ "reads = " ++ show effectReads ++ ", "   | not (null effectReads) ]
+            ++ [ "writes = " ++ show effectWrites ++ ", " | not (null effectWrites) ]
+            ++ [ "forks = " ++ show effectForks ++ ", "   | not (null effectForks)]
+            ++ [ "throws = " ++ show effectThrows ++ ", " | not (null effectThrows) ]
+            ++ [ "wakeup = " ++ show effectWakeup ++ ", " | not (null effectWakeup) ]
+            ++ [ "}" ]
+
 
 instance Semigroup Effect where
   Effect r w s ts wu <> Effect r' w' s' ts' wu' =
@@ -46,7 +58,7 @@ writeEffects :: [SomeTVar s] -> Effect
 writeEffects rs = mempty{effectWrites = Set.fromList (map someTvarId rs)}
 
 forkEffect :: ThreadId -> Effect
-forkEffect tid = mempty{effectForks = Set.singleton $ tid}
+forkEffect tid = mempty{effectForks = Set.singleton tid}
 
 throwToEffect :: ThreadId -> Effect
 throwToEffect tid = mempty{ effectThrows = [tid] }

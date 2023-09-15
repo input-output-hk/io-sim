@@ -1021,6 +1021,10 @@ data SimEventType
   | EventPerformAction StepId
   -- ^ /IOSimPOR/ event: perform action of the given step
   | EventReschedule           ScheduleControl
+
+  | EventEffect VectorClock Effect
+  -- ^ /IOSimPOR/ event: executed effect; Useful for debugging IOSimPOR or
+  -- showing compact information about thread execution.
   deriving Show
 
 

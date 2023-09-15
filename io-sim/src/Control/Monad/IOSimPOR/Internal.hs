@@ -376,14 +376,16 @@ schedule thread@Thread{
       (Right thread0@Thread { threadMasking = maskst' }, timers'') -> do
         -- We found a suitable exception handler, continue with that
         -- We record a step, in case there is no exception handler on replay.
-        let thread'  = stepThread thread0
-            control' = advanceControl (threadStepId thread0) control
-            races'   = updateRacesInSimState thread0 simstate
+        let (thread', eff)  = stepThread thread0
+            control'        = advanceControl (threadStepId thread0) control
+            races'          = updateRacesInSimState thread0 simstate
         trace <- schedule thread' simstate{ races = races',
                                             control = control',
                                             timers = timers'' }
         return (SimPORTrace time tid tstep tlbl (EventThrow e) $
-                SimPORTrace time tid tstep tlbl (EventMask maskst') trace)
+                SimPORTrace time tid tstep tlbl (EventMask maskst') $
+                SimPORTrace time tid tstep tlbl (EventEffect vClock eff)
+                trace)
 
       (Left isMain, timers'')
         -- We unwound and did not find any suitable exception handler, so we
@@ -809,16 +811,24 @@ threadInterruptible thread =
 
 deschedule :: Deschedule -> Thread s a -> SimState s a -> ST s (SimTrace a)
 
-deschedule Yield thread@Thread { threadId = tid }
-                 simstate@SimState{runqueue, threads, control} =
+deschedule Yield thread@Thread { threadId     = tid,
+                                 threadStep   = tstep,
+                                 threadLabel  = tlbl,
+                                 threadVClock = vClock }
+                 simstate@SimState{runqueue,
+                                   threads,
+                                   curTime  = time,
+                                   control } =
 
     -- We don't interrupt runnable threads anywhere else.
     -- We do it here by inserting the current thread into the runqueue in priority order.
 
-    let thread'   = stepThread thread
-        runqueue' = insertThread thread' runqueue
-        threads'  = Map.insert tid thread' threads
-        control'  = advanceControl (threadStepId thread) control in
+    let (thread', eff) = stepThread thread
+        runqueue'      = insertThread thread' runqueue
+        threads'       = Map.insert tid thread' threads
+        control'       = advanceControl (threadStepId thread) control in
+
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
     reschedule simstate { runqueue = runqueue',
                           threads  = threads',
                           races    = updateRacesInSimState thread simstate,
@@ -856,11 +866,18 @@ deschedule Interruptable thread@Thread {
                        , let tlbl'' = lookupThreadLabel tid'' threads ]
              trace
 
-deschedule Interruptable thread@Thread{threadId = tid } simstate@SimState{ control } =
+deschedule Interruptable thread@Thread{threadId     = tid,
+                                       threadStep   = tstep,
+                                       threadLabel  = tlbl,
+                                       threadVClock = vClock}
+                         simstate@SimState{ control,
+                                            curTime = time } =
     -- Either masked or unmasked but no pending async exceptions.
     -- Either way, just carry on.
     -- Record a step, though, in case on replay there is an async exception.
-    let thread' = stepThread thread in
+    let (thread', eff) = stepThread thread in
+
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
     schedule thread'
              simstate{ races   = updateRacesInSimState thread simstate,
                        control = advanceControl (threadStepId thread) control }
@@ -876,21 +893,29 @@ deschedule (Blocked _blockedReason) thread@Thread { threadId      = tid
     -- thread if possible.
     deschedule Interruptable thread { threadMasking = Unmasked } simstate
 
-deschedule (Blocked blockedReason) thread@Thread{ threadId = tid, threadEffect = effect } simstate@SimState{threads, control} =
-    let thread1 = thread { threadStatus = ThreadBlocked blockedReason }
-        thread'  = stepThread thread1
-        threads' = Map.insert (threadId thread') thread' threads in
+deschedule (Blocked blockedReason) thread@Thread{ threadId     = tid,
+                                                  threadStep   = tstep,
+                                                  threadLabel  = tlbl,
+                                                  threadVClock = vClock}
+                                   simstate@SimState{ threads,
+                                                      curTime = time,
+                                                      control } =
+    let thread1        = thread { threadStatus = ThreadBlocked blockedReason }
+        (thread', eff) = stepThread thread1
+        threads'       = Map.insert (threadId thread') thread' threads in
+
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
     reschedule simstate { threads = threads',
                           races   = updateRacesInSimState thread1 simstate,
                           control = advanceControl (threadStepId thread1) control }
 
-deschedule Terminated thread@Thread { threadId = tid, threadVClock = vClock, threadEffect = effect }
+deschedule Terminated thread@Thread { threadId = tid, threadLabel = tlbl, threadVClock = vClock, threadEffect = effect }
                                simstate@SimState{ curTime = time, control } = do
     -- This thread is done. If there are other threads blocked in a
     -- ThrowTo targeted at this thread then we can wake them up now.
-    let thread1     = thread
-        thread'     = stepThread $ thread { threadStatus = ThreadDone }
-        wakeup      = map (\(_,tid',_) -> l_labelled tid') (reverse (threadThrowTo thread))
+    let thread1        = thread
+        (thread', eff) = stepThread $ thread { threadStatus = ThreadDone }
+        wakeup         = map (\(_,tid',_) -> l_labelled tid') (reverse (threadThrowTo thread))
         (unblocked,
          simstate'@SimState{threads}) =
                       unblockThreads False vClock wakeup simstate
@@ -906,7 +931,8 @@ deschedule Terminated thread@Thread { threadId = tid, threadVClock = vClock, thr
                [ (time, tid', (-1), tlbl', EventThrowToWakeup)
                | tid' <- unblocked
                , let tlbl' = lookupThreadLabel tid' threads ]
-               trace
+          $ SimPORTrace time tid (threadStep thread) tlbl (EventEffect vClock eff)
+            trace
 
 deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect }
                  simstate@SimState{runqueue, threads} =
@@ -1672,14 +1698,19 @@ currentStep Thread { threadId     = stepThreadId,
                      threadVClock = stepVClock
                    } = Step {..}
 
-stepThread :: Thread s a -> Thread s a
+-- | Step a thread and return the previous `StepId` and its `Effect`.
+--
+stepThread :: Thread s a -> (Thread s a, Effect)
 stepThread thread@Thread { threadId     = tid,
                            threadStep   = tstep,
                            threadVClock = vClock } =
-  thread { threadStep   = tstep+1,
-           threadEffect = mempty,
-           threadVClock = insertVClock tid (tstep+1) vClock
-         }
+  ( thread { threadStep   = tstep+1,
+             threadEffect = mempty,
+             threadVClock = insertVClock tid (tstep+1) vClock
+           },
+    threadEffect thread
+  )
+
 
 -- As we run a simulation, we collect info about each previous step
 data StepInfo = StepInfo {
