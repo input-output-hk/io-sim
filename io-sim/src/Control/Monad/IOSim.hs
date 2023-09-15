@@ -362,7 +362,7 @@ runSimOrThrow mainAction =
 
 -- | Like 'runSim' but fail when the main thread terminates if there are other
 -- threads still running or blocked. If one is trying to follow a strict thread
--- cleanup policy then this helps testing for that.
+-- clean-up policy then this helps testing for that.
 --
 runSimStrictShutdown :: forall a. (forall s. IOSim s a) -> Either Failure a
 runSimStrictShutdown mainAction = traceResult True (runSimTrace mainAction)
@@ -451,8 +451,8 @@ runSimTrace mainAction = runST (runSimTraceST mainAction)
 -- slot.  In /IOSim/ and /IOSimPOR/ time only moves explicitly through timer
 -- events, e.g. things like `Control.Monad.Class.MonadTimer.SI.threadDelay`,
 -- `Control.Monad.Class.MonadTimer.SI.registerDelay` or the
--- `Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` api.  The usual
--- quickcheck techniques can help explore different schedules of
+-- `Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` API.  The usual
+-- QuickCheck techniques can help explore different schedules of
 -- threads too.
 
 -- | Execute a simulation, discover & revert races.  Note that this will execute

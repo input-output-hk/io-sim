@@ -175,7 +175,7 @@ data TimerCompletionInfo s =
      -- ^ `timeout` timer run by `ThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
 
-type RunQueue = OrdPSQ (Down ThreadId) (Down ThreadId) ()
+type RunQueue   = OrdPSQ (Down ThreadId) (Down ThreadId) ()
 type Timeouts s = OrdPSQ TimeoutId Time (TimerCompletionInfo s)
 
 -- | Internal state.
@@ -601,7 +601,7 @@ schedule thread@Thread{
           thread'' = Thread { threadId      = tid'
                             , threadControl = ThreadControl (runIOSim a)
                                                             ForkFrame
-                            , threadStatus  = ThreadRunning 
+                            , threadStatus  = ThreadRunning
                             , threadMasking = threadMasking thread
                             , threadThrowTo = []
                             , threadClockId = threadClockId thread
@@ -1023,7 +1023,7 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         TimeoutFired     -> error "MonadTimer(Sim): invariant violation"
         TimeoutCancelled -> return ()
     timeoutAction (TimerRegisterDelay var) = writeTVar var True
-    timeoutAction (TimerThreadDelay _ _)    = return ()
+    timeoutAction (TimerThreadDelay _ _)   = return ()
     timeoutAction (TimerTimeout _ _ _)     = return ()
 
 unblockThreads :: forall s a.
@@ -1105,7 +1105,7 @@ forkTimeoutInterruptThreads timeoutExpired simState =
   where
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, TMVar (IOSim s) ThreadId)] 
+    throwToThread :: [(Thread s a, TMVar (IOSim s) ThreadId)]
 
     (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
@@ -1143,7 +1143,7 @@ forkTimeoutInterruptThreads timeoutExpired simState =
                 , lock
                 )
               )
-       
+
 
 -- | Iterate through the control stack to find an enclosing exception handler
 -- of the right type, or unwind all the way to the top level for the thread.
@@ -1249,10 +1249,10 @@ runSimTraceST mainAction = controlSimTraceST Nothing ControlDefault mainAction
 controlSimTraceST :: Maybe Int -> ScheduleControl -> IOSim s a -> ST s (SimTrace a)
 controlSimTraceST limit control mainAction =
   SimPORTrace (curTime initialState)
-           (threadId mainThread)
-           0
-           (threadLabel mainThread)
-           (EventSimStart control)
+              (threadId mainThread)
+              0
+              (threadLabel mainThread)
+              (EventSimStart control)
   <$> schedule mainThread initialState { control  = control,
                                          control0 = control,
                                          perStepTimeLimit = limit
@@ -1662,6 +1662,7 @@ racingSteps s s' =
      )
   where throwsTo s1 s2 =
              stepThreadId s2 `elem` effectThrows (stepEffect s1)
+          -- `throwTo` races with any other effect
           && stepEffect s2 /= mempty
 
 currentStep :: Thread s a -> Step
@@ -1822,7 +1823,7 @@ updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
                       }
 
       activeRaces' :: [StepInfo]
-      !activeRaces' = 
+      !activeRaces' =
         case newStepInfo of
           Nothing ->       updateStepInfo <$> activeRaces
           Just si -> si : (updateStepInfo <$> activeRaces)

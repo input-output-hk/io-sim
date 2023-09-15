@@ -424,7 +424,7 @@ schedule !thread@Thread{
       let !expiry  = d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           !thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
-      !trace <- deschedule (Blocked BlockedOnOther) thread' simstate { timers   = timers'
+      !trace <- deschedule (Blocked BlockedOnDelay) thread' simstate { timers   = timers'
                                                                      , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) trace)
 
@@ -609,10 +609,10 @@ schedule !thread@Thread{
           -- exception and the source thread id to the pending async exceptions.
           let adjustTarget t = t { threadThrowTo = (e, Labelled tid tlbl) : threadThrowTo t }
               threads'       = Map.adjust adjustTarget tid' threads
-          !trace <- deschedule (Blocked BlockedOnOther) thread' simstate { threads = threads' }
+          !trace <- deschedule (Blocked BlockedOnThrowTo) thread' simstate { threads = threads' }
           return $ SimTrace time tid tlbl (EventThrowTo e tid')
                  $ SimTrace time tid tlbl EventThrowToBlocked
-                 $ SimTrace time tid tlbl (EventDeschedule (Blocked BlockedOnOther))
+                 $ SimTrace time tid tlbl (EventDeschedule (Blocked BlockedOnThrowTo))
                  $ trace
         else do
           -- The target thread has async exceptions unmasked, or is masked but
