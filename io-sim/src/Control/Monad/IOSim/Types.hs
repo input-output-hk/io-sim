@@ -1146,10 +1146,21 @@ data ExplorationOptions = ExplorationOptions{
     -- catching infinite loops etc.
     --
     -- The default value is `Nothing`.
-    explorationReplay        :: Maybe ScheduleControl
+    explorationReplay        :: Maybe ScheduleControl,
     -- ^ A schedule to replay.
     --
     -- The default value is `Nothing`.
+    explorationDebugLevel    :: Int
+    -- ^ Log detailed trace to stderr containing information on discovered
+    -- races.  The trace does not contain the result of the simulation, unless
+    -- one will do that explicitly inside the simulation.
+    --
+    -- level 0: don't show any output,
+    -- level 1: show simulation trace with discovered schedules
+    -- level 2: show simulation trace with discovered schedules and races
+    --
+    -- NOTE: discovered schedules & races are not exposed to the user in the
+    -- callback of `exploreSimTrace` or in the output of `controlSimTrace`.
   }
   deriving Show
 
@@ -1158,7 +1169,8 @@ stdExplorationOptions = ExplorationOptions{
     explorationScheduleBound = 100,
     explorationBranching     = 3,
     explorationStepTimelimit = Nothing,
-    explorationReplay        = Nothing
+    explorationReplay        = Nothing,
+    explorationDebugLevel    = 0
     }
 
 type ExplorationSpec = ExplorationOptions -> ExplorationOptions
