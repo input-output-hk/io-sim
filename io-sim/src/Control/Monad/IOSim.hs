@@ -46,6 +46,7 @@ module Control.Monad.IOSim
   , SimEvent (..)
   , SimEventType (..)
   , ThreadLabel
+  , IOSimThreadId (..)
   , Labelled (..)
     -- ** Dynamic Tracing
   , traceM
@@ -324,12 +325,12 @@ data Failure =
        FailureException SomeException
 
        -- | The threads all deadlocked.
-     | FailureDeadlock ![Labelled ThreadId]
+     | FailureDeadlock ![Labelled IOSimThreadId]
 
        -- | The main thread terminated normally but other threads were still
        -- alive, and strict shutdown checking was requested.
        -- See 'runSimStrictShutdown'.
-     | FailureSloppyShutdown [Labelled ThreadId]
+     | FailureSloppyShutdown [Labelled IOSimThreadId]
 
        -- | An exception was thrown while evaluation the trace.
        -- This could be an internal assertion failure of `io-sim` or an
@@ -404,7 +405,7 @@ traceResult strict = unsafePerformIO . eval
 
 -- | Turn 'SimTrace' into a list of timestamped events.
 --
-traceEvents :: SimTrace a -> [(Time, ThreadId, Maybe ThreadLabel, SimEventType)]
+traceEvents :: SimTrace a -> [(Time, IOSimThreadId, Maybe ThreadLabel, SimEventType)]
 traceEvents (SimTrace time tid tlbl event t)      = (time, tid, tlbl, event)
                                                   : traceEvents t
 traceEvents (SimPORTrace time tid _ tlbl event t) = (time, tid, tlbl, event)
@@ -414,7 +415,7 @@ traceEvents _                                     = []
 
 -- | Pretty print a timestamped event.
 --
-ppEvents :: [(Time, ThreadId, Maybe ThreadLabel, SimEventType)]
+ppEvents :: [(Time, IOSimThreadId, Maybe ThreadLabel, SimEventType)]
          -> String
 ppEvents events =
     intercalate "\n"
@@ -547,7 +548,7 @@ exploreSimTrace optsf mainAction k =
       [ n `div` k + if i < n `mod` k then 1 else 0
       | i <- [0..k-1] ]
 
-    showThread :: (ThreadId,Maybe ThreadLabel) -> String
+    showThread :: (IOSimThreadId,Maybe ThreadLabel) -> String
     showThread (tid,lab) =
       ppIOSimThreadId tid ++ (case lab of Nothing -> ""
                                           Just l  -> " ("++l++")")
@@ -661,8 +662,8 @@ raceReversals ControlFollow{}     = error "Impossible: raceReversals ControlFoll
 compareTracesST :: forall a b s.
                    Maybe (SimTrace a) -- ^ passing
                 -> SimTrace b         -- ^ failing
-                -> ST s ( ST s (Maybe ( (Time, ThreadId, Maybe ThreadLabel)
-                                      , Set.Set (ThreadId, Maybe ThreadLabel)
+                -> ST s ( ST s (Maybe ( (Time, IOSimThreadId, Maybe ThreadLabel)
+                                      , Set.Set (IOSimThreadId, Maybe ThreadLabel)
                                       ))
                         , SimTrace b
                         )
@@ -674,8 +675,8 @@ compareTracesST (Just passing) trace = do
          , trace'
          )
   where
-        go :: STRef s (Maybe ( (Time, ThreadId, Maybe ThreadLabel)
-                             , Set.Set (ThreadId, Maybe ThreadLabel)
+        go :: STRef s (Maybe ( (Time, IOSimThreadId, Maybe ThreadLabel)
+                             , Set.Set (IOSimThreadId, Maybe ThreadLabel)
                              ))
            -> SimTrace a -- ^ passing
            -> SimTrace b -- ^ failing
@@ -693,10 +694,10 @@ compareTracesST (Just passing) trace = do
         go _ _ SimTrace {} = error "compareTracesST: invariant violation"
         go _ _ fail = return fail
 
-        wakeup :: STRef s (Maybe ( (Time, ThreadId, Maybe ThreadLabel)
-                                 , Set.Set (ThreadId, Maybe ThreadLabel)
+        wakeup :: STRef s (Maybe ( (Time, IOSimThreadId, Maybe ThreadLabel)
+                                 , Set.Set (IOSimThreadId, Maybe ThreadLabel)
                                  ))
-               -> ThreadId
+               -> IOSimThreadId
                -> SimTrace b
                -> ST s (SimTrace b)
         wakeup sleeper tidpass

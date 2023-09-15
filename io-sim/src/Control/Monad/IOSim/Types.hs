@@ -82,8 +82,7 @@ import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar as StrictTVar
 import           Control.Monad.Class.MonadAsync hiding (Async)
 import qualified Control.Monad.Class.MonadAsync as MonadAsync
 import           Control.Monad.Class.MonadEventlog
-import           Control.Monad.Class.MonadFork hiding (ThreadId)
-import qualified Control.Monad.Class.MonadFork as MonadFork
+import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
@@ -181,13 +180,13 @@ data SimA s a where
                   SimA s a -> (e -> SimA s a) -> (a -> SimA s b) -> SimA s b
   Evaluate     :: a -> (a -> SimA s b) -> SimA s b
 
-  Fork         :: IOSim s () -> (ThreadId -> SimA s b) -> SimA s b
-  GetThreadId  :: (ThreadId -> SimA s b) -> SimA s b
-  LabelThread  :: ThreadId -> String -> SimA s b -> SimA s b
+  Fork         :: IOSim s () -> (IOSimThreadId -> SimA s b) -> SimA s b
+  GetThreadId  :: (IOSimThreadId -> SimA s b) -> SimA s b
+  LabelThread  :: IOSimThreadId -> String -> SimA s b -> SimA s b
 
   Atomically   :: STM  s a -> (a -> SimA s b) -> SimA s b
 
-  ThrowTo      :: SomeException -> ThreadId -> SimA s a -> SimA s a
+  ThrowTo      :: SomeException -> IOSimThreadId -> SimA s a -> SimA s a
   SetMaskState :: MaskingState  -> IOSim s a -> (a -> SimA s b) -> SimA s b
   GetMaskState :: (MaskingState -> SimA s b) -> SimA s b
 
@@ -448,7 +447,7 @@ block                a = IOSim (SetMaskState MaskedInterruptible a)
 blockUninterruptible a = IOSim (SetMaskState MaskedUninterruptible a)
 
 instance MonadThread (IOSim s) where
-  type ThreadId (IOSim s) = ThreadId
+  type ThreadId (IOSim s) = IOSimThreadId
   myThreadId       = IOSim $ oneShot $ \k -> GetThreadId k
   labelThread t l  = IOSim $ oneShot $ \k -> LabelThread t l (k ())
 
@@ -576,7 +575,7 @@ instance MonadInspectMVar (IOSim s) where
         MVarEmpty _ _ -> pure Nothing
         MVarFull x _  -> pure (Just x)
 
-data Async s a = Async !ThreadId (STM s (Either SomeException a))
+data Async s a = Async !IOSimThreadId (STM s (Either SomeException a))
 
 instance Eq (Async s a) where
     Async tid _ == Async tid' _ = tid == tid'
@@ -743,14 +742,14 @@ data SimEvent
     -- | Used when using `IOSim`.
   = SimEvent {
       seTime        :: !Time,
-      seThreadId    :: !ThreadId,
+      seThreadId    :: !IOSimThreadId,
       seThreadLabel :: !(Maybe ThreadLabel),
       seType        :: !SimEventType
     }
     -- | Only used for /IOSimPOR/
   | SimPOREvent {
       seTime        :: !Time,
-      seThreadId    :: !ThreadId,
+      seThreadId    :: !IOSimThreadId,
       seStep        :: !Int,
       seThreadLabel :: !(Maybe ThreadLabel),
       seType        :: !SimEventType
@@ -795,11 +794,11 @@ ppSimEvent _ _ _ (SimRacesFound controls) =
 
 -- | A result type of a simulation.
 data SimResult a
-    = MainReturn    !Time a             ![Labelled ThreadId]
+    = MainReturn    !Time a             ![Labelled IOSimThreadId]
     -- ^ Return value of the main thread.
-    | MainException !Time SomeException ![Labelled ThreadId]
+    | MainException !Time SomeException ![Labelled IOSimThreadId]
     -- ^ Exception thrown by the main thread.
-    | Deadlock      !Time               ![Labelled ThreadId]
+    | Deadlock      !Time               ![Labelled IOSimThreadId]
     -- ^ Deadlock discovered in the simulation.  Deadlocks are discovered if
     -- simply the simulation cannot do any progress in a given time slot and
     -- there's no event which would advance the time.
@@ -877,13 +876,13 @@ ppDebug = appEndo
         . Trace.toList
 
 
-pattern SimTrace :: Time -> ThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
+pattern SimTrace :: Time -> IOSimThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                  -> SimTrace a
 pattern SimTrace time threadId threadLabel traceEvent trace =
     Trace.Cons (SimEvent time threadId threadLabel traceEvent)
                trace
 
-pattern SimPORTrace :: Time -> ThreadId -> Int -> Maybe ThreadLabel -> SimEventType -> SimTrace a
+pattern SimPORTrace :: Time -> IOSimThreadId -> Int -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                     -> SimTrace a
 pattern SimPORTrace time threadId step threadLabel traceEvent trace =
     Trace.Cons (SimPOREvent time threadId step threadLabel traceEvent)
@@ -895,15 +894,15 @@ pattern TraceRacesFound controls trace =
     Trace.Cons (SimRacesFound controls)
                trace
 
-pattern TraceMainReturn :: Time -> a -> [Labelled ThreadId]
+pattern TraceMainReturn :: Time -> a -> [Labelled IOSimThreadId]
                         -> SimTrace a
 pattern TraceMainReturn time a threads = Trace.Nil (MainReturn time a threads)
 
-pattern TraceMainException :: Time -> SomeException -> [Labelled ThreadId]
+pattern TraceMainException :: Time -> SomeException -> [Labelled IOSimThreadId]
                            -> SimTrace a
 pattern TraceMainException time err threads = Trace.Nil (MainException time err threads)
 
-pattern TraceDeadlock :: Time -> [Labelled ThreadId]
+pattern TraceDeadlock :: Time -> [Labelled IOSimThreadId]
                       -> SimTrace a
 pattern TraceDeadlock time threads = Trace.Nil (Deadlock time threads)
 
@@ -925,17 +924,17 @@ data SimEventType
 
   | EventThrow          SomeException
   -- ^ throw exception
-  | EventThrowTo        SomeException ThreadId
+  | EventThrowTo        SomeException IOSimThreadId
   -- ^ throw asynchronous exception (`throwTo`)
   | EventThrowToBlocked
   -- ^ the thread which executed `throwTo` is blocked
   | EventThrowToWakeup
   -- ^ the thread which executed `throwTo` is woken up
-  | EventThrowToUnmasked (Labelled ThreadId)
+  | EventThrowToUnmasked (Labelled IOSimThreadId)
   -- ^ a target thread of `throwTo` unmasked its exceptions, this is paired
   -- with `EventThrowToWakeup` for threads which were blocked on `throwTo`
 
-  | EventThreadForked    ThreadId
+  | EventThreadForked    IOSimThreadId
   -- ^ forked a thread
   | EventThreadFinished
   -- ^ thread terminated normally
@@ -959,7 +958,7 @@ data SimEventType
                        (Maybe Effect)    -- ^ effect performed (only for `IOSimPOR`)
   | EventTxWakeup      [Labelled TVarId] -- ^ changed vars causing retry
 
-  | EventUnblocked     [ThreadId]
+  | EventUnblocked     [IOSimThreadId]
   -- ^ unblocked threads by a committed STM transaction
 
   --
@@ -971,7 +970,7 @@ data SimEventType
   | EventThreadDelayFired   TimeoutId
   -- ^ thread woken up after a delay
 
-  | EventTimeoutCreated        TimeoutId ThreadId Time
+  | EventTimeoutCreated        TimeoutId IOSimThreadId Time
   -- ^ new timeout created (via `timeout`)
   | EventTimeoutFired          TimeoutId
   -- ^ timeout fired
@@ -995,8 +994,8 @@ data SimEventType
   --
 
   -- | event traced when `threadStatus` is executed
-  | EventThreadStatus  ThreadId -- ^ current thread
-                       ThreadId -- ^ queried thread
+  | EventThreadStatus  IOSimThreadId -- ^ current thread
+                       IOSimThreadId -- ^ queried thread
 
   --
   -- /IOSimPOR/ events
@@ -1033,7 +1032,7 @@ data SimEventType
 
 -- | A labelled value.
 --
--- For example 'labelThread' or `labelTVar' will insert a label to `ThreadId`
+-- For example 'labelThread' or `labelTVar' will insert a label to `IOSimThreadId`
 -- (or `TVarId`).
 data Labelled a = Labelled {
     l_labelled :: !a,

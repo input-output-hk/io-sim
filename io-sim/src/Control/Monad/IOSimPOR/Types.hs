@@ -38,9 +38,9 @@ import           Control.Monad.IOSim.CommonTypes
 data Effect = Effect {
     effectReads  :: !(Set TVarId),
     effectWrites :: !(Set TVarId),
-    effectForks  :: !(Set ThreadId),
-    effectThrows :: ![ThreadId],
-    effectWakeup :: !(Set ThreadId)
+    effectForks  :: !(Set IOSimThreadId),
+    effectThrows :: ![IOSimThreadId],
+    effectWakeup :: !(Set IOSimThreadId)
   }
   deriving Eq
 
@@ -78,13 +78,13 @@ readEffects rs = mempty{effectReads = Set.fromList (map someTvarId rs)}
 writeEffects :: [SomeTVar s] -> Effect
 writeEffects rs = mempty{effectWrites = Set.fromList (map someTvarId rs)}
 
-forkEffect :: ThreadId -> Effect
+forkEffect :: IOSimThreadId -> Effect
 forkEffect tid = mempty{effectForks = Set.singleton tid}
 
-throwToEffect :: ThreadId -> Effect
+throwToEffect :: IOSimThreadId -> Effect
 throwToEffect tid = mempty{ effectThrows = [tid] }
 
-wakeupEffects :: [ThreadId] -> Effect
+wakeupEffects :: [IOSimThreadId] -> Effect
 wakeupEffects tids = mempty{effectWakeup = Set.fromList tids}
 
 --
@@ -167,7 +167,7 @@ data ScheduleMod = ScheduleMod{
 -- | Execution step is identified by the thread id and a monotonically
 -- increasing number (thread specific).
 --
-type StepId = (ThreadId, Int)
+type StepId = (IOSimThreadId, Int)
 
 instance Show ScheduleMod where
   showsPrec d (ScheduleMod tgt ctrl insertion) =
@@ -184,7 +184,7 @@ instance Show ScheduleMod where
 --
 
 data Step = Step {
-    stepThreadId :: !ThreadId,
+    stepThreadId :: !IOSimThreadId,
     stepStep     :: !Int,
     stepEffect   :: !Effect,
     stepVClock   :: !VectorClock
@@ -210,7 +210,7 @@ data StepInfo = StepInfo {
     stepInfoControl    :: !ScheduleControl,
 
     -- | Threads that are still concurrent with this step.
-    stepInfoConcurrent :: !(Set ThreadId),
+    stepInfoConcurrent :: !(Set IOSimThreadId),
 
     -- | Steps following this one that did not happen after it
     -- (in reverse order).

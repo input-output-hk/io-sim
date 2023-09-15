@@ -15,7 +15,7 @@ import           Control.Exception (Exception)
 import           Control.Concurrent.Class.MonadSTM
 import           Control.Monad.Class.MonadThrow (MaskingState (..))
 
-import           Control.Monad.IOSim.Types (IOSim (..), SimA (..), ThreadId, TimeoutId)
+import           Control.Monad.IOSim.Types (IOSim (..), SimA (..), IOSimThreadId, TimeoutId)
 
 import           GHC.Exts (oneShot)
 
@@ -43,7 +43,7 @@ data ControlStack s b a where
              -> !(ControlStack s c a)
              -> ControlStack s b a
   TimeoutFrame :: TimeoutId
-               -> TMVar (IOSim s) ThreadId
+               -> TMVar (IOSim s) IOSimThreadId
                -> (Maybe b -> SimA s c)
                -> !(ControlStack s c a)
                -> ControlStack s b a
@@ -74,7 +74,7 @@ data ControlStackDash =
   | DelayFrame' TimeoutId ControlStackDash
   deriving Show
 
-data IsLocked = NotLocked | Locked !ThreadId
+data IsLocked = NotLocked | Locked !IOSimThreadId
   deriving (Eq, Show)
 
 -- | Unsafe method which removes a timeout.

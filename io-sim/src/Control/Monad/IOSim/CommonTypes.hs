@@ -7,7 +7,23 @@
 
 -- | Common types shared between `IOSim` and `IOSimPOR`.
 --
-module Control.Monad.IOSim.CommonTypes where
+module Control.Monad.IOSim.CommonTypes
+  ( IOSimThreadId (..)
+  , childThreadId
+  , setRacyThread
+  , TVarId (..)
+  , TimeoutId (..)
+  , ClockId (..)
+  , VectorClock (..)
+  , unTimeoutId
+  , ThreadLabel
+  , TVarLabel
+  , TVar (..)
+  , SomeTVar (..)
+  , Deschedule (..)
+  , ThreadStatus (..)
+  , BlockedReason (..)
+  ) where
 
 import           Control.DeepSeq (NFData (..))
 import           Control.Monad.Class.MonadSTM (TraceValue)
@@ -28,18 +44,18 @@ import           GHC.Generics
 -- `Control.Monad.Class.MonadTest.exploreRaces` was
 -- executed in it or it's a thread forked by a racy thread.
 --
-data ThreadId = RacyThreadId [Int]
-              | ThreadId     [Int]    -- non racy threads have higher priority
+data IOSimThreadId = RacyThreadId [Int]
+                   | ThreadId     [Int]    -- non racy threads have higher priority
   deriving stock    (Eq, Ord, Show, Generic)
   deriving anyclass NFData
   deriving anyclass NoThunks
 
 
-childThreadId :: ThreadId -> Int -> ThreadId
+childThreadId :: IOSimThreadId -> Int -> IOSimThreadId
 childThreadId (RacyThreadId is) i = RacyThreadId (is ++ [i])
 childThreadId (ThreadId     is) i = ThreadId     (is ++ [i])
 
-setRacyThread :: ThreadId -> ThreadId
+setRacyThread :: IOSimThreadId -> IOSimThreadId
 setRacyThread (ThreadId is)      = RacyThreadId is
 setRacyThread tid@RacyThreadId{} = tid
 
@@ -47,7 +63,7 @@ setRacyThread tid@RacyThreadId{} = tid
 newtype TVarId      = TVarId    Int   deriving (Eq, Ord, Enum, Show)
 newtype TimeoutId   = TimeoutId Int   deriving (Eq, Ord, Enum, Show)
 newtype ClockId     = ClockId   [Int] deriving (Eq, Ord, Show)
-newtype VectorClock = VectorClock { getVectorClock :: Map ThreadId Int }
+newtype VectorClock = VectorClock { getVectorClock :: Map IOSimThreadId Int }
   deriving Show
 
 unTimeoutId :: TimeoutId -> Int
@@ -80,7 +96,7 @@ data TVar s a = TVar {
        -- To avoid duplicates efficiently, the operations rely on a copy of the
        -- thread Ids represented as a set.
        --
-       tvarBlocked :: !(STRef s ([ThreadId], Set ThreadId)),
+       tvarBlocked :: !(STRef s ([IOSimThreadId], Set IOSimThreadId)),
 
        -- | The vector clock of the current value.
        --

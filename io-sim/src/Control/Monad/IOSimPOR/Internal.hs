@@ -29,7 +29,7 @@ module Control.Monad.IOSimPOR.Internal
   , TimeoutException (..)
   , EventlogEvent (..)
   , EventlogMarker (..)
-  , ThreadId
+  , IOSimThreadId
   , ThreadLabel
   , Labelled (..)
   , SimTrace
@@ -88,12 +88,12 @@ import           Control.Monad.IOSimPOR.Types
 --
 
 data Thread s a = Thread {
-    threadId      :: !ThreadId,
+    threadId      :: !IOSimThreadId,
     threadControl :: !(ThreadControl s a),
     threadStatus  :: !ThreadStatus,
     threadMasking :: !MaskingState,
     -- other threads blocked in a ThrowTo to us because we are or were masked
-    threadThrowTo :: ![(SomeException, Labelled ThreadId, VectorClock)],
+    threadThrowTo :: ![(SomeException, Labelled IOSimThreadId, VectorClock)],
     threadClockId :: !ClockId,
     threadLabel   :: Maybe ThreadLabel,
     threadNextTId :: !Int,
@@ -114,21 +114,21 @@ isThreadDone t = case threadStatus t of
     ThreadDone -> True
     _          -> False
 
-threadStepId :: Thread s a -> (ThreadId, Int)
+threadStepId :: Thread s a -> (IOSimThreadId, Int)
 threadStepId Thread{ threadId, threadStep } = (threadId, threadStep)
 
-isRacyThreadId :: ThreadId -> Bool
+isRacyThreadId :: IOSimThreadId -> Bool
 isRacyThreadId (RacyThreadId _) = True
 isRacyThreadId _                = True
 
-isNotRacyThreadId :: ThreadId -> Bool
+isNotRacyThreadId :: IOSimThreadId -> Bool
 isNotRacyThreadId (ThreadId _) = True
 isNotRacyThreadId _            = False
 
 bottomVClock :: VectorClock
 bottomVClock = VectorClock Map.empty
 
-insertVClock :: ThreadId -> Int -> VectorClock -> VectorClock
+insertVClock :: IOSimThreadId -> Int -> VectorClock -> VectorClock
 insertVClock tid !step (VectorClock m) = VectorClock (Map.insert tid step m)
 
 leastUpperBoundVClock :: VectorClock -> VectorClock -> VectorClock
@@ -149,7 +149,7 @@ happensBeforeStep step step' =
 labelledTVarId :: TVar s a -> ST s (Labelled TVarId)
 labelledTVarId TVar { tvarId, tvarLabel } = Labelled tvarId <$> readSTRef tvarLabel
 
-labelledThreads :: Map ThreadId (Thread s a) -> [Labelled ThreadId]
+labelledThreads :: Map IOSimThreadId (Thread s a) -> [Labelled IOSimThreadId]
 labelledThreads threadMap =
     -- @Map.foldr'@ (and alikes) are not strict enough, to not retain the
     -- original thread map we need to evaluate the spine of the list.
@@ -168,14 +168,14 @@ data TimerCompletionInfo s =
      -- ^ `newTimeout` timer.
      | TimerRegisterDelay !(TVar s Bool)
      -- ^ `registerDelay` timer.
-     | TimerThreadDelay !ThreadId !TimeoutId
-     -- ^ `threadDelay` timer run by `ThreadId` which was assigned the given
+     | TimerThreadDelay !IOSimThreadId !TimeoutId
+     -- ^ `threadDelay` timer run by `IOSimThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
-     | TimerTimeout !ThreadId !TimeoutId !(TMVar (IOSim s) ThreadId)
-     -- ^ `timeout` timer run by `ThreadId` which was assigned the given
+     | TimerTimeout !IOSimThreadId !TimeoutId !(TMVar (IOSim s) IOSimThreadId)
+     -- ^ `timeout` timer run by `IOSimThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
 
-type RunQueue   = OrdPSQ (Down ThreadId) (Down ThreadId) ()
+type RunQueue   = OrdPSQ (Down IOSimThreadId) (Down IOSimThreadId) ()
 type Timeouts s = OrdPSQ TimeoutId Time (TimerCompletionInfo s)
 
 -- | Internal state.
@@ -184,7 +184,7 @@ data SimState s a = SimState {
        runqueue         :: !RunQueue,
        -- | All threads other than the currently running thread: both running
        -- and blocked threads.
-       threads          :: !(Map ThreadId (Thread s a)),
+       threads          :: !(Map IOSimThreadId (Thread s a)),
        -- | current time
        curTime          :: !Time,
        -- | ordered list of timers and timeouts
@@ -1062,9 +1062,9 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
 unblockThreads :: forall s a.
                   Bool -- ^ `True` if we are blocked on STM
                -> VectorClock
-               -> [ThreadId]
+               -> [IOSimThreadId]
                -> SimState s a
-               -> ([ThreadId], SimState s a)
+               -> ([IOSimThreadId], SimState s a)
 unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
@@ -1092,7 +1092,7 @@ unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
                        Nothing -> [ ]
                  ]
 
-    unblockedIds :: [ThreadId]
+    unblockedIds :: [IOSimThreadId]
     !unblockedIds = map threadId unblocked
 
     -- and in which case we mark them as now running
@@ -1119,7 +1119,7 @@ unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
 -- receive a 'ThreadKilled' exception.
 --
 forkTimeoutInterruptThreads :: forall s a.
-                               [(ThreadId, TimeoutId, TMVar (IOSim s) ThreadId)]
+                               [(IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)]
                             -> SimState s a
                             -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState =
@@ -1139,13 +1139,13 @@ forkTimeoutInterruptThreads timeoutExpired simState =
   where
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, TMVar (IOSim s) ThreadId)]
+    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)]
 
     (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
         fn :: SimState s a
-           -> (ThreadId, TimeoutId, TMVar (IOSim s) ThreadId)
-           -> (SimState s a, (Thread s a, TMVar (IOSim s) ThreadId))
+           -> (IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)
+           -> (SimState s a, (Thread s a, TMVar (IOSim s) IOSimThreadId))
         fn state@SimState { threads } (tid, tmid, lock) =
           let t = case tid `Map.lookup` threads of
                     Just t' -> t'
@@ -1262,13 +1262,13 @@ removeMinimums = \psq ->
           | p == p' -> collectAll (k:ks) p (x:xs) psq'
         _           -> (reverse ks, p, reverse xs, psq)
 
-traceMany :: [(Time, ThreadId, Int, Maybe ThreadLabel, SimEventType)]
+traceMany :: [(Time, IOSimThreadId, Int, Maybe ThreadLabel, SimEventType)]
           -> SimTrace a -> SimTrace a
 traceMany []                                   trace = trace
 traceMany ((time, tid, tstep, tlbl, event):ts) trace =
     SimPORTrace time tid tstep tlbl event (traceMany ts trace)
 
-lookupThreadLabel :: ThreadId -> Map ThreadId (Thread s a) -> Maybe ThreadLabel
+lookupThreadLabel :: IOSimThreadId -> Map IOSimThreadId (Thread s a) -> Maybe ThreadLabel
 lookupThreadLabel tid threads = join (threadLabel <$> Map.lookup tid threads)
 
 
@@ -1315,7 +1315,7 @@ controlSimTraceST limit control mainAction =
 
 execAtomically :: forall s a c.
                   Time
-               -> ThreadId
+               -> IOSimThreadId
                -> Maybe ThreadLabel
                -> TVarId
                -> StmA s a
@@ -1619,10 +1619,10 @@ leastUpperBoundTVarVClocks tvars =
 -- Blocking and unblocking on TVars
 --
 
-readTVarBlockedThreads :: TVar s a -> ST s [ThreadId]
+readTVarBlockedThreads :: TVar s a -> ST s [IOSimThreadId]
 readTVarBlockedThreads TVar{tvarBlocked} = fst <$> readSTRef tvarBlocked
 
-blockThreadOnTVar :: ThreadId -> TVar s a -> ST s ()
+blockThreadOnTVar :: IOSimThreadId -> TVar s a -> ST s ()
 blockThreadOnTVar tid TVar{tvarBlocked} = do
     (tids, tidsSet) <- readSTRef tvarBlocked
     when (tid `Set.notMember` tidsSet) $ do
@@ -1641,7 +1641,7 @@ unblockAllThreadsFromTVar TVar{tvarBlocked} = do
 -- the var writes that woke them.
 --
 threadsUnblockedByWrites :: [SomeTVar s]
-                         -> ST s ([ThreadId], Map ThreadId (Set (Labelled TVarId)))
+                         -> ST s ([IOSimThreadId], Map IOSimThreadId (Set (Labelled TVarId)))
 threadsUnblockedByWrites written = do
   tidss <- sequence
              [ (,) <$> labelledTVarId tvar <*> readTVarBlockedThreads tvar
@@ -1749,7 +1749,7 @@ updateRaces thread@Thread { threadId = tid }
                                stepInfoRaces      = []
                              }
           where
-            concurrent :: Set ThreadId
+            concurrent :: Set IOSimThreadId
             concurrent = concurrent0 Set.\\ effectWakeup newEffect
 
             isBlocking :: Bool
@@ -1827,7 +1827,7 @@ normalizeRaces Races{ activeRaces, completeRaces } =
 
 -- When a thread terminates, we remove it from the concurrent thread
 -- sets of active races.
-threadTerminatesRaces :: ThreadId -> Races -> Races
+threadTerminatesRaces :: IOSimThreadId -> Races -> Races
 threadTerminatesRaces tid races@Races{ activeRaces } =
   let activeRaces' = [ s{stepInfoConcurrent = Set.delete tid stepInfoConcurrent}
                      | s@StepInfo{ stepInfoConcurrent } <- activeRaces ]
@@ -1897,7 +1897,7 @@ advanceControl stepId control =
 -- Schedule modifications
 --
 
-stepStepId :: Step -> (ThreadId, Int)
+stepStepId :: Step -> (IOSimThreadId, Int)
 stepStepId Step{ stepThreadId = tid, stepStep = n } = (tid,n)
 
 stepInfoToScheduleMods :: StepInfo -> [ScheduleMod]
