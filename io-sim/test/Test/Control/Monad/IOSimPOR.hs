@@ -1,16 +1,18 @@
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module Test.Control.Monad.IOSimPOR (tests) where
 
 import           Data.Fixed (Micro)
-import           Data.Foldable (foldl')
+import           Data.Foldable (foldl', traverse_)
 import           Data.Functor (($>))
 import           Data.IORef
 import qualified Data.List as List
@@ -26,8 +28,9 @@ import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Parallel
 
-import           Control.Monad.Class.MonadFork
 import           Control.Concurrent.Class.MonadSTM
+import           Control.Monad.Class.MonadAsync
+import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
@@ -258,39 +261,47 @@ sortTasks (x:y:xs) | x>y = [y:x:xs] ++ ((x:) <$> sortTasks (y:xs))
 sortTasks (x:xs)         = (x:) <$> sortTasks xs
 sortTasks []             = []
 
-interpret :: forall s. TVar (IOSim s) Int -> TVar (IOSim s) [ThreadId (IOSim s)] -> Task -> IOSim s (ThreadId (IOSim s))
-interpret r t (Task steps) = forkIO $ do
-    context <- atomically $ do
+interpret :: forall s.
+             TVar (IOSim s) Int
+          -> TVar (IOSim s) [ThreadId (IOSim s)]
+          -> Task
+          -> IOSim s (Async (IOSim s) ())
+interpret r t (Task steps) = async $ do
+    (ts, timer) <- atomically $ do
       ts <- readTVar t
-      when (null ts) retry
+      check (not (null ts))
       timer <- newTVar Nothing
       return (ts,timer)
-    mapM_ (interpretStep context) steps
-  where interpretStep _ (WhenSet m n) = atomically $ do
-          a <- readTVar r
-          when (a/=m) retry
-          writeTVar r n
-        interpretStep (ts,_) (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
-        interpretStep _      (Delay i)   = threadDelay (fromIntegral i)
-        interpretStep (_,timer) (Timeout tstep) = do
-          timerVal <- atomically $ readTVar timer
-          case (timerVal,tstep) of
-            (_,NewTimeout n)            -> do tout <- newTimeout (fromIntegral n)
-                                              atomically $ writeTVar timer (Just tout)
-            (Just tout,CancelTimeout)   -> cancelTimeout tout
-            (Just tout,AwaitTimeout)    -> atomically $ awaitTimeout tout >> return ()
-            (Nothing,_)                 -> return ()
+    mapM_ (interpretStep ts timer) steps
+  where
+    interpretStep :: [ThreadId (IOSim s)]
+                  -> TVar (IOSim s) (Maybe _) -- Timeout is not exported
+                  -> Step
+                  -> IOSim s ()
+    interpretStep _ _ (WhenSet m n) = atomically $ do
+      readTVar r >>= check . (== m)
+      writeTVar r n
+    interpretStep ts _     (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
+    interpretStep _  _     (Delay i)   = threadDelay (fromIntegral i)
+    interpretStep _  timer (Timeout tstep) = do
+      timerVal <- readTVarIO timer
+      case (timerVal,tstep) of
+        (_,NewTimeout n)          -> do tout <- newTimeout (fromIntegral n)
+                                        atomically $ writeTVar timer (Just tout)
+        (Just tout,CancelTimeout) -> cancelTimeout tout
+        (Just tout,AwaitTimeout)  -> atomically $ awaitTimeout tout >> return ()
+        (Nothing,_)               -> return ()
 
 runTasks :: [Task] -> IOSim s (Int,Int)
 runTasks tasks = do
   let m = maximum [maxTaskValue t | Task t <- tasks]
-  r  <- atomically $ newTVar m
-  t  <- atomically $ newTVar []
+  r  <- newTVarIO m
+  t  <- newTVarIO []
   exploreRaces
   ts <- mapM (interpret r t) tasks
-  atomically $ writeTVar t ts
-  threadDelay 1000000000  -- allow the SUT threads to run
-  a  <- atomically $ readTVar r
+  atomically $ writeTVar t (asyncThreadId <$> ts)
+  traverse_ wait ts -- allow the SUT threads to run
+  a  <- readTVarIO r
   return (m,a)
 
 maxTaskValue :: [Step] -> Int
@@ -301,22 +312,24 @@ maxTaskValue []              = 0
 propSimulates :: Tasks -> Property
 propSimulates (Tasks tasks) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
-    let Right (m,a) = runSim (runTasks tasks) in
-    m>=a
+    let trace = runSimTrace (runTasks tasks) in
+    case traceResult False trace of
+      Right (m,a) -> property (m >= a)
+      Left x      -> counterexample (ppTrace trace)
+                   $ counterexample (show x) True 
 
 propExploration :: Tasks -> Property
 propExploration (Tasks tasks) =
-  -- Debug.trace ("\nTasks:\n"++ show tasks) $
   any (not . null . (\(Task steps)->steps)) tasks ==>
     traceNoDuplicates $ \addTrace ->
     --traceCounter $ \addTrace ->
     exploreSimTrace id (runTasks tasks) $ \_ trace ->
-    --Debug.trace (("\nTrace:\n"++) . splitTrace . noExceptions $ show trace) $
     addTrace trace $
     counterexample (splitTrace . noExceptions $ show trace) $
     case traceResult False trace of
-      Right (m,a) -> property $ m>=a
-      Left e      -> counterexample (show e) False
+      Right (m,a) -> property (m >= a)
+      Left e      -> counterexample (ppTrace trace)
+                   $ counterexample (show e) True
 
 -- Testing propPermutations n should collect every permutation of [1..n] once only.
 -- Test manually, and supply a small value of n.
@@ -331,11 +344,11 @@ propPermutations n =
 
 doit :: Int -> IOSim s [Int]
 doit n = do
-          r <- atomically $ newTVar []
-          exploreRaces
-          mapM_ (\i -> forkIO $ atomically $ modifyTVar r (++[i])) [1..n]
-          threadDelay 1
-          atomically $ readTVar r
+  r <- atomically $ newTVar []
+  exploreRaces
+  mapM_ (\i -> forkIO $ atomically $ modifyTVar r (++[i])) [1..n]
+  threadDelay 1
+  atomically $ readTVar r
 
 ordered :: Ord a => [a] -> Bool
 ordered xs = and (zipWith (<) xs (drop 1 xs))
