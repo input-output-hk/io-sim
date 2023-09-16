@@ -1664,14 +1664,6 @@ ordNub = go Set.empty
 -- Steps
 --
 
-data Step = Step {
-    stepThreadId :: !ThreadId,
-    stepStep     :: !Int,
-    stepEffect   :: !Effect,
-    stepVClock   :: !VectorClock
-  }
-  deriving Show
-
 -- | Check if two steps can be reordered with a possibly different outcome.
 --
 racingSteps :: Step -- ^ an earlier step
@@ -1713,36 +1705,6 @@ stepThread thread@Thread { threadId     = tid,
            },
     threadEffect thread
   )
-
-
--- As we run a simulation, we collect info about each previous step
-data StepInfo = StepInfo {
-    stepInfoStep       :: !Step,
-    -- Control information when we reached this step
-    stepInfoControl    :: !ScheduleControl,
-    -- threads that are still concurrent with this step
-    stepInfoConcurrent :: !(Set ThreadId),
-    -- steps following this one that did not happen after it
-    -- (in reverse order)
-    stepInfoNonDep     :: ![Step],
-    -- later steps that race with this one
-    stepInfoRaces      :: ![Step]
-  }
-  deriving Show
-
---
--- Races
---
-
-data Races = Races { -- These steps may still race with future steps
-                     activeRaces   :: ![StepInfo],
-                     -- These steps cannot be concurrent with future steps
-                     completeRaces :: ![StepInfo]
-                   }
-  deriving Show
-
-noRaces :: Races
-noRaces = Races [] []
 
 -- | 'updateRaces' turns a current 'Step' into 'StepInfo', and updates all
 -- 'activeRaces'.

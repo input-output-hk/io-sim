@@ -1,5 +1,26 @@
 {-# LANGUAGE NamedFieldPuns #-}
-module Control.Monad.IOSimPOR.Types where
+module Control.Monad.IOSimPOR.Types
+  ( -- * Effects
+    Effect (..)
+  , readEffects
+  , writeEffects
+  , forkEffect
+  , throwToEffect
+  , wakeupEffects
+  , onlyReadEffect
+  , racingEffects
+    -- * Schedules
+  , ScheduleControl (..)
+  , isDefaultSchedule
+  , ScheduleMod (..)
+    -- * Steps
+  , StepId
+  , Step (..)
+  , StepInfo (..)
+    -- * Races
+  , Races (..)
+  , noRaces
+  ) where
 
 import qualified Data.List as List
 import           Data.Set (Set)
@@ -99,3 +120,107 @@ racingEffects e e' =
 
     intersectsL :: Eq a => [a] -> [a] -> Bool
     intersectsL a b = not $ null $ a `List.intersect` b
+
+
+---
+--- Schedules
+---
+
+-- | Modified execution schedule.
+--
+data ScheduleControl = ControlDefault
+                     -- ^ default scheduling mode
+                     | ControlAwait [ScheduleMod]
+                     -- ^ if the current control is 'ControlAwait', the normal
+                     -- scheduling will proceed, until the thread found in the
+                     -- first 'ScheduleMod' reaches the given step.  At this
+                     -- point the thread is put to sleep, until after all the
+                     -- steps are followed.
+                     | ControlFollow [StepId] [ScheduleMod]
+                     -- ^ follow the steps then continue with schedule
+                     -- modifications.  This control is set by 'followControl'
+                     -- when 'controlTargets' returns true.
+  deriving (Eq, Ord, Show)
+
+
+isDefaultSchedule :: ScheduleControl -> Bool
+isDefaultSchedule ControlDefault        = True
+isDefaultSchedule (ControlFollow [] []) = True
+isDefaultSchedule _                     = False
+
+-- | A schedule modification inserted at given execution step.
+--
+data ScheduleMod = ScheduleMod{
+    -- | Step at which the 'ScheduleMod' is activated.
+    scheduleModTarget    :: StepId,
+    -- | 'ScheduleControl' at the activation step.  It is needed by
+    -- 'extendScheduleControl' when combining the discovered schedule with the
+    -- initial one.
+    scheduleModControl   :: ScheduleControl,
+    -- | Series of steps which are executed at the target step.  This *includes*
+    -- the target step, not necessarily as the last step.
+    scheduleModInsertion :: [StepId]
+  }
+  deriving (Eq, Ord)
+
+
+-- | Execution step is identified by the thread id and a monotonically
+-- increasing number (thread specific).
+--
+type StepId = (ThreadId, Int)
+
+instance Show ScheduleMod where
+  showsPrec d (ScheduleMod tgt ctrl insertion) =
+    showParen (d>10) $
+      showString "ScheduleMod " .
+      showsPrec 11 tgt .
+      showString " " .
+      showsPrec 11 ctrl .
+      showString " " .
+      showsPrec 11 insertion
+
+--
+-- Steps
+--
+
+data Step = Step {
+    stepThreadId :: !ThreadId,
+    stepStep     :: !Int,
+    stepEffect   :: !Effect,
+    stepVClock   :: !VectorClock
+  }
+  deriving Show
+
+
+--
+-- StepInfo
+--
+
+-- As we run a simulation, we collect info about each previous step
+data StepInfo = StepInfo {
+    stepInfoStep       :: !Step,
+    -- Control information when we reached this step
+    stepInfoControl    :: !ScheduleControl,
+    -- threads that are still concurrent with this step
+    stepInfoConcurrent :: !(Set ThreadId),
+    -- steps following this one that did not happen after it
+    -- (in reverse order)
+    stepInfoNonDep     :: ![Step],
+    -- later steps that race with this one
+    stepInfoRaces      :: ![Step]
+  }
+  deriving Show
+
+--
+-- Races
+--
+
+data Races = Races { -- These steps may still race with future steps
+                     activeRaces   :: ![StepInfo],
+                     -- These steps cannot be concurrent with future steps
+                     completeRaces :: ![StepInfo]
+                   }
+  deriving Show
+
+noRaces :: Races
+noRaces = Races [] []
