@@ -378,7 +378,7 @@ schedule thread@Thread{
         -- We record a step, in case there is no exception handler on replay.
         let (thread', eff)  = stepThread thread0
             control'        = advanceControl (threadStepId thread0) control
-            races'          = updateRacesInSimState thread0 simstate
+            races'          = updateRaces thread0 simstate
         trace <- schedule thread' simstate{ races = races',
                                             control = control',
                                             timers = timers'' }
@@ -826,12 +826,13 @@ deschedule Yield thread@Thread { threadId     = tid,
     let (thread', eff) = stepThread thread
         runqueue'      = insertThread thread' runqueue
         threads'       = Map.insert tid thread' threads
-        control'       = advanceControl (threadStepId thread) control in
+        control'       = advanceControl (threadStepId thread) control
+        races'         = updateRaces thread simstate in
 
     SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
     reschedule simstate { runqueue = runqueue',
                           threads  = threads',
-                          races    = updateRacesInSimState thread simstate,
+                          races    = races',
                           control  = control' }
 
 deschedule Interruptable thread@Thread {
@@ -875,11 +876,12 @@ deschedule Interruptable thread@Thread{threadId     = tid,
     -- Either masked or unmasked but no pending async exceptions.
     -- Either way, just carry on.
     -- Record a step, though, in case on replay there is an async exception.
-    let (thread', eff) = stepThread thread in
+    let (thread', eff) = stepThread thread
+        races' = updateRaces thread simstate in
 
     SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
     schedule thread'
-             simstate{ races   = updateRacesInSimState thread simstate,
+             simstate{ races   = races',
                        control = advanceControl (threadStepId thread) control }
 
 deschedule (Blocked _blockedReason) thread@Thread { threadId      = tid
@@ -902,11 +904,12 @@ deschedule (Blocked blockedReason) thread@Thread{ threadId     = tid,
                                                       control } =
     let thread1        = thread { threadStatus = ThreadBlocked blockedReason }
         (thread', eff) = stepThread thread1
-        threads'       = Map.insert (threadId thread') thread' threads in
+        threads'       = Map.insert (threadId thread') thread' threads
+        races'         = updateRaces thread1 simstate in
 
     SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
     reschedule simstate { threads = threads',
-                          races   = updateRacesInSimState thread1 simstate,
+                          races   = races',
                           control = advanceControl (threadStepId thread1) control }
 
 deschedule Terminated thread@Thread { threadId = tid, threadLabel = tlbl, threadVClock = vClock, threadEffect = effect }
@@ -920,10 +923,10 @@ deschedule Terminated thread@Thread { threadId = tid, threadLabel = tlbl, thread
          simstate'@SimState{threads}) =
                       unblockThreads False vClock wakeup simstate
         threads'    = Map.insert tid thread' threads
+        races'      = threadTerminatesRaces tid $ updateRaces thread1 simstate
     -- We must keep terminated threads in the state to preserve their vector clocks,
     -- which matters when other threads throwTo them.
-    !trace <- reschedule simstate' { races = threadTerminatesRaces tid $
-                                              updateRacesInSimState thread1 simstate,
+    !trace <- reschedule simstate' { races  = races',
                                     control = advanceControl (threadStepId thread) control,
                                     threads = threads' }
     return $ traceMany
@@ -1741,20 +1744,6 @@ data Races = Races { -- These steps may still race with future steps
 noRaces :: Races
 noRaces = Races [] []
 
-updateRacesInSimState :: Thread s a -> SimState s a -> Races
-updateRacesInSimState thread SimState{ control, threads, races } =
-    debugTraceRaces $
-    updateRaces step
-                (isThreadBlocked thread)
-                control
-                (Map.keysSet (Map.filter (\t -> not (isThreadDone t)
-                                             && threadId t `Set.notMember`
-                                                effectForks (stepEffect step)
-                                         ) threads))
-                races
-  where
-    step = currentStep thread
-
 -- | 'updateRaces' turns a current 'Step' into 'StepInfo', and updates all
 -- 'activeRaces'.
 --
@@ -1762,104 +1751,101 @@ updateRacesInSimState thread SimState{ control, threads, races } =
 -- concurrent set. When this becomes empty, a step can be retired into
 -- the "complete" category, but only if there are some steps racing
 -- with it.
-updateRaces :: Step
-            -- ^ executed step
-            -> Bool
-            -- ^ is the thread blocking
-            -> ScheduleControl
-            -- ^ schedule control
-            -> Set ThreadId
-            -- ^ set of runnable threads which are not forked by the step, and
-            -- thus can race with it.
-            -> Races -> Races
-updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
-            blocking
-            control
-            concurrent0
-            races@Races{ activeRaces } =
+updateRaces :: Thread s a -> SimState s a -> Races
+updateRaces thread@Thread { threadId = tid }
+            SimState{ control, threads, races = races@Races { activeRaces } } =
+    let 
+        newStep@Step{ stepEffect = newEffect } = currentStep thread
 
-  let -- A new step to add to the `activeRaces` list.
-      newStepInfo :: Maybe StepInfo
-      !newStepInfo | isNotRacyThreadId tid = Nothing
-                     -- non-racy threads do not race
+        concurrent0 = 
+          Map.keysSet (Map.filter (\t -> not (isThreadDone t)
+                                      && threadId t `Set.notMember`
+                                         effectForks (stepEffect newStep)
+                                  ) threads)
 
-                   | Set.null concurrent   = Nothing
-                     -- cannot race with nothing
+        -- A new step to add to the `activeRaces` list.
+        newStepInfo :: Maybe StepInfo
+        !newStepInfo | isNotRacyThreadId tid = Nothing
+                       -- non-racy threads do not race
 
-                   | isBlocking            = Nothing
-                   -- no need to defer a blocking transaction
+                     | Set.null concurrent   = Nothing
+                       -- cannot race with nothing
 
-                   | otherwise =
-          Just $! StepInfo { stepInfoStep       = newStep,
-                             stepInfoControl    = control,
-                             stepInfoConcurrent = concurrent,
-                             stepInfoNonDep     = [],
-                             stepInfoRaces      = []
-                           }
-        where
-          concurrent :: Set ThreadId
-          concurrent = foldr Set.delete concurrent0 (effectWakeup newEffect)
+                     | isBlocking            = Nothing
+                     -- no need to defer a blocking transaction
 
-          isBlocking :: Bool
-          isBlocking = blocking && onlyReadEffect newEffect
+                     | otherwise =
+            Just $! StepInfo { stepInfoStep       = newStep,
+                               stepInfoControl    = control,
+                               stepInfoConcurrent = concurrent,
+                               stepInfoNonDep     = [],
+                               stepInfoRaces      = []
+                             }
+          where
+            concurrent :: Set ThreadId
+            concurrent = foldr Set.delete concurrent0 (effectWakeup newEffect)
 
-      -- Used to update each `StepInfo` in `activeRaces`.
-      updateStepInfo :: StepInfo -> StepInfo
-      updateStepInfo stepInfo@StepInfo { stepInfoStep       = step,
-                                         stepInfoConcurrent = concurrent,
-                                         stepInfoNonDep,
-                                         stepInfoRaces  } =
-        -- if this step depends on the previous step, or is not concurrent,
-        -- then any threads that it wakes up become non-concurrent also.
-        let !lessConcurrent = foldr Set.delete concurrent (effectWakeup newEffect) in
+            isBlocking :: Bool
+            isBlocking = isThreadBlocked thread && onlyReadEffect newEffect
 
-        if tid `notElem` concurrent
-          then stepInfo { stepInfoConcurrent = lessConcurrent }
+        -- Used to update each `StepInfo` in `activeRaces`.
+        updateStepInfo :: StepInfo -> StepInfo
+        updateStepInfo stepInfo@StepInfo { stepInfoStep       = step,
+                                           stepInfoConcurrent = concurrent,
+                                           stepInfoNonDep,
+                                           stepInfoRaces  } =
+          -- if this step depends on the previous step, or is not concurrent,
+          -- then any threads that it wakes up become non-concurrent also.
+          let !lessConcurrent = foldr Set.delete concurrent (effectWakeup newEffect) in
 
-          -- The core of IOSimPOR.  Detect if `newStep` is racing with any
-          -- previous steps and update each `StepInfo`.
-          else let theseStepsRace = step `racingSteps` newStep
-                   -- `step` happened before `newStep` (`newStep` happened after
-                   -- `step`)
-                   happensBefore  = step `happensBeforeStep` newStep
+          if tid `notElem` concurrent
+            then stepInfo { stepInfoConcurrent = lessConcurrent }
 
-                   -- We will only record the first race with each thread.
-                   -- Reversing the first race makes the next race detectable.
-                   -- Thus we remove a thread from the concurrent set after the
-                   -- first race.
-                   !concurrent'
-                     | happensBefore  = Set.delete tid lessConcurrent
-                     | theseStepsRace = Set.delete tid concurrent
-                     | otherwise      = concurrent
+            -- The core of IOSimPOR.  Detect if `newStep` is racing with any
+            -- previous steps and update each `StepInfo`.
+            else let theseStepsRace = step `racingSteps` newStep
+                     -- `step` happened before `newStep` (`newStep` happened after
+                     -- `step`)
+                     happensBefore  = step `happensBeforeStep` newStep
 
-                   !stepInfoNonDep'
-                     -- `newStep` happened after `step`
-                     | happensBefore =           stepInfoNonDep
-                     -- `newStep` did not happen after `step`
-                     | otherwise     = newStep : stepInfoNonDep
+                     -- We will only record the first race with each thread.
+                     -- Reversing the first race makes the next race detectable.
+                     -- Thus we remove a thread from the concurrent set after the
+                     -- first race.
+                     !concurrent'
+                       | happensBefore  = Set.delete tid lessConcurrent
+                       | theseStepsRace = Set.delete tid concurrent
+                       | otherwise      = concurrent
 
-                   -- Here we record discovered races.  We only record a new
-                   -- race if we are following the default schedule, to avoid
-                   -- finding the same race in different parts of the search
-                   -- space.
-                   !stepInfoRaces'
-                     | theseStepsRace && isDefaultSchedule control
-                                 = newStep : stepInfoRaces
-                     | otherwise =           stepInfoRaces
+                     !stepInfoNonDep'
+                       -- `newStep` happened after `step`
+                       | happensBefore =           stepInfoNonDep
+                       -- `newStep` did not happen after `step`
+                       | otherwise     = newStep : stepInfoNonDep
 
-          in stepInfo { stepInfoConcurrent = effectForks newEffect
-                                             `Set.union` concurrent',
-                        stepInfoNonDep     = stepInfoNonDep',
-                        stepInfoRaces      = stepInfoRaces'
-                      }
+                     -- Here we record discovered races.  We only record a new
+                     -- race if we are following the default schedule, to avoid
+                     -- finding the same race in different parts of the search
+                     -- space.
+                     !stepInfoRaces'
+                       | theseStepsRace && isDefaultSchedule control
+                                   = newStep : stepInfoRaces
+                       | otherwise =           stepInfoRaces
 
-      activeRaces' :: [StepInfo]
-      !activeRaces' =
-        case newStepInfo of
-          Nothing ->       updateStepInfo <$> activeRaces
-          Just si -> si : (updateStepInfo <$> activeRaces)
+            in stepInfo { stepInfoConcurrent = effectForks newEffect
+                                               `Set.union` concurrent',
+                          stepInfoNonDep     = stepInfoNonDep',
+                          stepInfoRaces      = stepInfoRaces'
+                        }
 
-  in normalizeRaces races { activeRaces = activeRaces' }
+        activeRaces' :: [StepInfo]
+        !activeRaces' =
+          case newStepInfo of
+            Nothing ->       updateStepInfo <$> activeRaces
+            Just si -> si : (updateStepInfo <$> activeRaces)
+
+    in normalizeRaces races { activeRaces = activeRaces' }
+
 
 normalizeRaces :: Races -> Races
 normalizeRaces Races{ activeRaces, completeRaces } =
@@ -1892,12 +1878,6 @@ quiescentRaces Races{ activeRaces, completeRaces } =
                          | s <- activeRaces
                          , not (null (stepInfoRaces s))
                          ] ++ completeRaces }
-
--- for debugging purposes
-debugTraceRaces :: Races -> Races
-debugTraceRaces r = r
--- debugTraceRaces r@Races{activeRaces,completeRaces} =
-  -- Debug.trace ("Tracking "++show (length (concatMap stepInfoRaces activeRaces)) ++" races") r
 
 
 --
