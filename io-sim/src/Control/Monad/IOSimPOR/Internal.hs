@@ -849,13 +849,15 @@ deschedule Interruptable thread@Thread {
                          }
                         simstate@SimState{ curTime = time, threads } = do
 
-    -- We're unmasking, but there are pending blocked async exceptions.
-    -- So immediately raise the exception and unblock the blocked thread
-    -- if possible.
-    let thread' = thread { threadControl = ThreadControl (Throw e) ctl
+    let effect' = effect <> wakeupEffects unblocked
+        -- We're unmasking, but there are pending blocked async exceptions.
+        -- So immediately raise the exception and unblock the blocked thread
+        -- if possible.
+        thread' = thread { threadControl = ThreadControl (Throw e) ctl
                          , threadMasking = MaskedInterruptible
                          , threadThrowTo = etids
                          , threadVClock  = vClock `leastUpperBoundVClock` vClock'
+                         , threadEffect  = effect'
                          }
         (unblocked,
          simstate') = unblockThreads False vClock [l_labelled tid'] simstate
@@ -916,23 +918,25 @@ deschedule (Blocked blockedReason) thread@Thread{ threadId     = tid,
                           races   = races',
                           control = advanceControl (threadStepId thread1) control }
 
-deschedule Terminated thread@Thread { threadId = tid, threadLabel = tlbl, threadVClock = vClock, threadEffect = effect }
+deschedule Terminated thread@Thread { threadId = tid, threadStep = tstep, threadLabel = tlbl,
+                                      threadVClock = vClock, threadEffect = effect }
                                simstate@SimState{ curTime = time, control } = do
     -- This thread is done. If there are other threads blocked in a
     -- ThrowTo targeted at this thread then we can wake them up now.
-    let thread1        = thread
-        (thread', eff) = stepThread $ thread { threadStatus = ThreadDone }
-        wakeup         = map (\(_,tid',_) -> l_labelled tid') (reverse (threadThrowTo thread))
+    let wakeup         = map (\(_,tid',_) -> l_labelled tid') (reverse (threadThrowTo thread))
         (unblocked,
          simstate'@SimState{threads}) =
                       unblockThreads False vClock wakeup simstate
-        threads'    = Map.insert tid thread' threads
-        races'      = threadTerminatesRaces tid $ updateRaces thread1 simstate
+        effect'        = effect <> wakeupEffects unblocked
+        (thread', eff) = stepThread $ thread { threadStatus = ThreadDone,
+                                               threadEffect = effect' }
+        threads'       = Map.insert tid thread' threads
+        races'         = threadTerminatesRaces tid $ updateRaces thread { threadEffect = effect' } simstate
     -- We must keep terminated threads in the state to preserve their vector clocks,
     -- which matters when other threads throwTo them.
-    !trace <- reschedule simstate' { races  = races',
-                                    control = advanceControl (threadStepId thread) control,
-                                    threads = threads' }
+    !trace <- reschedule simstate' { races   = races',
+                                     control = advanceControl (threadStepId thread) control,
+                                     threads = threads' }
     return $ traceMany
                -- TODO: step
                [ (time, tid', (-1), tlbl', EventThrowToWakeup)
