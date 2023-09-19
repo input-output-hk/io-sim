@@ -50,6 +50,7 @@ import           Test.Control.Monad.STM
 import           Test.QuickCheck
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck
+import qualified Data.List.Trace as Trace
 
 tests :: TestTree
 tests =
@@ -57,6 +58,11 @@ tests =
   [ testGroup "schedule exploration"
     [ testProperty "propSimulates"    propSimulates
     , testProperty "propExploration"  propExploration
+    , testGroup "issue113"
+      [ testProperty "wakeup"         unit_issue113_wakeup
+      , testProperty "racy"           unit_issue113_racy
+      , testProperty "nonDep"         unit_issue113_nonDep
+      ]
     -- , testProperty "propPermutations" propPermutations
     ]
   , testGroup "IO simulator properties"
@@ -261,12 +267,25 @@ sortTasks (x:y:xs) | x>y = [y:x:xs] ++ ((x:) <$> sortTasks (y:xs))
 sortTasks (x:xs)         = (x:) <$> sortTasks xs
 sortTasks []             = []
 
+data Compare = AreEqual | AreNotEqual
+  deriving Show
+
+instance Arbitrary Compare where
+  arbitrary = frequency [(8, pure AreEqual),
+                         (2, pure AreNotEqual)]
+
+  shrink AreEqual    = []
+  shrink AreNotEqual = [AreEqual]
+
+
 interpret :: forall s.
-             TVar (IOSim s) Int
+             Compare
+          -> TVar (IOSim s) Int
           -> TVar (IOSim s) [ThreadId (IOSim s)]
-          -> Task
+          -> (Int, Task)
           -> IOSim s (Async (IOSim s) ())
-interpret r t (Task steps) = async $ do
+interpret cmp r t (tlbl, Task steps) = async $ do
+    labelThisThread (show tlbl)
     (ts, timer) <- atomically $ do
       ts <- readTVar t
       check (not (null ts))
@@ -274,12 +293,15 @@ interpret r t (Task steps) = async $ do
       return (ts,timer)
     mapM_ (interpretStep ts timer) steps
   where
+    compareFn = case cmp of
+      AreEqual    -> (==)
+      AreNotEqual -> (/=)
     interpretStep :: [ThreadId (IOSim s)]
                   -> TVar (IOSim s) (Maybe _) -- Timeout is not exported
                   -> Step
                   -> IOSim s ()
     interpretStep _ _ (WhenSet m n) = atomically $ do
-      readTVar r >>= check . (== m)
+      readTVar r >>= check . compareFn m
       writeTVar r n
     interpretStep ts _     (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
     interpretStep _  _     (Delay i)   = threadDelay (fromIntegral i)
@@ -292,13 +314,13 @@ interpret r t (Task steps) = async $ do
         (Just tout,AwaitTimeout)  -> atomically $ awaitTimeout tout >> return ()
         (Nothing,_)               -> return ()
 
-runTasks :: [Task] -> IOSim s (Int,Int)
-runTasks tasks = do
+runTasks :: Compare -> [Task] -> IOSim s (Int,Int)
+runTasks cmp tasks = do
   let m = maximum [maxTaskValue t | Task t <- tasks]
   r  <- newTVarIO m
   t  <- newTVarIO []
   exploreRaces
-  ts <- mapM (interpret r t) tasks
+  ts <- mapM (interpret cmp r t) (zip [1..] tasks)
   atomically $ writeTVar t (asyncThreadId <$> ts)
   traverse_ wait ts -- allow the SUT threads to run
   a  <- readTVarIO r
@@ -309,27 +331,83 @@ maxTaskValue (WhenSet m _:_) = m
 maxTaskValue (_:t)           = maxTaskValue t
 maxTaskValue []              = 0
 
-propSimulates :: Tasks -> Property
-propSimulates (Tasks tasks) =
+propSimulates :: Compare -> Shrink2 Tasks -> Property
+propSimulates cmp (Shrink2 (Tasks tasks)) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
-    let trace = runSimTrace (runTasks tasks) in
+    let trace = runSimTrace (runTasks cmp tasks) in
     case traceResult False trace of
       Right (m,a) -> property (m >= a)
+      Left (FailureInternal msg)
+                  -> counterexample msg False
       Left x      -> counterexample (ppTrace trace)
                    $ counterexample (show x) True 
 
-propExploration :: Tasks -> Property
-propExploration (Tasks tasks) =
+propExploration :: Compare -> (Shrink2 Tasks) -> Property
+propExploration cmp (Shrink2 ts@(Tasks tasks)) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
     traceNoDuplicates $ \addTrace ->
     --traceCounter $ \addTrace ->
-    exploreSimTrace id (runTasks tasks) $ \_ trace ->
+    exploreSimTrace (\a -> a { explorationDebugLevel = 0 })
+      (say (show ts) >> runTasks cmp tasks) $ \_ trace ->
     addTrace trace $
-    counterexample (splitTrace . noExceptions $ show trace) $
+    -- TODO: for now @coot is leaving `Trace.ppTrace`, but once we change all
+    -- assertions into `FailureInternal`, we can use `ppTrace` instead
+    counterexample (noExceptions $ Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
     case traceResult False trace of
       Right (m,a) -> property (m >= a)
-      Left e      -> counterexample (ppTrace trace)
-                   $ counterexample (show e) True
+      Left _      -> property True
+
+
+-- | This is a counterexample for a fix included in the commit: "io-sim-por:
+-- fixed counterexample in issue #113".  There was a missing wakeup effect when
+-- a thread terminates, for threads that were blocked on `throwTo`.
+--
+unit_issue113_wakeup :: Property
+unit_issue113_wakeup =
+    propExploration AreEqual (Shrink2 tasks)
+  where
+    tasks = Tasks [Task [ThrowTo 1, WhenSet 0 0],
+                   Task [Delay 1],
+                   Task [WhenSet 0 0],
+                   Task [WhenSet 1 0, ThrowTo 1]]
+
+
+-- | This test checks that we don't build a schedule which execute a racing
+-- step that depends on something that wasn't added to `stepInfoNonDep`.
+--
+unit_issue113_racy :: Property
+unit_issue113_racy =
+    propExploration AreNotEqual (Shrink2 tasks)
+  where
+    tasks = Tasks [Task [WhenSet 1 0,ThrowTo 1],
+                   Task [],
+                   Task [ThrowTo 1,WhenSet 0 0],
+                   Task [ThrowTo 1]]
+
+prop :: Property
+prop = shrinking shrink (Shrink2 tasks) (propExploration AreNotEqual)
+  where
+    tasks = Tasks [Task [WhenSet 1 0,ThrowTo 1],
+                   Task [],
+                   Task [ThrowTo 1,WhenSet 0 0],
+                   Task [ThrowTo 1]]
+
+
+-- | This test checks that we don't build a schedule which execute a non
+-- dependent step that depends on something that wasn't added to
+-- `stepInfoNonDep`.
+--
+unit_issue113_nonDep :: Property
+unit_issue113_nonDep =
+    propExploration AreNotEqual (Shrink2 tasks)
+  where
+    tasks = Tasks [Task [WhenSet 0 0],
+                   Task [],
+                   Task [WhenSet 0 0],
+                   Task [ThrowTo 1,WhenSet 1 1],
+                   Task [ThrowTo 5],
+                   Task [ThrowTo 1]]
+
 
 -- Testing propPermutations n should collect every permutation of [1..n] once only.
 -- Test manually, and supply a small value of n.
@@ -358,12 +436,6 @@ noExceptions xs = unsafePerformIO $ try (evaluate xs) >>= \case
   Right []     -> return []
   Right (x:ys) -> return (x:noExceptions ys)
   Left e       -> return ("\n"++show (e :: SomeException))
-
-splitTrace :: [Char] -> [Char]
-splitTrace [] = []
-splitTrace (x:xs) | begins "(Trace" = "\n(" ++ splitTrace xs
-                  | otherwise       = x:splitTrace xs
-  where begins s = take (length s) (x:xs) == s
 
 traceCounter :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
 traceCounter k = r `pseq` (k addTrace .&&.
@@ -398,7 +470,7 @@ prop_stm_graph_sim g =
   traceNoDuplicates $ \addTrace ->
     exploreSimTrace id (prop_stm_graph g) $ \_ trace ->
       addTrace trace $
-      counterexample (splitTrace . noExceptions $ show trace) $
+      counterexample (noExceptions $ Trace.ppTrace show show trace) $
       case traceResult False trace of
         Right () -> property True
         Left e   -> counterexample (show e) False
