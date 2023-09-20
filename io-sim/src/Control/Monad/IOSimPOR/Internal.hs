@@ -1777,16 +1777,19 @@ updateRaces thread@Thread { threadId = tid }
             else let theseStepsRace = step `racingSteps` newStep
                      -- `step` happened before `newStep` (`newStep` happened after
                      -- `step`)
-                     happensBefore  = step `happensBeforeStep` newStep
+                     happensBefore   = step `happensBeforeStep` newStep
+                     -- `newStep` happens after any of the racing steps
+                     afterRacingStep = any (`happensBeforeStep` newStep) stepInfoRaces
 
                      -- We will only record the first race with each thread.
                      -- Reversing the first race makes the next race detectable.
                      -- Thus we remove a thread from the concurrent set after the
                      -- first race.
                      !concurrent'
-                       | happensBefore  = Set.delete tid lessConcurrent
-                       | theseStepsRace = Set.delete tid concurrent
-                       | otherwise      = concurrent
+                       | happensBefore   = Set.delete tid lessConcurrent
+                       | theseStepsRace  = Set.delete tid concurrent
+                       | afterRacingStep = Set.delete tid concurrent
+                       | otherwise       = concurrent
 
                      !stepInfoNonDep'
                        -- `newStep` happened after `step`
