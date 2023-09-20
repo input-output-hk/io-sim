@@ -1745,7 +1745,7 @@ updateRaces thread@Thread { threadId = tid }
                              }
           where
             concurrent :: Set ThreadId
-            concurrent = foldr Set.delete concurrent0 (effectWakeup newEffect)
+            concurrent = concurrent0 Set.\\ effectWakeup newEffect
 
             isBlocking :: Bool
             isBlocking = isThreadBlocked thread && onlyReadEffect newEffect
@@ -1758,7 +1758,7 @@ updateRaces thread@Thread { threadId = tid }
                                            stepInfoRaces  } =
           -- if this step depends on the previous step, or is not concurrent,
           -- then any threads that it wakes up become non-concurrent also.
-          let !lessConcurrent = foldr Set.delete concurrent (effectWakeup newEffect) in
+          let !lessConcurrent = concurrent Set.\\ effectWakeup newEffect in
 
           if tid `notElem` concurrent
             then stepInfo { stepInfoConcurrent = lessConcurrent }

@@ -40,7 +40,7 @@ data Effect = Effect {
     effectWrites :: !(Set TVarId),
     effectForks  :: !(Set ThreadId),
     effectThrows :: ![ThreadId],
-    effectWakeup :: ![ThreadId]
+    effectWakeup :: !(Set ThreadId)
   }
   deriving Eq
 
@@ -57,10 +57,10 @@ instance Show Effect where
 
 instance Semigroup Effect where
   Effect r w s ts wu <> Effect r' w' s' ts' wu' =
-    Effect (r <> r') (w <> w') (s <> s') (ts ++ ts') (wu++wu')
+    Effect (r <> r') (w <> w') (s <> s') (ts ++ ts') (wu <> wu')
 
 instance Monoid Effect where
-  mempty = Effect Set.empty Set.empty Set.empty [] []
+  mempty = Effect Set.empty Set.empty Set.empty [] Set.empty
 
 --
 -- Effect smart constructors
@@ -85,7 +85,7 @@ throwToEffect :: ThreadId -> Effect
 throwToEffect tid = mempty{ effectThrows = [tid] }
 
 wakeupEffects :: [ThreadId] -> Effect
-wakeupEffects tids = mempty{effectWakeup = tids}
+wakeupEffects tids = mempty{effectWakeup = Set.fromList tids}
 
 --
 -- Utils
