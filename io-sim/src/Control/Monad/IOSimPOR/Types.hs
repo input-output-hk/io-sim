@@ -196,17 +196,27 @@ data Step = Step {
 -- StepInfo
 --
 
--- As we run a simulation, we collect info about each previous step
+-- | As we execute a simulation, we collect information about each step.  This
+-- information is updated as the simulation evolves by
+-- `Control.Monad.IOSimPOR.Types.updateRaces`.
+--
 data StepInfo = StepInfo {
+    -- | Step that we want to reschedule to run after a step in `stepInfoRaces`
+    -- (there will be one schedule modification per step in
+    -- `stepInfoRaces`).
     stepInfoStep       :: !Step,
-    -- Control information when we reached this step
+
+    -- | Control information when we reached this step.
     stepInfoControl    :: !ScheduleControl,
-    -- threads that are still concurrent with this step
+
+    -- | Threads that are still concurrent with this step.
     stepInfoConcurrent :: !(Set ThreadId),
-    -- steps following this one that did not happen after it
-    -- (in reverse order)
+
+    -- | Steps following this one that did not happen after it
+    -- (in reverse order).
     stepInfoNonDep     :: ![Step],
-    -- later steps that race with this one
+
+    -- | Later steps that race with `stepInfoStep`.
     stepInfoRaces      :: ![Step]
   }
   deriving Show
