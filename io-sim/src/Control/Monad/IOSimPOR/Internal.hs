@@ -384,7 +384,8 @@ schedule thread@Thread{
                                             timers = timers'' }
         return (SimPORTrace time tid tstep tlbl (EventThrow e) $
                 SimPORTrace time tid tstep tlbl (EventMask maskst') $
-                SimPORTrace time tid tstep tlbl (EventEffect vClock eff)
+                SimPORTrace time tid tstep tlbl (EventEffect vClock eff) $
+                SimPORTrace time tid tstep tlbl (EventRaces races')
                 trace)
 
       (Left isMain, timers'')
@@ -829,7 +830,8 @@ deschedule Yield thread@Thread { threadId     = tid,
         control'       = advanceControl (threadStepId thread) control
         races'         = updateRaces thread simstate in
 
-    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) .
+    SimPORTrace time tid tstep tlbl (EventRaces races') <$>
     reschedule simstate { runqueue = runqueue',
                           threads  = threads',
                           races    = races',
@@ -879,7 +881,8 @@ deschedule Interruptable thread@Thread{threadId     = tid,
     let (thread', eff) = stepThread thread
         races' = updateRaces thread simstate in
 
-    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) .
+    SimPORTrace time tid tstep tlbl (EventRaces races') <$>
     schedule thread'
              simstate{ races   = races',
                        control = advanceControl (threadStepId thread) control }
@@ -907,7 +910,8 @@ deschedule (Blocked blockedReason) thread@Thread{ threadId     = tid,
         threads'       = Map.insert (threadId thread') thread' threads
         races'         = updateRaces thread1 simstate in
 
-    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) <$>
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) .
+    SimPORTrace time tid tstep tlbl (EventRaces races') <$>
     reschedule simstate { threads = threads',
                           races   = races',
                           control = advanceControl (threadStepId thread1) control }
@@ -934,10 +938,11 @@ deschedule Terminated thread@Thread { threadId = tid, threadLabel = tlbl, thread
                [ (time, tid', (-1), tlbl', EventThrowToWakeup)
                | tid' <- unblocked
                , let tlbl' = lookupThreadLabel tid' threads ]
-          $ SimPORTrace time tid (threadStep thread) tlbl (EventEffect vClock eff)
+          $ SimPORTrace time tid tstep tlbl (EventEffect vClock eff)
+          $ SimPORTrace time tid tstep tlbl (EventRaces races')
             trace
 
-deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect }
+deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect' }
                  simstate@SimState{runqueue, threads} =
 
     -- Schedule control says we should run a different thread. Put

@@ -1025,6 +1025,9 @@ data SimEventType
   | EventEffect VectorClock Effect
   -- ^ /IOSimPOR/ event: executed effect; Useful for debugging IOSimPOR or
   -- showing compact information about thread execution.
+  | EventRaces Races
+  -- ^ /IOSimPOR/ event: races.  Races are updated while we execute
+  -- a simulation.  Useful for debugging IOSimPOR.
   deriving Show
 
 

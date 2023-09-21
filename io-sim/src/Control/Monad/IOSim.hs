@@ -176,6 +176,8 @@ detachTraceRacesST trace0 = do
 
       go :: SimTrace a -> ST s (SimTrace a)
       go (SimTrace a b c d trace)      = SimTrace a b c d <$> go trace
+      go (SimPORTrace _ _ _ _ EventRaces {} trace)
+                                       = go trace
       go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e <$> go trace
       go (TraceRacesFound rs trace)    = saveRaces rs >> go trace
       go t                             = return t
