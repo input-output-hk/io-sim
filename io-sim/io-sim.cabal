@@ -117,6 +117,8 @@ test-suite test
                        tasty-hunit,
                        time
   ghc-options:         -fno-ignore-asserts
+                       -rtsopts
+                       -threaded
 
 benchmark bench
   import:              warnings
