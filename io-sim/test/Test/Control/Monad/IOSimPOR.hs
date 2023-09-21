@@ -318,6 +318,7 @@ runTasks :: Compare -> [Task] -> IOSim s (Int,Int)
 runTasks cmp tasks = do
   let m = maximum [maxTaskValue t | Task t <- tasks]
   r  <- newTVarIO m
+  traceTVarIO r (\_ a -> return (TraceString (show a)))
   t  <- newTVarIO []
   exploreRaces
   ts <- mapM (interpret cmp r t) (zip [1..] tasks)
