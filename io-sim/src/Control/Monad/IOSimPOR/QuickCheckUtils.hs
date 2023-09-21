@@ -10,10 +10,10 @@ import           Control.Monad.ST.Lazy.Unsafe (unsafeInterleaveST)
 import           Test.QuickCheck.Gen
 import           Test.QuickCheck.Property
 
--- note: this only evaluates `prop` in parallel, not `ST` actions
+-- note: it evaluates each `ST` action in parallel. 
 conjoinParST :: TestableNoCatch prop => [ST s prop] -> ST s Property
 conjoinParST sts = do
-    ps <- sequence sts
+    ps <- sequence (unsafeInterleaveST <$> sts)
     return $ conjoinPar ps
 
 -- Take the conjunction of several properties, in parallel This is a
