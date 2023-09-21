@@ -650,7 +650,7 @@ schedule thread@Thread{
           return $
             SimPORTrace time tid tstep tlbl (EventTxCommitted written' created' (Just effect')) $
             traceMany
-              [ (time, tid', tstep, tlbl', EventTxWakeup vids')
+              [ (time, tid', (-1), tlbl', EventTxWakeup vids')
               | tid' <- unblocked
               , let tlbl' = lookupThreadLabel tid' threads
               , let Just vids' = Set.toList <$> Map.lookup tid' wokeby ] $
