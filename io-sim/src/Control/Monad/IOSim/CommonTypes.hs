@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -9,12 +10,16 @@
 --
 module Control.Monad.IOSim.CommonTypes
   ( IOSimThreadId (..)
+  , ppIOSimThreadId
+  , StepId
+  , ppStepId
   , childThreadId
   , setRacyThread
   , TVarId (..)
   , TimeoutId (..)
   , ClockId (..)
   , VectorClock (..)
+  , ppVectorClock
   , unTimeoutId
   , ThreadLabel
   , TVarLabel
@@ -23,6 +28,8 @@ module Control.Monad.IOSim.CommonTypes
   , Deschedule (..)
   , ThreadStatus (..)
   , BlockedReason (..)
+    -- * Utils
+  , ppList
   ) where
 
 import           Control.DeepSeq (NFData (..))
@@ -31,10 +38,13 @@ import           Control.Monad.ST.Lazy
 
 import           NoThunks.Class
 
+import           Data.List (intercalate, intersperse)
 import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.STRef.Lazy
 import           Data.Set (Set)
 import           GHC.Generics
+import           Quiet
 
 
 -- | A thread id.
@@ -44,12 +54,20 @@ import           GHC.Generics
 -- `Control.Monad.Class.MonadTest.exploreRaces` was
 -- executed in it or it's a thread forked by a racy thread.
 --
-data IOSimThreadId = RacyThreadId [Int]
-                   | ThreadId     [Int]    -- non racy threads have higher priority
+data IOSimThreadId =
+    -- | A racy thread (`IOSimPOR` only), shown in the trace with curly braces,
+    -- e.g. `Thread {2,3}`.
+    RacyThreadId [Int]
+    -- | A non racy thread.  They have higher priority than racy threads in
+    -- `IOSimPOR` scheduler.
+  | ThreadId     [Int]
   deriving stock    (Eq, Ord, Show, Generic)
   deriving anyclass NFData
   deriving anyclass NoThunks
 
+ppIOSimThreadId :: IOSimThreadId -> String
+ppIOSimThreadId (RacyThreadId as) = "Thread {"++ intercalate "," (map show as) ++"}"
+ppIOSimThreadId     (ThreadId as) = "Thread " ++ show as
 
 childThreadId :: IOSimThreadId -> Int -> IOSimThreadId
 childThreadId (RacyThreadId is) i = RacyThreadId (is ++ [i])
@@ -59,12 +77,26 @@ setRacyThread :: IOSimThreadId -> IOSimThreadId
 setRacyThread (ThreadId is)      = RacyThreadId is
 setRacyThread tid@RacyThreadId{} = tid
 
+-- | Execution step in `IOSimPOR` is identified by the thread id and
+-- a monotonically increasing number (thread specific).
+--
+type StepId = (IOSimThreadId, Int)
+
+ppStepId :: (IOSimThreadId, Int) -> String
+ppStepId (tid, step) | step < 0
+                     = concat [ppIOSimThreadId tid, ".-"]
+ppStepId (tid, step) = concat [ppIOSimThreadId tid, ".", show step]
+
 
 newtype TVarId      = TVarId    Int   deriving (Eq, Ord, Enum, Show)
 newtype TimeoutId   = TimeoutId Int   deriving (Eq, Ord, Enum, Show)
 newtype ClockId     = ClockId   [Int] deriving (Eq, Ord, Show)
 newtype VectorClock = VectorClock { getVectorClock :: Map IOSimThreadId Int }
-  deriving Show
+  deriving Generic
+  deriving Show via Quiet VectorClock
+
+ppVectorClock :: VectorClock -> String
+ppVectorClock (VectorClock m) = "VectorClock " ++ "[" ++ concat (intersperse ", " (ppStepId <$> Map.toList m)) ++ "]"
 
 unTimeoutId :: TimeoutId -> Int
 unTimeoutId (TimeoutId a) = a
@@ -129,3 +161,10 @@ data BlockedReason = BlockedOnSTM
                    | BlockedOnDelay
                    | BlockedOnThrowTo
   deriving (Eq, Show)
+
+--
+-- Utils
+--
+
+ppList :: (a -> String) -> [a] -> String
+ppList pp as = "[" ++ concat (intersperse ", " (map pp as)) ++ "]"

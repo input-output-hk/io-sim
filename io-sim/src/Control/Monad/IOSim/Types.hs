@@ -5,6 +5,7 @@
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTSyntax                 #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE NumericUnderscores         #-}
@@ -22,7 +23,6 @@ module Control.Monad.IOSim.Types
   , traceSTM
   , liftST
   , SimA (..)
-  , StepId
   , STMSim
   , STM (..)
   , runSTM
@@ -46,6 +46,7 @@ module Control.Monad.IOSim.Types
   , EventlogEvent (..)
   , EventlogMarker (..)
   , SimEventType (..)
+  , ppSimEventType
   , SimEvent (..)
   , SimResult (..)
   , SimTrace
@@ -767,30 +768,34 @@ ppSimEvent :: Int -- ^ width of the time
            -> Int -- ^ width of thread label
            -> SimEvent
            -> String
-ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime, seThreadId, seThreadLabel, seType} =
+
+ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime = Time time, seThreadId, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
            timeWidth
-           (show seTime)
+           (show time)
            tidWidth
-           (show seThreadId)
+           (ppIOSimThreadId seThreadId)
            tLabelWidth
            threadLabel
-           (show seType)
+           (ppSimEventType seType)
   where
     threadLabel = fromMaybe "" seThreadLabel
-ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime, seThreadId, seStep, seThreadLabel, seType} =
+
+ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime = Time time, seThreadId, seStep, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
            timeWidth
-           (show seTime)
+           (show time)
            tidWidth
-           (show (seThreadId, seStep))
+           (ppStepId (seThreadId, seStep))
            tLableWidth
            threadLabel
-           (show seType)
+           (ppSimEventType seType)
   where
     threadLabel = fromMaybe "" seThreadLabel
+
 ppSimEvent _ _ _ (SimRacesFound controls) =
     "RacesFound "++show controls
+
 
 -- | A result type of a simulation.
 data SimResult a
@@ -805,6 +810,7 @@ data SimResult a
     | Loop
     -- ^ Only returned by /IOSimPOR/ when a step execution took longer than
     -- 'explorationStepTimelimit` was exceeded.
+    | InternalError String
     deriving (Show, Functor)
 
 -- | A type alias for 'IOSim' simulation trace.  It comes with useful pattern
@@ -866,6 +872,8 @@ ppTrace_ tr = Trace.ppTrace
                   (Max 0, Max 0, Max 0)
               )
       $ tr
+
+
 
 -- | Trace each event using 'Debug.trace'; this is useful when a trace ends with
 -- a pure error, e.g. an assertion.
@@ -1029,6 +1037,91 @@ data SimEventType
   -- a simulation.  Useful for debugging IOSimPOR.
   deriving Show
 
+ppSimEventType :: SimEventType -> String
+ppSimEventType = \case
+  EventSay a -> "Say " ++ a
+  EventLog a -> "Dynamic " ++ show a
+  EventMask a -> "Mask " ++ show a
+  EventThrow a -> "Throw " ++ show a
+  EventThrowTo err tid ->
+    concat [ "ThrowTo (",
+              show err, ") ",
+              ppIOSimThreadId tid ]
+  EventThrowToBlocked -> "ThrowToBlocked"
+  EventThrowToWakeup -> "ThrowToWakeup"
+  EventThrowToUnmasked a ->
+    "ThrowToUnmasked " ++ ppLabelled ppIOSimThreadId a
+  EventThreadForked a ->
+    "ThreadForked " ++ ppIOSimThreadId a
+  EventThreadFinished -> "ThreadFinished"
+  EventThreadUnhandled a ->
+    "ThreadUnhandled " ++ show a
+  EventTxCommitted written created mbEff ->
+    concat [ "TxCommitted ",
+             ppList (ppLabelled show) written, " ",
+             ppList (ppLabelled show) created,
+             maybe "" ((' ' :) . ppEffect) mbEff ]
+
+  EventTxAborted mbEff ->
+    concat [ "TxAborted",
+             maybe "" ((' ' :) . ppEffect) mbEff ]
+  EventTxBlocked blocked mbEff ->
+   concat [ "TxBlocked ",
+             ppList (ppLabelled show) blocked,
+             maybe "" ((' ' :) . ppEffect) mbEff ]
+  EventTxWakeup changed ->
+    "TxWakeup " ++ ppList (ppLabelled show) changed
+  EventUnblocked unblocked ->
+    "Unblocked " ++ ppList ppIOSimThreadId unblocked
+  EventThreadDelay tid t ->
+    concat [ "ThreadDelay ",
+             show tid, " ",
+             show t ]
+  EventThreadDelayFired  tid -> "ThreadDelayFired " ++ show tid
+  EventTimeoutCreated timer tid t ->
+    concat [ "TimeoutCreated ",
+             show timer, " ",
+             ppIOSimThreadId tid, " ",
+             show t ]
+  EventTimeoutFired timer ->
+    "TimeoutFired " ++ show timer
+  EventRegisterDelayCreated timer tvarId t ->
+    concat [ "RegisterDelayCreated ",
+             show timer, " ",
+             show tvarId, " ",
+             show t ]
+  EventRegisterDelayFired timer -> "RegisterDelayFired " ++ show timer
+  EventTimerCreated timer tvarId t ->
+    concat [ "TimerCreated ",
+              show timer, " ",
+              show tvarId, " ",
+              show t ]
+  EventTimerUpdated timer t ->
+    concat [ "TimerUpdated ",
+             show timer, " ",
+             show t ]
+  EventTimerCancelled timer -> "TimerCancelled " ++ show timer
+  EventTimerFired timer -> "TimerFired " ++ show timer
+  EventThreadStatus  tid tid' ->
+    concat [ "ThreadStatus ",
+             ppIOSimThreadId tid, " ",
+             ppIOSimThreadId tid' ]
+  EventSimStart a -> "SimStart " ++ show a
+  EventThreadSleep -> "ThreadSleep"
+  EventThreadWake -> "ThreadWake"
+  EventDeschedule a -> "Deschedule " ++ show a
+  EventFollowControl a -> "FollowControl " ++ show a
+  EventAwaitControl s a ->
+    concat [ "AwaitControl ",
+             ppStepId s, " ",
+             show a ]
+  EventPerformAction a -> "PerformAction " ++ ppStepId a
+  EventReschedule a -> "Reschedule " ++ show a
+  EventEffect clock eff ->
+    concat [ "Effect ",
+             ppVectorClock clock, " ",
+             ppEffect eff ]
+  EventRaces a -> "Races " ++ show a
 
 -- | A labelled value.
 --
@@ -1040,6 +1133,10 @@ data Labelled a = Labelled {
   }
   deriving (Eq, Ord, Generic)
   deriving Show via Quiet (Labelled a)
+
+ppLabelled :: (a -> String) -> Labelled a -> String
+ppLabelled pp Labelled { l_labelled = a, l_label = Nothing  } = pp a
+ppLabelled pp Labelled { l_labelled = a, l_label = Just lbl } = concat ["Labelled ", pp a, " ", lbl]
 
 --
 -- Executing STM Transactions

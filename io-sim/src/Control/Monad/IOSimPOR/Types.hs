@@ -9,12 +9,14 @@ module Control.Monad.IOSimPOR.Types
   , wakeupEffects
   , onlyReadEffect
   , racingEffects
+  , ppEffect
     -- * Schedules
   , ScheduleControl (..)
   , isDefaultSchedule
   , ScheduleMod (..)
     -- * Steps
   , StepId
+  , ppStepId
   , Step (..)
   , StepInfo (..)
     -- * Races
@@ -42,17 +44,17 @@ data Effect = Effect {
     effectThrows :: ![IOSimThreadId],
     effectWakeup :: !(Set IOSimThreadId)
   }
-  deriving Eq
+  deriving (Show, Eq)
 
-instance Show Effect where
-    show Effect { effectReads, effectWrites, effectForks, effectThrows, effectWakeup } =
-      concat $ [ "Effect { " ]
-            ++ [ "reads = " ++ show effectReads ++ ", "   | not (null effectReads) ]
-            ++ [ "writes = " ++ show effectWrites ++ ", " | not (null effectWrites) ]
-            ++ [ "forks = " ++ show effectForks ++ ", "   | not (null effectForks)]
-            ++ [ "throws = " ++ show effectThrows ++ ", " | not (null effectThrows) ]
-            ++ [ "wakeup = " ++ show effectWakeup ++ ", " | not (null effectWakeup) ]
-            ++ [ "}" ]
+ppEffect :: Effect -> String
+ppEffect Effect { effectReads, effectWrites, effectForks, effectThrows, effectWakeup } =
+  concat $ [ "Effect { " ]
+        ++ [ "reads = "  ++ show effectReads  ++ ", " | not (null effectReads)  ]
+        ++ [ "writes = " ++ show effectWrites ++ ", " | not (null effectWrites) ]
+        ++ [ "forks = "  ++ ppList ppIOSimThreadId (Set.toList effectForks)  ++ ", " | not (null effectForks)  ]
+        ++ [ "throws = " ++ ppList ppIOSimThreadId             effectThrows  ++ ", " | not (null effectThrows) ]
+        ++ [ "wakeup = " ++ ppList ppIOSimThreadId (Set.toList effectWakeup) ++ ", " | not (null effectWakeup) ]
+        ++ [ "}" ]
 
 
 instance Semigroup Effect where
@@ -163,11 +165,6 @@ data ScheduleMod = ScheduleMod{
   }
   deriving (Eq, Ord)
 
-
--- | Execution step is identified by the thread id and a monotonically
--- increasing number (thread specific).
---
-type StepId = (IOSimThreadId, Int)
 
 instance Show ScheduleMod where
   showsPrec d (ScheduleMod tgt ctrl insertion) =
