@@ -50,7 +50,7 @@ module Control.Monad.IOSim.Types
   , SimEvent (..)
   , SimResult (..)
   , SimTrace
-  , Trace.Trace (SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop)
+  , Trace.Trace (SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop, TraceInternalError)
   , ppTrace
   , ppTrace_
   , ppSimEvent
@@ -917,7 +917,10 @@ pattern TraceDeadlock time threads = Trace.Nil (Deadlock time threads)
 pattern TraceLoop :: SimTrace a
 pattern TraceLoop = Trace.Nil Loop
 
-{-# COMPLETE SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceLoop #-}
+pattern TraceInternalError :: String -> SimTrace a
+pattern TraceInternalError msg = Trace.Nil (InternalError msg)
+
+{-# COMPLETE SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceLoop, TraceInternalError #-}
 
 
 -- | Events recorded by the simulation.

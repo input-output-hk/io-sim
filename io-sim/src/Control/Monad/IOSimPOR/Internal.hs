@@ -966,12 +966,18 @@ deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect' }
 reschedule :: SimState s a -> ST s (SimTrace a)
 
 -- If we are following a controlled schedule, just do that.
+reschedule simstate@SimState { runqueue, control = control@(ControlFollow ((tid,_):_) _) }
+                             | not (Down tid `PSQ.member` runqueue) =
+    return (Trace.Nil (InternalError ("assertion failure: " ++ ppIOSimThreadId tid ++ " not runnable")))
+
+reschedule simstate@SimState { threads, control = control@(ControlFollow ((tid,_):_) _) }
+                             | not (tid `Map.member` threads) =
+    return (Trace.Nil (InternalError ("assertion failure: " ++ ppIOSimThreadId tid ++ " not in threads")))
+
 reschedule simstate@SimState { runqueue, threads,
                                control = control@(ControlFollow ((tid,tstep):_) _),
                                curTime = time } =
     fmap (SimPORTrace time tid tstep Nothing (EventReschedule control)) $
-    assert (Down tid `PSQ.member` runqueue) $
-    assert (tid `Map.member` threads) $
     invariant Nothing simstate $
     let thread = threads Map.! tid in
     assert (threadId thread == tid) $

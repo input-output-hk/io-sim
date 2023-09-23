@@ -356,6 +356,8 @@ propExploration cmp (Shrink2 ts@(Tasks tasks)) =
     counterexample (noExceptions $ Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
     case traceResult False trace of
       Right (m,a) -> property (m >= a)
+      Left (FailureInternal msg)
+                  -> counterexample msg False
       Left _      -> property True
 
 

@@ -132,6 +132,7 @@ selectTraceEvents fn =
                     Deadlock      _   threads -> throw (FailureDeadlock threads)
                     MainReturn    _ _ _       -> []
                     Loop                      -> error "Impossible: selectTraceEvents _ TraceLoop{}"
+                    InternalError msg         -> throw (FailureInternal msg)
               )
               ( \ b acc -> b : acc )
               []
@@ -336,6 +337,12 @@ data Failure =
        -- This could be an internal assertion failure of `io-sim` or an
        -- unhandled exception in the simulation.
      | FailureEvaluation SomeException
+
+       -- | An internal failure of the simulator.
+       --
+       -- Please open an issue at
+       -- <https://github.com/input-output-hk/io-sim/issues>.
+     | FailureInternal String
   deriving Show
 
 instance Exception Failure where
@@ -350,7 +357,18 @@ instance Exception Failure where
              , intercalate ", " (show `map` threads)
              , ">>"
              ]
-    displayException (FailureEvaluation err) = "evaluation error:" ++ displayException  err
+    displayException (FailureEvaluation err) =
+      concat [ "<<evaluation error: "
+             , displayException  err
+             , ">>"
+             ]
+    displayException (FailureInternal msg) =
+      concat [ "<<internal failure: "
+             , msg
+             , ">>\n"
+             , "please report the issue at\n"
+             , "https://github.com/input-output-hk/io-sim/issues"
+             ]
     
 
 -- | 'IOSim' is a pure monad.
@@ -402,6 +420,7 @@ traceResult strict = unsafePerformIO . eval
     go (TraceMainException _ e _)       = pure $ Left (FailureException e)
     go (TraceDeadlock   _   threads)    = pure $ Left (FailureDeadlock threads)
     go TraceLoop{}                      = error "Impossible: traceResult TraceLoop{}"
+    go (TraceInternalError msg)         = pure $ Left (FailureInternal msg)
 
 -- | Turn 'SimTrace' into a list of timestamped events.
 --
