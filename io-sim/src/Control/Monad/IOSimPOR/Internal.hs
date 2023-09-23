@@ -863,12 +863,13 @@ deschedule Interruptable thread@Thread {
          simstate') = unblockThreads False vClock [l_labelled tid'] simstate
     -- the thread is stepped when we Yield
     !trace <- deschedule Yield thread' simstate'
-    return $ SimPORTrace time tid tstep tlbl (EventDeschedule Yield)
-           $ SimPORTrace time tid tstep tlbl (EventThrowToUnmasked tid')
+    return $ SimPORTrace time tid tstep tlbl (EventThrowToUnmasked tid')
+           $ SimPORTrace time tid tstep tlbl (EventEffect vClock effect')
            -- TODO: step
            $ traceMany [ (time, tid'', (-1), tlbl'', EventThrowToWakeup)
                        | tid'' <- unblocked
                        , let tlbl'' = lookupThreadLabel tid'' threads ]
+           $ SimPORTrace time tid tstep tlbl (EventDeschedule Yield)
              trace
 
 deschedule Interruptable thread@Thread{threadId     = tid,
@@ -890,15 +891,19 @@ deschedule Interruptable thread@Thread{threadId     = tid,
                        control = advanceControl (threadStepId thread) control }
 
 deschedule (Blocked _blockedReason) thread@Thread { threadId      = tid
+                                                  , threadStep    = tstep
+                                                  , threadLabel   = tlbl
                                                   , threadThrowTo = _ : _
                                                   , threadMasking = maskst
-                                                  , threadEffect  = effect } simstate
+                                                  , threadEffect  = effect }
+                                    simstate@SimState{ curTime = time }
     | maskst /= MaskedUninterruptible =
     -- We're doing a blocking operation, which is an interrupt point even if
     -- we have async exceptions masked, and there are pending blocked async
     -- exceptions. So immediately raise the exception and unblock the blocked
     -- thread if possible.
-    deschedule Interruptable thread { threadMasking = Unmasked } simstate
+    SimPORTrace time tid tstep tlbl (EventDeschedule Interruptable) <$>
+      deschedule Interruptable thread { threadMasking = Unmasked } simstate
 
 deschedule (Blocked blockedReason) thread@Thread{ threadId     = tid,
                                                   threadStep   = tstep,
