@@ -1,5 +1,34 @@
 # Revsion history of io-sim
 
+## next
+
+### Breaking changes
+
+#### Breaking changes
+
+* Renamed `ThreadId` to `IOSimThreadId` to avoid a clash with `ThreadId`
+  associated type family of `MonadFork`.  It makes it much simpler to paste
+  failing `ScheduleControl` in `ghci` or tests.
+* `BlockedReason` was modified: `BlockedOnOther` was removed, in favour of `BlockedOnDelay` and `BlockOnThrowTo`.
+* The `Failure` type (for example returned by `runSim`) now also contains
+  a constructor for internal failures.  This improved error reporting when
+  there's a bug in `IOSimPOR`.  Currently it's only used by some of the
+  assertions in `IOSimPOR`.
+
+#### Non breaking changes
+
+* Refactored the internal API to avoid `unsafePerformIO`.
+* Fixed bugs which lead to discovery of schedules which are impossible to run.
+* Added haddocks, refactored the code base to improve readability.
+* Fixed reported `step` in `EventTxWakup`
+* Added debugging information schedule, (`explorationDebugLevel` option).
+  Mostly useful for debugging `IOSimPOR` itself.  This information will
+  contains `Effect`, discovered races and schedules.
+* Addded or improved pretty printers for `SimTrace`.  Among other changes,
+  a racy `StepId`: `(RacyThreadId [1,2], 2)`, is now pretty printed as `Thread
+  {1,2}.2`, a non racy step is printed as `Thread [1,2].2`.
+* Fixed trace of calls to the `deschedule` function.
+
 ## 1.2.0.0
 
 ### Breaking changes
