@@ -14,19 +14,18 @@ module Test.Control.Monad.IOSimPOR (tests) where
 import           Data.Fixed (Micro)
 import           Data.Foldable (foldl', traverse_)
 import           Data.Functor (($>))
-import           Data.IORef
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.STRef.Lazy
 
 import           System.Exit
 import           System.IO.Error (ioeGetErrorString, isUserError)
-import           System.IO.Unsafe
 
 import           Control.Exception (ArithException (..), AsyncException)
 import           Control.Monad
 import           Control.Monad.Fix
-import           Control.Parallel
+import           Control.Monad.ST.Lazy (ST, runST)
 
 import           Control.Concurrent.Class.MonadSTM
 import           Control.Monad.Class.MonadAsync
@@ -343,22 +342,26 @@ propSimulates cmp (Shrink2 (Tasks tasks)) =
       Left x      -> counterexample (ppTrace trace)
                    $ counterexample (show x) True 
 
+-- NOTE: This property needs to be executed sequentially, otherwise it fails
+-- undeterministically, which `exploreSimTraceST` does.
+--
 propExploration :: Compare -> (Shrink2 Tasks) -> Property
 propExploration cmp (Shrink2 ts@(Tasks tasks)) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
-    traceNoDuplicates $ \addTrace ->
-    --traceCounter $ \addTrace ->
-    exploreSimTrace (\a -> a { explorationDebugLevel = 0 })
-      (say (show ts) >> runTasks cmp tasks) $ \_ trace ->
-    addTrace trace $
+    runST $
+    -- traceNoDuplicates $ \addTrace->
+    exploreSimTraceST (\a -> a { explorationDebugLevel = 0 })
+                      (say (show ts) >> runTasks cmp tasks)
+                    $ \_ trace -> do
+    -- addTrace trace
     -- TODO: for now @coot is leaving `Trace.ppTrace`, but once we change all
     -- assertions into `FailureInternal`, we can use `ppTrace` instead
-    counterexample (noExceptions $ Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
-    case traceResult False trace of
-      Right (m,a) -> property (m >= a)
-      Left (FailureInternal msg)
-                  -> counterexample msg False
-      Left _      -> property True
+    return $ counterexample (Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
+             case traceResult False trace of
+               Right (m,a) -> property (m >= a)
+               Left (FailureInternal msg)
+                           -> counterexample msg False
+               Left _      -> property True
 
 
 -- | This is a counterexample for a fix included in the commit: "io-sim-por:
@@ -387,14 +390,6 @@ unit_issue113_racy =
                    Task [ThrowTo 1,WhenSet 0 0],
                    Task [ThrowTo 1]]
 
-prop :: Property
-prop = shrinking shrink (Shrink2 tasks) (propExploration AreNotEqual)
-  where
-    tasks = Tasks [Task [WhenSet 1 0,ThrowTo 1],
-                   Task [],
-                   Task [ThrowTo 1,WhenSet 0 0],
-                   Task [ThrowTo 1]]
-
 
 -- | This test checks that we don't build a schedule which execute a non
 -- dependent step that depends on something that wasn't added to
@@ -416,12 +411,12 @@ unit_issue113_nonDep =
 -- Test manually, and supply a small value of n.
 propPermutations :: Int -> Property
 propPermutations n =
+  runST $
   traceNoDuplicates $ \addTrace ->
-  exploreSimTrace (withScheduleBound 10000) (doit n) $ \_ trace ->
-    addTrace trace $
-    let Right result = traceResult False trace in
-    tabulate "Result" [noExceptions $ show $ result] $
-      True
+  exploreSimTraceST (withScheduleBound 10000) (doit n) $ \_ trace -> do
+    addTrace trace
+    let Right result = traceResult False trace
+    return $ tabulate "Result" [show $ result] $ True
 
 doit :: Int -> IOSim s [Int]
 doit n = do
@@ -431,38 +426,20 @@ doit n = do
   threadDelay 1
   atomically $ readTVar r
 
-ordered :: Ord a => [a] -> Bool
-ordered xs = and (zipWith (<) xs (drop 1 xs))
 
-noExceptions :: [Char] -> [Char]
-noExceptions xs = unsafePerformIO $ try (evaluate xs) >>= \case
-  Right []     -> return []
-  Right (x:ys) -> return (x:noExceptions ys)
-  Left e       -> return ("\n"++show (e :: SomeException))
+traceNoDuplicates :: forall s a prop. (Show a, Testable prop)
+                  => ((a -> ST s ()) -> ST s prop)
+                  -> ST s Property
+traceNoDuplicates k = do
+  v <- newSTRef Map.empty :: ST s (STRef s (Map String Int))
+  prop <- k (\a -> modifySTRef v (Map.insertWith (+) (show a) 1))
+  m <- readSTRef v
+  return $ prop .&&. counterexample (show (Map.keys $ Map.filter (> 1) m)) (maximum m === 1)
 
-traceCounter :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
-traceCounter k = r `pseq` (k addTrace .&&.
-                           tabulate "Trace repetitions" (map show $ traceCounts ()) True)
-  where
-    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
-    addTrace t x = unsafePerformIO $ do
-      atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
-      return x
-    traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
-
-traceNoDuplicates :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
-traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
-  where
-    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
-    addTrace t x = unsafePerformIO $ do
-      atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
-      return x
-    traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
 
 --
 -- IOSim reused properties
 --
-
 
 --
 -- Read/Write graph
@@ -470,16 +447,17 @@ traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
 
 prop_stm_graph_sim :: TestThreadGraph -> Property
 prop_stm_graph_sim g =
+  runST $
   traceNoDuplicates $ \addTrace ->
-    exploreSimTrace id (prop_stm_graph g) $ \_ trace ->
-      addTrace trace $
-      counterexample (noExceptions $ Trace.ppTrace show show trace) $
-      case traceResult False trace of
-        Right () -> property True
-        Left e   -> counterexample (show e) False
-      -- TODO: Note that we do not use runSimStrictShutdown here to check
-      -- that all other threads finished, but perhaps we should and structure
-      -- the graph tests so that's the case.
+    exploreSimTraceST id (prop_stm_graph g) $ \_ trace -> do
+      addTrace trace
+      return $ counterexample (Trace.ppTrace show show trace) $
+        case traceResult False trace of
+          Right () -> property True
+          Left e   -> counterexample (show e) False
+        -- TODO: Note that we do not use runSimStrictShutdown here to check
+        -- that all other threads finished, but perhaps we should and structure
+        -- the graph tests so that's the case.
 
 prop_timers_ST :: TestMicro -> Property
 prop_timers_ST (TestMicro xs) =

@@ -23,7 +23,9 @@ module Control.Monad.IOSim
     -- ** Explore races using /IOSimPOR/
     -- $iosimpor
   , exploreSimTrace
+  , exploreSimTraceST
   , controlSimTrace
+  , controlSimTraceST
   , ScheduleMod (..)
   , ScheduleControl (..)
     -- *** Exploration options
@@ -171,6 +173,10 @@ selectTraceRaces = go
 -- unsafe, of course, since that function may return different results
 -- at different times.
 
+-- | Detach discovered races.  This is written in `ST` monad to support
+-- simulations which do not terminate, in which case we will only detach races
+-- up to the point we evaluated the simulation.
+--
 detachTraceRacesST :: forall a s. SimTrace a -> ST s (ST s [ScheduleControl], SimTrace a)
 detachTraceRacesST trace0 = do
   races <- newSTRef []
@@ -190,6 +196,15 @@ detachTraceRacesST trace0 = do
 
   trace <- go trace0
   return (readRaces, trace)
+
+
+-- | Like `detachTraceRacesST`, but it doesn't expose discovered races.
+--
+detachTraceRaces :: forall a. SimTrace a -> SimTrace a
+detachTraceRaces = Trace.filter (\a -> case a of
+                                         SimPOREvent { seType = EventRaces {} } -> False
+                                         SimRacesFound {} -> False
+                                         _                -> True)
 
 -- | Select all the traced values matching the expected type. This relies on
 -- the sim's dynamic trace facility.
@@ -489,6 +504,8 @@ runSimTrace mainAction = runST (runSimTraceST mainAction)
 -- On property failure it will show the failing schedule (`ScheduleControl`)
 -- which can be plugged to `controlSimTrace`.
 --
+-- Note: `exploreSimTrace` evaluates each schedule in parallel (using `par`).
+--
 exploreSimTrace
   :: forall a test. Testable test
   => (ExplorationOptions -> ExplorationOptions)
@@ -499,34 +516,51 @@ exploreSimTrace
   -- ^ a callback which receives the previous trace (e.g. before reverting
   -- a race condition) and current trace
   -> Property
-exploreSimTrace optsf mainAction k =
-  case explorationReplay opts of
-    Nothing ->
-      case runST (do cacheRef <- createCacheST
-                     prop <- explore cacheRef (explorationScheduleBound opts) (explorationBranching opts) ControlDefault Nothing
-                     size <- cacheSizeST cacheRef
-                     return (prop, size)
-                 ) of
-        (prop, !size) -> tabulate "Modified schedules explored" [bucket size] prop
+exploreSimTrace optsf main k =
+    runST (exploreSimTraceST optsf main (\a b -> pure (k a b)))
 
-    Just control ->
-      replaySimTrace opts mainAction control (k Nothing)
 
+-- | An 'ST' version of 'exploreSimTrace'. The callback also receives
+-- 'ScheduleControl'.  This is mostly useful for testing /IOSimPOR/ itself.
+--
+-- Note: `exploreSimTraceST` evaluates each schedule sequentially.
+--
+exploreSimTraceST
+  :: forall s a test. Testable test
+  => (ExplorationOptions -> ExplorationOptions)
+  -> (forall s. IOSim s a)
+  -> (Maybe (SimTrace a) -> SimTrace a -> ST s test)
+  -> ST s Property
+exploreSimTraceST optsf main k =
+    case explorationReplay opts of
+      Just control -> do
+        trace <- controlSimTraceST (explorationStepTimelimit opts) control main
+        counterexample ("Schedule control: " ++ show control)
+          <$> k Nothing trace
+      Nothing -> do
+        cacheRef <- createCacheST
+        prop <- go cacheRef (explorationScheduleBound opts)
+                            (explorationBranching opts)
+                            ControlDefault Nothing
+        !size <- cacheSizeST cacheRef
+        return $ tabulate "Modified schedules explored" [bucket size] prop
   where
     opts = optsf stdExplorationOptions
 
-    explore :: forall s.
-               STRef s (Set ScheduleControl)
-            -> Int -- schedule bound
-            -> Int -- branching factor
-            -> ScheduleControl -> Maybe (SimTrace a) -> ST s Property
-    explore cacheRef n m control passingTrace = do
-      traceWithRaces <-  IOSimPOR.controlSimTraceST (explorationStepTimelimit opts) control mainAction
+    go :: STRef s (Set ScheduleControl)
+       -> Int -- schedule bound
+       -> Int -- branching factor
+       -> ScheduleControl
+       -> Maybe (SimTrace a)
+       -> ST s Property
+    go cacheRef n m control passingTrace = do
+      traceWithRaces <- IOSimPOR.controlSimTraceST (explorationStepTimelimit opts) control main
       (readRaces, trace0) <- detachTraceRacesST traceWithRaces
       (readSleeperST, trace) <- compareTracesST passingTrace trace0
       conjoinNoCatchST
         [ do sleeper <- readSleeperST
              () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
+             prop <- k passingTrace trace
              return $ counterexample ("Schedule control: " ++ show control)
                     $ counterexample
                        (case sleeper of
@@ -538,7 +572,7 @@ exploreSimTrace optsf mainAction k =
                            "\n  until after:\n" ++
                            unlines (map (("    "++).showThread) $ Set.toList racing)
                         )
-                    $ k passingTrace trace
+                      prop
         , do let limit = (n+m-1) `div` m
               -- To ensure the set of schedules explored is deterministic, we
               -- filter out cached ones *after* selecting the children of this
@@ -550,8 +584,9 @@ exploreSimTrace optsf mainAction k =
              -- tabulate "Races explored" (map show races) $
              tabulate "Branching factor" [bucket branching]
                 .  tabulate "Race reversals per schedule" [bucket (raceReversals control)]
-               <$> conjoinParST
-                     [ explore cacheRef n' ((m-1) `max` 1) r (Just trace0)
+                .  conjoin
+               <$> sequence
+                     [ go cacheRef n' ((m-1) `max` 1) r (Just trace0)
                      | (r,n') <- zip races (divide (n-branching) branching) ]
         ]
 
@@ -609,28 +644,6 @@ traceDebugLog _ trace = Debug.traceM $ "Simulation trace with discovered schedul
                                     ++ Trace.ppTrace show (ppSimEvent 0 0 0) (void `first` trace)
 
 
-
--- | A specialised version of `controlSimTrace'.
---
--- An internal function.
---
-replaySimTrace :: forall a test. (Testable test)
-               => ExplorationOptions
-               -- ^ race exploration options
-               -> (forall s. IOSim s a)
-               -> ScheduleControl
-               -- ^ a schedule control to reproduce
-               -> (SimTrace a -> test)
-               -- ^ a callback which receives the simulation trace. The trace
-               -- will not contain any race events
-               -> Property
-replaySimTrace opts mainAction control k =
-  let trace = runST $ do
-        (_readRaces, trace) <- IOSimPOR.controlSimTraceST (explorationStepTimelimit opts) control mainAction
-                           >>= detachTraceRacesST
-        return (ignoreRaces trace)
-  in property (k trace)
-
 -- | Run a simulation using a given schedule.  This is useful to reproduce
 -- failing cases without exploring the races.
 --
@@ -650,7 +663,7 @@ controlSimTrace limit control main =
 
 controlSimTraceST :: Maybe Int -> ScheduleControl -> IOSim s a -> ST s (SimTrace a)
 controlSimTraceST limit control main =
-  ignoreRaces <$> IOSimPOR.controlSimTraceST limit control main
+  detachTraceRaces <$> IOSimPOR.controlSimTraceST limit control main
 
 
 --

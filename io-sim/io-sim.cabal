@@ -80,7 +80,6 @@ library
                        containers,
                        deepseq,
                        nothunks,
-                       parallel,
                        psqueues          >=0.2 && <0.3,
                        strict-stm       ^>=1.2,
                        si-timers        ^>=1.2,
@@ -108,7 +107,6 @@ test-suite test
                        containers,
                        io-classes,
                        io-sim,
-                       parallel,
                        QuickCheck,
                        si-timers,
                        strict-stm,
@@ -118,7 +116,7 @@ test-suite test
                        time
   ghc-options:         -fno-ignore-asserts
                        -rtsopts
-                       -threaded
+                       -- -threaded
 
 benchmark bench
   import:              warnings
