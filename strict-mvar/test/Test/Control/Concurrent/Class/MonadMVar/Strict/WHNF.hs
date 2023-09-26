@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use camelCase" #-}
 
 -- | Test whether functions on 'StrictMVar's correctly force values to WHNF
 -- before they are put inside the 'StrictMVar'.
