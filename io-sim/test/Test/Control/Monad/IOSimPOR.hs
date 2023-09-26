@@ -7,7 +7,6 @@
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module Test.Control.Monad.IOSimPOR (tests) where
 
@@ -296,7 +295,7 @@ interpret cmp r t (tlbl, Task steps) = async $ do
       AreEqual    -> (==)
       AreNotEqual -> (/=)
     interpretStep :: [ThreadId (IOSim s)]
-                  -> TVar (IOSim s) (Maybe _) -- Timeout is not exported
+                  -> TVar (IOSim s) (Maybe (Timeout s))
                   -> Step
                   -> IOSim s ()
     interpretStep _ _ (WhenSet m n) = atomically $ do

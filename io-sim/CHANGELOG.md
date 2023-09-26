@@ -28,6 +28,7 @@
   a racy `StepId`: `(RacyThreadId [1,2], 2)`, is now pretty printed as `Thread
   {1,2}.2`, a non racy step is printed as `Thread [1,2].2`.
 * Fixed trace of calls to the `deschedule` function.
+* Exposed `Timeout` type as part of the `newTimeout` API.
 
 ## 1.2.0.0
 
