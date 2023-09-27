@@ -5,6 +5,7 @@
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTSyntax                 #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE NumericUnderscores         #-}
@@ -22,7 +23,6 @@ module Control.Monad.IOSim.Types
   , traceSTM
   , liftST
   , SimA (..)
-  , StepId
   , STMSim
   , STM (..)
   , runSTM
@@ -34,6 +34,7 @@ module Control.Monad.IOSim.Types
   , setCurrentTime
   , unshareClock
   , ScheduleControl (..)
+  , isDefaultSchedule
   , ScheduleMod (..)
   , ExplorationOptions (..)
   , ExplorationSpec
@@ -45,10 +46,11 @@ module Control.Monad.IOSim.Types
   , EventlogEvent (..)
   , EventlogMarker (..)
   , SimEventType (..)
+  , ppSimEventType
   , SimEvent (..)
   , SimResult (..)
   , SimTrace
-  , Trace.Trace (SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop)
+  , Trace.Trace (SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop, TraceInternalError)
   , ppTrace
   , ppTrace_
   , ppSimEvent
@@ -81,8 +83,7 @@ import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar as StrictTVar
 import           Control.Monad.Class.MonadAsync hiding (Async)
 import qualified Control.Monad.Class.MonadAsync as MonadAsync
 import           Control.Monad.Class.MonadEventlog
-import           Control.Monad.Class.MonadFork hiding (ThreadId)
-import qualified Control.Monad.Class.MonadFork as MonadFork
+import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
@@ -180,13 +181,13 @@ data SimA s a where
                   SimA s a -> (e -> SimA s a) -> (a -> SimA s b) -> SimA s b
   Evaluate     :: a -> (a -> SimA s b) -> SimA s b
 
-  Fork         :: IOSim s () -> (ThreadId -> SimA s b) -> SimA s b
-  GetThreadId  :: (ThreadId -> SimA s b) -> SimA s b
-  LabelThread  :: ThreadId -> String -> SimA s b -> SimA s b
+  Fork         :: IOSim s () -> (IOSimThreadId -> SimA s b) -> SimA s b
+  GetThreadId  :: (IOSimThreadId -> SimA s b) -> SimA s b
+  LabelThread  :: IOSimThreadId -> String -> SimA s b -> SimA s b
 
   Atomically   :: STM  s a -> (a -> SimA s b) -> SimA s b
 
-  ThrowTo      :: SomeException -> ThreadId -> SimA s a -> SimA s a
+  ThrowTo      :: SomeException -> IOSimThreadId -> SimA s a -> SimA s a
   SetMaskState :: MaskingState  -> IOSim s a -> (a -> SimA s b) -> SimA s b
   GetMaskState :: (MaskingState -> SimA s b) -> SimA s b
 
@@ -447,7 +448,7 @@ block                a = IOSim (SetMaskState MaskedInterruptible a)
 blockUninterruptible a = IOSim (SetMaskState MaskedUninterruptible a)
 
 instance MonadThread (IOSim s) where
-  type ThreadId (IOSim s) = ThreadId
+  type ThreadId (IOSim s) = IOSimThreadId
   myThreadId       = IOSim $ oneShot $ \k -> GetThreadId k
   labelThread t l  = IOSim $ oneShot $ \k -> LabelThread t l (k ())
 
@@ -575,7 +576,7 @@ instance MonadInspectMVar (IOSim s) where
         MVarEmpty _ _ -> pure Nothing
         MVarFull x _  -> pure (Just x)
 
-data Async s a = Async !ThreadId (STM s (Either SomeException a))
+data Async s a = Async !IOSimThreadId (STM s (Either SomeException a))
 
 instance Eq (Async s a) where
     Async tid _ == Async tid' _ = tid == tid'
@@ -742,14 +743,14 @@ data SimEvent
     -- | Used when using `IOSim`.
   = SimEvent {
       seTime        :: !Time,
-      seThreadId    :: !ThreadId,
+      seThreadId    :: !IOSimThreadId,
       seThreadLabel :: !(Maybe ThreadLabel),
       seType        :: !SimEventType
     }
     -- | Only used for /IOSimPOR/
   | SimPOREvent {
       seTime        :: !Time,
-      seThreadId    :: !ThreadId,
+      seThreadId    :: !IOSimThreadId,
       seStep        :: !Int,
       seThreadLabel :: !(Maybe ThreadLabel),
       seType        :: !SimEventType
@@ -767,44 +768,49 @@ ppSimEvent :: Int -- ^ width of the time
            -> Int -- ^ width of thread label
            -> SimEvent
            -> String
-ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime, seThreadId, seThreadLabel, seType} =
+
+ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime = Time time, seThreadId, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
            timeWidth
-           (show seTime)
+           (show time)
            tidWidth
-           (show seThreadId)
+           (ppIOSimThreadId seThreadId)
            tLabelWidth
            threadLabel
-           (show seType)
+           (ppSimEventType seType)
   where
     threadLabel = fromMaybe "" seThreadLabel
-ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime, seThreadId, seStep, seThreadLabel, seType} =
+
+ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime = Time time, seThreadId, seStep, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
            timeWidth
-           (show seTime)
+           (show time)
            tidWidth
-           (show (seThreadId, seStep))
+           (ppStepId (seThreadId, seStep))
            tLableWidth
            threadLabel
-           (show seType)
+           (ppSimEventType seType)
   where
     threadLabel = fromMaybe "" seThreadLabel
+
 ppSimEvent _ _ _ (SimRacesFound controls) =
     "RacesFound "++show controls
 
+
 -- | A result type of a simulation.
 data SimResult a
-    = MainReturn    !Time a             ![Labelled ThreadId]
+    = MainReturn    !Time a             ![Labelled IOSimThreadId]
     -- ^ Return value of the main thread.
-    | MainException !Time SomeException ![Labelled ThreadId]
+    | MainException !Time SomeException ![Labelled IOSimThreadId]
     -- ^ Exception thrown by the main thread.
-    | Deadlock      !Time               ![Labelled ThreadId]
+    | Deadlock      !Time               ![Labelled IOSimThreadId]
     -- ^ Deadlock discovered in the simulation.  Deadlocks are discovered if
     -- simply the simulation cannot do any progress in a given time slot and
     -- there's no event which would advance the time.
     | Loop
     -- ^ Only returned by /IOSimPOR/ when a step execution took longer than
     -- 'explorationStepTimelimit` was exceeded.
+    | InternalError String
     deriving (Show, Functor)
 
 -- | A type alias for 'IOSim' simulation trace.  It comes with useful pattern
@@ -867,6 +873,8 @@ ppTrace_ tr = Trace.ppTrace
               )
       $ tr
 
+
+
 -- | Trace each event using 'Debug.trace'; this is useful when a trace ends with
 -- a pure error, e.g. an assertion.
 --
@@ -876,13 +884,13 @@ ppDebug = appEndo
         . Trace.toList
 
 
-pattern SimTrace :: Time -> ThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
+pattern SimTrace :: Time -> IOSimThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                  -> SimTrace a
 pattern SimTrace time threadId threadLabel traceEvent trace =
     Trace.Cons (SimEvent time threadId threadLabel traceEvent)
                trace
 
-pattern SimPORTrace :: Time -> ThreadId -> Int -> Maybe ThreadLabel -> SimEventType -> SimTrace a
+pattern SimPORTrace :: Time -> IOSimThreadId -> Int -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                     -> SimTrace a
 pattern SimPORTrace time threadId step threadLabel traceEvent trace =
     Trace.Cons (SimPOREvent time threadId step threadLabel traceEvent)
@@ -894,22 +902,25 @@ pattern TraceRacesFound controls trace =
     Trace.Cons (SimRacesFound controls)
                trace
 
-pattern TraceMainReturn :: Time -> a -> [Labelled ThreadId]
+pattern TraceMainReturn :: Time -> a -> [Labelled IOSimThreadId]
                         -> SimTrace a
 pattern TraceMainReturn time a threads = Trace.Nil (MainReturn time a threads)
 
-pattern TraceMainException :: Time -> SomeException -> [Labelled ThreadId]
+pattern TraceMainException :: Time -> SomeException -> [Labelled IOSimThreadId]
                            -> SimTrace a
 pattern TraceMainException time err threads = Trace.Nil (MainException time err threads)
 
-pattern TraceDeadlock :: Time -> [Labelled ThreadId]
+pattern TraceDeadlock :: Time -> [Labelled IOSimThreadId]
                       -> SimTrace a
 pattern TraceDeadlock time threads = Trace.Nil (Deadlock time threads)
 
 pattern TraceLoop :: SimTrace a
 pattern TraceLoop = Trace.Nil Loop
 
-{-# COMPLETE SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceLoop #-}
+pattern TraceInternalError :: String -> SimTrace a
+pattern TraceInternalError msg = Trace.Nil (InternalError msg)
+
+{-# COMPLETE SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceLoop, TraceInternalError #-}
 
 
 -- | Events recorded by the simulation.
@@ -924,17 +935,17 @@ data SimEventType
 
   | EventThrow          SomeException
   -- ^ throw exception
-  | EventThrowTo        SomeException ThreadId
+  | EventThrowTo        SomeException IOSimThreadId
   -- ^ throw asynchronous exception (`throwTo`)
   | EventThrowToBlocked
   -- ^ the thread which executed `throwTo` is blocked
   | EventThrowToWakeup
   -- ^ the thread which executed `throwTo` is woken up
-  | EventThrowToUnmasked (Labelled ThreadId)
+  | EventThrowToUnmasked (Labelled IOSimThreadId)
   -- ^ a target thread of `throwTo` unmasked its exceptions, this is paired
   -- with `EventThrowToWakeup` for threads which were blocked on `throwTo`
 
-  | EventThreadForked    ThreadId
+  | EventThreadForked    IOSimThreadId
   -- ^ forked a thread
   | EventThreadFinished
   -- ^ thread terminated normally
@@ -958,7 +969,7 @@ data SimEventType
                        (Maybe Effect)    -- ^ effect performed (only for `IOSimPOR`)
   | EventTxWakeup      [Labelled TVarId] -- ^ changed vars causing retry
 
-  | EventUnblocked     [ThreadId]
+  | EventUnblocked     [IOSimThreadId]
   -- ^ unblocked threads by a committed STM transaction
 
   --
@@ -970,7 +981,7 @@ data SimEventType
   | EventThreadDelayFired   TimeoutId
   -- ^ thread woken up after a delay
 
-  | EventTimeoutCreated        TimeoutId ThreadId Time
+  | EventTimeoutCreated        TimeoutId IOSimThreadId Time
   -- ^ new timeout created (via `timeout`)
   | EventTimeoutFired          TimeoutId
   -- ^ timeout fired
@@ -994,8 +1005,8 @@ data SimEventType
   --
 
   -- | event traced when `threadStatus` is executed
-  | EventThreadStatus  ThreadId -- ^ current thread
-                       ThreadId -- ^ queried thread
+  | EventThreadStatus  IOSimThreadId -- ^ current thread
+                       IOSimThreadId -- ^ queried thread
 
   --
   -- /IOSimPOR/ events
@@ -1020,12 +1031,104 @@ data SimEventType
   | EventPerformAction StepId
   -- ^ /IOSimPOR/ event: perform action of the given step
   | EventReschedule           ScheduleControl
+
+  | EventEffect VectorClock Effect
+  -- ^ /IOSimPOR/ event: executed effect; Useful for debugging IOSimPOR or
+  -- showing compact information about thread execution.
+  | EventRaces Races
+  -- ^ /IOSimPOR/ event: races.  Races are updated while we execute
+  -- a simulation.  Useful for debugging IOSimPOR.
   deriving Show
 
+ppSimEventType :: SimEventType -> String
+ppSimEventType = \case
+  EventSay a -> "Say " ++ a
+  EventLog a -> "Dynamic " ++ show a
+  EventMask a -> "Mask " ++ show a
+  EventThrow a -> "Throw " ++ show a
+  EventThrowTo err tid ->
+    concat [ "ThrowTo (",
+              show err, ") ",
+              ppIOSimThreadId tid ]
+  EventThrowToBlocked -> "ThrowToBlocked"
+  EventThrowToWakeup -> "ThrowToWakeup"
+  EventThrowToUnmasked a ->
+    "ThrowToUnmasked " ++ ppLabelled ppIOSimThreadId a
+  EventThreadForked a ->
+    "ThreadForked " ++ ppIOSimThreadId a
+  EventThreadFinished -> "ThreadFinished"
+  EventThreadUnhandled a ->
+    "ThreadUnhandled " ++ show a
+  EventTxCommitted written created mbEff ->
+    concat [ "TxCommitted ",
+             ppList (ppLabelled show) written, " ",
+             ppList (ppLabelled show) created,
+             maybe "" ((' ' :) . ppEffect) mbEff ]
+
+  EventTxAborted mbEff ->
+    concat [ "TxAborted",
+             maybe "" ((' ' :) . ppEffect) mbEff ]
+  EventTxBlocked blocked mbEff ->
+   concat [ "TxBlocked ",
+             ppList (ppLabelled show) blocked,
+             maybe "" ((' ' :) . ppEffect) mbEff ]
+  EventTxWakeup changed ->
+    "TxWakeup " ++ ppList (ppLabelled show) changed
+  EventUnblocked unblocked ->
+    "Unblocked " ++ ppList ppIOSimThreadId unblocked
+  EventThreadDelay tid t ->
+    concat [ "ThreadDelay ",
+             show tid, " ",
+             show t ]
+  EventThreadDelayFired  tid -> "ThreadDelayFired " ++ show tid
+  EventTimeoutCreated timer tid t ->
+    concat [ "TimeoutCreated ",
+             show timer, " ",
+             ppIOSimThreadId tid, " ",
+             show t ]
+  EventTimeoutFired timer ->
+    "TimeoutFired " ++ show timer
+  EventRegisterDelayCreated timer tvarId t ->
+    concat [ "RegisterDelayCreated ",
+             show timer, " ",
+             show tvarId, " ",
+             show t ]
+  EventRegisterDelayFired timer -> "RegisterDelayFired " ++ show timer
+  EventTimerCreated timer tvarId t ->
+    concat [ "TimerCreated ",
+              show timer, " ",
+              show tvarId, " ",
+              show t ]
+  EventTimerUpdated timer t ->
+    concat [ "TimerUpdated ",
+             show timer, " ",
+             show t ]
+  EventTimerCancelled timer -> "TimerCancelled " ++ show timer
+  EventTimerFired timer -> "TimerFired " ++ show timer
+  EventThreadStatus  tid tid' ->
+    concat [ "ThreadStatus ",
+             ppIOSimThreadId tid, " ",
+             ppIOSimThreadId tid' ]
+  EventSimStart a -> "SimStart " ++ show a
+  EventThreadSleep -> "ThreadSleep"
+  EventThreadWake -> "ThreadWake"
+  EventDeschedule a -> "Deschedule " ++ show a
+  EventFollowControl a -> "FollowControl " ++ show a
+  EventAwaitControl s a ->
+    concat [ "AwaitControl ",
+             ppStepId s, " ",
+             show a ]
+  EventPerformAction a -> "PerformAction " ++ ppStepId a
+  EventReschedule a -> "Reschedule " ++ show a
+  EventEffect clock eff ->
+    concat [ "Effect ",
+             ppVectorClock clock, " ",
+             ppEffect eff ]
+  EventRaces a -> "Races " ++ show a
 
 -- | A labelled value.
 --
--- For example 'labelThread' or `labelTVar' will insert a label to `ThreadId`
+-- For example 'labelThread' or `labelTVar' will insert a label to `IOSimThreadId`
 -- (or `TVarId`).
 data Labelled a = Labelled {
     l_labelled :: !a,
@@ -1033,6 +1136,10 @@ data Labelled a = Labelled {
   }
   deriving (Eq, Ord, Generic)
   deriving Show via Quiet (Labelled a)
+
+ppLabelled :: (a -> String) -> Labelled a -> String
+ppLabelled pp Labelled { l_labelled = a, l_label = Nothing  } = pp a
+ppLabelled pp Labelled { l_labelled = a, l_label = Just lbl } = concat ["Labelled ", pp a, " ", lbl]
 
 --
 -- Executing STM Transactions
@@ -1102,57 +1209,6 @@ data StmStack s b a where
                    -> StmStack s b c
                    -> StmStack s a c
 
-
----
---- Schedules
----
-
--- | Modified execution schedule.
---
-data ScheduleControl = ControlDefault
-                     -- ^ default scheduling mode
-                     | ControlAwait [ScheduleMod]
-                     -- ^ if the current control is 'ControlAwait', the normal
-                     -- scheduling will proceed, until the thread found in the
-                     -- first 'ScheduleMod' reaches the given step.  At this
-                     -- point the thread is put to sleep, until after all the
-                     -- steps are followed.
-                     | ControlFollow [StepId] [ScheduleMod]
-                     -- ^ follow the steps then continue with schedule
-                     -- modifications.  This control is set by 'followControl'
-                     -- when 'controlTargets' returns true.
-  deriving (Eq, Ord, Show)
-
--- | A schedule modification inserted at given execution step.
---
-data ScheduleMod = ScheduleMod{
-    -- | Step at which the 'ScheduleMod' is activated.
-    scheduleModTarget    :: StepId,
-    -- | 'ScheduleControl' at the activation step.  It is needed by
-    -- 'extendScheduleControl' when combining the discovered schedule with the
-    -- initial one.
-    scheduleModControl   :: ScheduleControl,
-    -- | Series of steps which are executed at the target step.  This *includes*
-    -- the target step, not necessarily as the last step.
-    scheduleModInsertion :: [StepId]
-  }
-  deriving (Eq, Ord)
-
--- | Execution step is identified by the thread id and a monotonically
--- increasing number (thread specific).
---
-type StepId = (ThreadId, Int)
-
-instance Show ScheduleMod where
-  showsPrec d (ScheduleMod tgt ctrl insertion) =
-    showParen (d>10) $
-      showString "ScheduleMod " .
-      showsPrec 11 tgt .
-      showString " " .
-      showsPrec 11 ctrl .
-      showString " " .
-      showsPrec 11 insertion
-
 ---
 --- Exploration options
 ---
@@ -1189,10 +1245,21 @@ data ExplorationOptions = ExplorationOptions{
     -- catching infinite loops etc.
     --
     -- The default value is `Nothing`.
-    explorationReplay        :: Maybe ScheduleControl
+    explorationReplay        :: Maybe ScheduleControl,
     -- ^ A schedule to replay.
     --
     -- The default value is `Nothing`.
+    explorationDebugLevel    :: Int
+    -- ^ Log detailed trace to stderr containing information on discovered
+    -- races.  The trace does not contain the result of the simulation, unless
+    -- one will do that explicitly inside the simulation.
+    --
+    -- level 0: don't show any output,
+    -- level 1: show simulation trace with discovered schedules
+    -- level 2: show simulation trace with discovered schedules and races
+    --
+    -- NOTE: discovered schedules & races are not exposed to the user in the
+    -- callback of `exploreSimTrace` or in the output of `controlSimTrace`.
   }
   deriving Show
 
@@ -1201,7 +1268,8 @@ stdExplorationOptions = ExplorationOptions{
     explorationScheduleBound = 100,
     explorationBranching     = 3,
     explorationStepTimelimit = Nothing,
-    explorationReplay        = Nothing
+    explorationReplay        = Nothing,
+    explorationDebugLevel    = 0
     }
 
 type ExplorationSpec = ExplorationOptions -> ExplorationOptions

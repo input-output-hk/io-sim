@@ -7,6 +7,8 @@
 {-# LANGUAGE MultiParamTypeClasses     #-}
 {-# LANGUAGE NamedFieldPuns            #-}
 {-# LANGUAGE RankNTypes                #-}
+-- only used to construct records if its clear to do so
+{-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE TypeFamilies              #-}
 
@@ -27,7 +29,7 @@ module Control.Monad.IOSimPOR.Internal
   , TimeoutException (..)
   , EventlogEvent (..)
   , EventlogMarker (..)
-  , ThreadId
+  , IOSimThreadId
   , ThreadLabel
   , Labelled (..)
   , SimTrace
@@ -86,12 +88,12 @@ import           Control.Monad.IOSimPOR.Types
 --
 
 data Thread s a = Thread {
-    threadId      :: !ThreadId,
+    threadId      :: !IOSimThreadId,
     threadControl :: !(ThreadControl s a),
     threadStatus  :: !ThreadStatus,
     threadMasking :: !MaskingState,
     -- other threads blocked in a ThrowTo to us because we are or were masked
-    threadThrowTo :: ![(SomeException, Labelled ThreadId, VectorClock)],
+    threadThrowTo :: ![(SomeException, Labelled IOSimThreadId, VectorClock)],
     threadClockId :: !ClockId,
     threadLabel   :: Maybe ThreadLabel,
     threadNextTId :: !Int,
@@ -112,21 +114,21 @@ isThreadDone t = case threadStatus t of
     ThreadDone -> True
     _          -> False
 
-threadStepId :: Thread s a -> (ThreadId, Int)
+threadStepId :: Thread s a -> (IOSimThreadId, Int)
 threadStepId Thread{ threadId, threadStep } = (threadId, threadStep)
 
-isRacyThreadId :: ThreadId -> Bool
+isRacyThreadId :: IOSimThreadId -> Bool
 isRacyThreadId (RacyThreadId _) = True
 isRacyThreadId _                = True
 
-isNotRacyThreadId :: ThreadId -> Bool
+isNotRacyThreadId :: IOSimThreadId -> Bool
 isNotRacyThreadId (ThreadId _) = True
 isNotRacyThreadId _            = False
 
 bottomVClock :: VectorClock
 bottomVClock = VectorClock Map.empty
 
-insertVClock :: ThreadId -> Int -> VectorClock -> VectorClock
+insertVClock :: IOSimThreadId -> Int -> VectorClock -> VectorClock
 insertVClock tid !step (VectorClock m) = VectorClock (Map.insert tid step m)
 
 leastUpperBoundVClock :: VectorClock -> VectorClock -> VectorClock
@@ -147,7 +149,7 @@ happensBeforeStep step step' =
 labelledTVarId :: TVar s a -> ST s (Labelled TVarId)
 labelledTVarId TVar { tvarId, tvarLabel } = Labelled tvarId <$> readSTRef tvarLabel
 
-labelledThreads :: Map ThreadId (Thread s a) -> [Labelled ThreadId]
+labelledThreads :: Map IOSimThreadId (Thread s a) -> [Labelled IOSimThreadId]
 labelledThreads threadMap =
     -- @Map.foldr'@ (and alikes) are not strict enough, to not retain the
     -- original thread map we need to evaluate the spine of the list.
@@ -166,14 +168,14 @@ data TimerCompletionInfo s =
      -- ^ `newTimeout` timer.
      | TimerRegisterDelay !(TVar s Bool)
      -- ^ `registerDelay` timer.
-     | TimerThreadDelay !ThreadId !TimeoutId
-     -- ^ `threadDelay` timer run by `ThreadId` which was assigned the given
+     | TimerThreadDelay !IOSimThreadId !TimeoutId
+     -- ^ `threadDelay` timer run by `IOSimThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
-     | TimerTimeout !ThreadId !TimeoutId !(TMVar (IOSim s) ThreadId)
-     -- ^ `timeout` timer run by `ThreadId` which was assigned the given
+     | TimerTimeout !IOSimThreadId !TimeoutId !(TMVar (IOSim s) IOSimThreadId)
+     -- ^ `timeout` timer run by `IOSimThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
 
-type RunQueue = OrdPSQ (Down ThreadId) (Down ThreadId) ()
+type RunQueue   = OrdPSQ (Down IOSimThreadId) (Down IOSimThreadId) ()
 type Timeouts s = OrdPSQ TimeoutId Time (TimerCompletionInfo s)
 
 -- | Internal state.
@@ -182,7 +184,7 @@ data SimState s a = SimState {
        runqueue         :: !RunQueue,
        -- | All threads other than the currently running thread: both running
        -- and blocked threads.
-       threads          :: !(Map ThreadId (Thread s a)),
+       threads          :: !(Map IOSimThreadId (Thread s a)),
        -- | current time
        curTime          :: !Time,
        -- | ordered list of timers and timeouts
@@ -374,14 +376,17 @@ schedule thread@Thread{
       (Right thread0@Thread { threadMasking = maskst' }, timers'') -> do
         -- We found a suitable exception handler, continue with that
         -- We record a step, in case there is no exception handler on replay.
-        let thread'  = stepThread thread0
-            control' = advanceControl (threadStepId thread0) control
-            races'   = updateRacesInSimState thread0 simstate
+        let (thread', eff)  = stepThread thread0
+            control'        = advanceControl (threadStepId thread0) control
+            races'          = updateRaces thread0 simstate
         trace <- schedule thread' simstate{ races = races',
                                             control = control',
                                             timers = timers'' }
         return (SimPORTrace time tid tstep tlbl (EventThrow e) $
-                SimPORTrace time tid tstep tlbl (EventMask maskst') trace)
+                SimPORTrace time tid tstep tlbl (EventMask maskst') $
+                SimPORTrace time tid tstep tlbl (EventEffect vClock eff) $
+                SimPORTrace time tid tstep tlbl (EventRaces races')
+                trace)
 
       (Left isMain, timers'')
         -- We unwound and did not find any suitable exception handler, so we
@@ -525,7 +530,7 @@ schedule thread@Thread{
       let expiry  = d `addTime` time
           timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
-      trace <- deschedule (Blocked BlockedOnOther) thread'
+      trace <- deschedule (Blocked BlockedOnDelay) thread'
                           simstate { timers   = timers',
                                      nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventThreadDelay nextTmid expiry) trace)
@@ -599,7 +604,7 @@ schedule thread@Thread{
           thread'' = Thread { threadId      = tid'
                             , threadControl = ThreadControl (runIOSim a)
                                                             ForkFrame
-                            , threadStatus  = ThreadRunning 
+                            , threadStatus  = ThreadRunning
                             , threadMasking = threadMasking thread
                             , threadThrowTo = []
                             , threadClockId = threadClockId thread
@@ -646,7 +651,7 @@ schedule thread@Thread{
           return $
             SimPORTrace time tid tstep tlbl (EventTxCommitted written' created' (Just effect')) $
             traceMany
-              [ (time, tid', tstep, tlbl', EventTxWakeup vids')
+              [ (time, tid', (-1), tlbl', EventTxWakeup vids')
               | tid' <- unblocked
               , let tlbl' = lookupThreadLabel tid' threads
               , let Just vids' = Set.toList <$> Map.lookup tid' wokeby ] $
@@ -759,10 +764,10 @@ schedule thread@Thread{
           let adjustTarget t =
                 t { threadThrowTo = (e, Labelled tid tlbl, vClock) : threadThrowTo t }
               threads'       = Map.adjust adjustTarget tid' threads
-          trace <- deschedule (Blocked BlockedOnOther) thread' simstate { threads = threads' }
+          trace <- deschedule (Blocked BlockedOnThrowTo) thread' simstate { threads = threads' }
           return $ SimPORTrace time tid tstep tlbl (EventThrowTo e tid')
                  $ SimPORTrace time tid tstep tlbl EventThrowToBlocked
-                 $ SimPORTrace time tid tstep tlbl (EventDeschedule (Blocked BlockedOnOther))
+                 $ SimPORTrace time tid tstep tlbl (EventDeschedule (Blocked BlockedOnThrowTo))
                  $ trace
         else do
           -- The target thread has async exceptions unmasked, or is masked but
@@ -807,19 +812,29 @@ threadInterruptible thread =
 
 deschedule :: Deschedule -> Thread s a -> SimState s a -> ST s (SimTrace a)
 
-deschedule Yield thread@Thread { threadId = tid }
-                 simstate@SimState{runqueue, threads, control} =
+deschedule Yield thread@Thread { threadId     = tid,
+                                 threadStep   = tstep,
+                                 threadLabel  = tlbl,
+                                 threadVClock = vClock }
+                 simstate@SimState{runqueue,
+                                   threads,
+                                   curTime  = time,
+                                   control } =
 
     -- We don't interrupt runnable threads anywhere else.
     -- We do it here by inserting the current thread into the runqueue in priority order.
 
-    let thread'   = stepThread thread
-        runqueue' = insertThread thread' runqueue
-        threads'  = Map.insert tid thread' threads
-        control'  = advanceControl (threadStepId thread) control in
+    let (thread', eff) = stepThread thread
+        runqueue'      = insertThread thread' runqueue
+        threads'       = Map.insert tid thread' threads
+        control'       = advanceControl (threadStepId thread) control
+        races'         = updateRaces thread simstate in
+
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) .
+    SimPORTrace time tid tstep tlbl (EventRaces races') <$>
     reschedule simstate { runqueue = runqueue',
                           threads  = threads',
-                          races    = updateRacesInSimState thread simstate,
+                          races    = races',
                           control  = control' }
 
 deschedule Interruptable thread@Thread {
@@ -834,79 +849,109 @@ deschedule Interruptable thread@Thread {
                          }
                         simstate@SimState{ curTime = time, threads } = do
 
-    -- We're unmasking, but there are pending blocked async exceptions.
-    -- So immediately raise the exception and unblock the blocked thread
-    -- if possible.
-    let thread' = thread { threadControl = ThreadControl (Throw e) ctl
+    let effect' = effect <> wakeupEffects unblocked
+        -- We're unmasking, but there are pending blocked async exceptions.
+        -- So immediately raise the exception and unblock the blocked thread
+        -- if possible.
+        thread' = thread { threadControl = ThreadControl (Throw e) ctl
                          , threadMasking = MaskedInterruptible
                          , threadThrowTo = etids
                          , threadVClock  = vClock `leastUpperBoundVClock` vClock'
+                         , threadEffect  = effect'
                          }
         (unblocked,
          simstate') = unblockThreads False vClock [l_labelled tid'] simstate
     -- the thread is stepped when we Yield
     !trace <- deschedule Yield thread' simstate'
-    return $ SimPORTrace time tid tstep tlbl (EventDeschedule Yield)
-           $ SimPORTrace time tid tstep tlbl (EventThrowToUnmasked tid')
+    return $ SimPORTrace time tid tstep tlbl (EventThrowToUnmasked tid')
+           $ SimPORTrace time tid tstep tlbl (EventEffect vClock effect')
            -- TODO: step
            $ traceMany [ (time, tid'', (-1), tlbl'', EventThrowToWakeup)
                        | tid'' <- unblocked
                        , let tlbl'' = lookupThreadLabel tid'' threads ]
+           $ SimPORTrace time tid tstep tlbl (EventDeschedule Yield)
              trace
 
-deschedule Interruptable thread@Thread{threadId = tid } simstate@SimState{ control } =
+deschedule Interruptable thread@Thread{threadId     = tid,
+                                       threadStep   = tstep,
+                                       threadLabel  = tlbl,
+                                       threadVClock = vClock}
+                         simstate@SimState{ control,
+                                            curTime = time } =
     -- Either masked or unmasked but no pending async exceptions.
     -- Either way, just carry on.
     -- Record a step, though, in case on replay there is an async exception.
-    let thread' = stepThread thread in
+    let (thread', eff) = stepThread thread
+        races' = updateRaces thread simstate in
+
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) .
+    SimPORTrace time tid tstep tlbl (EventRaces races') <$>
     schedule thread'
-             simstate{ races   = updateRacesInSimState thread simstate,
+             simstate{ races   = races',
                        control = advanceControl (threadStepId thread) control }
 
 deschedule (Blocked _blockedReason) thread@Thread { threadId      = tid
+                                                  , threadStep    = tstep
+                                                  , threadLabel   = tlbl
                                                   , threadThrowTo = _ : _
                                                   , threadMasking = maskst
-                                                  , threadEffect  = effect } simstate
+                                                  , threadEffect  = effect }
+                                    simstate@SimState{ curTime = time }
     | maskst /= MaskedUninterruptible =
     -- We're doing a blocking operation, which is an interrupt point even if
     -- we have async exceptions masked, and there are pending blocked async
     -- exceptions. So immediately raise the exception and unblock the blocked
     -- thread if possible.
-    deschedule Interruptable thread { threadMasking = Unmasked } simstate
+    SimPORTrace time tid tstep tlbl (EventDeschedule Interruptable) <$>
+      deschedule Interruptable thread { threadMasking = Unmasked } simstate
 
-deschedule (Blocked blockedReason) thread@Thread{ threadId = tid, threadEffect = effect } simstate@SimState{threads, control} =
-    let thread1 = thread { threadStatus = ThreadBlocked blockedReason }
-        thread'  = stepThread thread1
-        threads' = Map.insert (threadId thread') thread' threads in
+deschedule (Blocked blockedReason) thread@Thread{ threadId     = tid,
+                                                  threadStep   = tstep,
+                                                  threadLabel  = tlbl,
+                                                  threadVClock = vClock}
+                                   simstate@SimState{ threads,
+                                                      curTime = time,
+                                                      control } =
+    let thread1        = thread { threadStatus = ThreadBlocked blockedReason }
+        (thread', eff) = stepThread thread1
+        threads'       = Map.insert (threadId thread') thread' threads
+        races'         = updateRaces thread1 simstate in
+
+    SimPORTrace time tid tstep tlbl (EventEffect vClock eff) .
+    SimPORTrace time tid tstep tlbl (EventRaces races') <$>
     reschedule simstate { threads = threads',
-                          races   = updateRacesInSimState thread1 simstate,
+                          races   = races',
                           control = advanceControl (threadStepId thread1) control }
 
-deschedule Terminated thread@Thread { threadId = tid, threadVClock = vClock, threadEffect = effect }
+deschedule Terminated thread@Thread { threadId = tid, threadStep = tstep, threadLabel = tlbl,
+                                      threadVClock = vClock, threadEffect = effect }
                                simstate@SimState{ curTime = time, control } = do
     -- This thread is done. If there are other threads blocked in a
     -- ThrowTo targeted at this thread then we can wake them up now.
-    let thread1     = thread
-        thread'     = stepThread $ thread { threadStatus = ThreadDone }
-        wakeup      = map (\(_,tid',_) -> l_labelled tid') (reverse (threadThrowTo thread))
+    let wakeup         = map (\(_,tid',_) -> l_labelled tid') (reverse (threadThrowTo thread))
         (unblocked,
          simstate'@SimState{threads}) =
                       unblockThreads False vClock wakeup simstate
-        threads'    = Map.insert tid thread' threads
+        effect'        = effect <> wakeupEffects unblocked
+        (thread', eff) = stepThread $ thread { threadStatus = ThreadDone,
+                                               threadEffect = effect' }
+        threads'       = Map.insert tid thread' threads
+        races'         = threadTerminatesRaces tid $ updateRaces thread { threadEffect = effect' } simstate
     -- We must keep terminated threads in the state to preserve their vector clocks,
     -- which matters when other threads throwTo them.
-    !trace <- reschedule simstate' { races = threadTerminatesRaces tid $
-                                              updateRacesInSimState thread1 simstate,
-                                    control = advanceControl (threadStepId thread) control,
-                                    threads = threads' }
+    !trace <- reschedule simstate' { races   = races',
+                                     control = advanceControl (threadStepId thread) control,
+                                     threads = threads' }
     return $ traceMany
                -- TODO: step
                [ (time, tid', (-1), tlbl', EventThrowToWakeup)
                | tid' <- unblocked
                , let tlbl' = lookupThreadLabel tid' threads ]
-               trace
+          $ SimPORTrace time tid tstep tlbl (EventEffect vClock eff)
+          $ SimPORTrace time tid tstep tlbl (EventRaces races')
+            trace
 
-deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect }
+deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect' }
                  simstate@SimState{runqueue, threads} =
 
     -- Schedule control says we should run a different thread. Put
@@ -921,13 +966,18 @@ deschedule Sleep thread@Thread { threadId = tid , threadEffect = effect }
 reschedule :: SimState s a -> ST s (SimTrace a)
 
 -- If we are following a controlled schedule, just do that.
-reschedule simstate@SimState{ runqueue, threads,
-                              control=control@(ControlFollow ((tid,tstep):_) _),
-                              curTime=time
-                              } =
+reschedule simstate@SimState { runqueue, control = control@(ControlFollow ((tid,_):_) _) }
+                             | not (Down tid `PSQ.member` runqueue) =
+    return (Trace.Nil (InternalError ("assertion failure: " ++ ppIOSimThreadId tid ++ " not runnable")))
+
+reschedule simstate@SimState { threads, control = control@(ControlFollow ((tid,_):_) _) }
+                             | not (tid `Map.member` threads) =
+    return (Trace.Nil (InternalError ("assertion failure: " ++ ppIOSimThreadId tid ++ " not in threads")))
+
+reschedule simstate@SimState { runqueue, threads,
+                               control = control@(ControlFollow ((tid,tstep):_) _),
+                               curTime = time } =
     fmap (SimPORTrace time tid tstep Nothing (EventReschedule control)) $
-    assert (Down tid `PSQ.member` runqueue) $
-    assert (tid `Map.member` threads) $
     invariant Nothing simstate $
     let thread = threads Map.! tid in
     assert (threadId thread == tid) $
@@ -1021,15 +1071,15 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         TimeoutFired     -> error "MonadTimer(Sim): invariant violation"
         TimeoutCancelled -> return ()
     timeoutAction (TimerRegisterDelay var) = writeTVar var True
-    timeoutAction (TimerThreadDelay _ _)    = return ()
+    timeoutAction (TimerThreadDelay _ _)   = return ()
     timeoutAction (TimerTimeout _ _ _)     = return ()
 
 unblockThreads :: forall s a.
                   Bool -- ^ `True` if we are blocked on STM
                -> VectorClock
-               -> [ThreadId]
+               -> [IOSimThreadId]
                -> SimState s a
-               -> ([ThreadId], SimState s a)
+               -> ([IOSimThreadId], SimState s a)
 unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
@@ -1046,17 +1096,18 @@ unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
                      case Map.lookup tid threads of
                        Just   Thread { threadStatus = ThreadRunning }
                          -> [ ]
-                       Just t@Thread { threadStatus = ThreadBlocked BlockedOnOther }
+                       Just t@Thread { threadStatus = ThreadBlocked BlockedOnSTM }
+                         -> [t]
+                       Just t@Thread { threadStatus = ThreadBlocked _ }
                          | onlySTM
                          -> [ ]
                          | otherwise
                          -> [t]
-                       Just t@Thread { threadStatus = ThreadBlocked BlockedOnSTM }
-                         -> [t]
-                       _ -> [ ]
+                       Just   Thread { threadStatus = ThreadDone } -> [ ]
+                       Nothing -> [ ]
                  ]
 
-    unblockedIds :: [ThreadId]
+    unblockedIds :: [IOSimThreadId]
     !unblockedIds = map threadId unblocked
 
     -- and in which case we mark them as now running
@@ -1083,7 +1134,7 @@ unblockThreads !onlySTM vClock wakeup simstate@SimState {runqueue, threads} =
 -- receive a 'ThreadKilled' exception.
 --
 forkTimeoutInterruptThreads :: forall s a.
-                               [(ThreadId, TimeoutId, TMVar (IOSim s) ThreadId)]
+                               [(IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)]
                             -> SimState s a
                             -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState =
@@ -1103,13 +1154,13 @@ forkTimeoutInterruptThreads timeoutExpired simState =
   where
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, TMVar (IOSim s) ThreadId)] 
+    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)]
 
     (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
         fn :: SimState s a
-           -> (ThreadId, TimeoutId, TMVar (IOSim s) ThreadId)
-           -> (SimState s a, (Thread s a, TMVar (IOSim s) ThreadId))
+           -> (IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)
+           -> (SimState s a, (Thread s a, TMVar (IOSim s) IOSimThreadId))
         fn state@SimState { threads } (tid, tmid, lock) =
           let t = case tid `Map.lookup` threads of
                     Just t' -> t'
@@ -1141,7 +1192,7 @@ forkTimeoutInterruptThreads timeoutExpired simState =
                 , lock
                 )
               )
-       
+
 
 -- | Iterate through the control stack to find an enclosing exception handler
 -- of the right type, or unwind all the way to the top level for the thread.
@@ -1226,13 +1277,13 @@ removeMinimums = \psq ->
           | p == p' -> collectAll (k:ks) p (x:xs) psq'
         _           -> (reverse ks, p, reverse xs, psq)
 
-traceMany :: [(Time, ThreadId, Int, Maybe ThreadLabel, SimEventType)]
+traceMany :: [(Time, IOSimThreadId, Int, Maybe ThreadLabel, SimEventType)]
           -> SimTrace a -> SimTrace a
 traceMany []                                   trace = trace
 traceMany ((time, tid, tstep, tlbl, event):ts) trace =
     SimPORTrace time tid tstep tlbl event (traceMany ts trace)
 
-lookupThreadLabel :: ThreadId -> Map ThreadId (Thread s a) -> Maybe ThreadLabel
+lookupThreadLabel :: IOSimThreadId -> Map IOSimThreadId (Thread s a) -> Maybe ThreadLabel
 lookupThreadLabel tid threads = join (threadLabel <$> Map.lookup tid threads)
 
 
@@ -1247,10 +1298,10 @@ runSimTraceST mainAction = controlSimTraceST Nothing ControlDefault mainAction
 controlSimTraceST :: Maybe Int -> ScheduleControl -> IOSim s a -> ST s (SimTrace a)
 controlSimTraceST limit control mainAction =
   SimPORTrace (curTime initialState)
-           (threadId mainThread)
-           0
-           (threadLabel mainThread)
-           (EventSimStart control)
+              (threadId mainThread)
+              0
+              (threadLabel mainThread)
+              (EventSimStart control)
   <$> schedule mainThread initialState { control  = control,
                                          control0 = control,
                                          perStepTimeLimit = limit
@@ -1279,7 +1330,7 @@ controlSimTraceST limit control mainAction =
 
 execAtomically :: forall s a c.
                   Time
-               -> ThreadId
+               -> IOSimThreadId
                -> Maybe ThreadLabel
                -> TVarId
                -> StmA s a
@@ -1583,10 +1634,10 @@ leastUpperBoundTVarVClocks tvars =
 -- Blocking and unblocking on TVars
 --
 
-readTVarBlockedThreads :: TVar s a -> ST s [ThreadId]
+readTVarBlockedThreads :: TVar s a -> ST s [IOSimThreadId]
 readTVarBlockedThreads TVar{tvarBlocked} = fst <$> readSTRef tvarBlocked
 
-blockThreadOnTVar :: ThreadId -> TVar s a -> ST s ()
+blockThreadOnTVar :: IOSimThreadId -> TVar s a -> ST s ()
 blockThreadOnTVar tid TVar{tvarBlocked} = do
     (tids, tidsSet) <- readSTRef tvarBlocked
     when (tid `Set.notMember` tidsSet) $ do
@@ -1605,7 +1656,7 @@ unblockAllThreadsFromTVar TVar{tvarBlocked} = do
 -- the var writes that woke them.
 --
 threadsUnblockedByWrites :: [SomeTVar s]
-                         -> ST s ([ThreadId], Map ThreadId (Set (Labelled TVarId)))
+                         -> ST s ([IOSimThreadId], Map IOSimThreadId (Set (Labelled TVarId)))
 threadsUnblockedByWrites written = do
   tidss <- sequence
              [ (,) <$> labelledTVarId tvar <*> readTVarBlockedThreads tvar
@@ -1633,91 +1684,47 @@ ordNub = go Set.empty
 -- Steps
 --
 
-data Step = Step {
-    stepThreadId :: !ThreadId,
-    stepStep     :: !Int,
-    stepEffect   :: !Effect,
-    stepVClock   :: !VectorClock
-  }
-  deriving Show
-
--- steps race if they can be reordered with a possibly different outcome
+-- | Check if two steps can be reordered with a possibly different outcome.
+--
 racingSteps :: Step -- ^ an earlier step
             -> Step -- ^ a later step
             -> Bool
 racingSteps s s' =
-     stepThreadId s /= stepThreadId s'
+     -- is s executed by a racy thread
+     isRacyThreadId (stepThreadId s)
+     -- steps which belong to the same thread cannot race
+  && stepThreadId s /= stepThreadId s'
+     -- if s wakes up s' then s and s' cannot race
   && not (stepThreadId s' `elem` effectWakeup (stepEffect s))
-  && (stepEffect s `racingEffects` stepEffect s'
-   || throwsTo s s'
-   || throwsTo s' s)
+     -- s effects races with s' effects or either one throws to the other
+  && (  stepEffect s `racingEffects` stepEffect s'
+     || throwsTo s s'
+     || throwsTo s' s
+     )
   where throwsTo s1 s2 =
              stepThreadId s2 `elem` effectThrows (stepEffect s1)
+          -- `throwTo` races with any other effect
           && stepEffect s2 /= mempty
 
 currentStep :: Thread s a -> Step
-currentStep Thread { threadId     = tid,
-                     threadStep   = tstep,
-                     threadEffect = teffect,
-                     threadVClock = vClock
-                   } =
-  Step { stepThreadId = tid,
-         stepStep     = tstep,
-         stepEffect   = teffect,
-         stepVClock   = vClock
-       }
+currentStep Thread { threadId     = stepThreadId,
+                     threadStep   = stepStep,
+                     threadEffect = stepEffect,
+                     threadVClock = stepVClock
+                   } = Step {..}
 
-stepThread :: Thread s a -> Thread s a
+-- | Step a thread and return the previous `StepId` and its `Effect`.
+--
+stepThread :: Thread s a -> (Thread s a, Effect)
 stepThread thread@Thread { threadId     = tid,
                            threadStep   = tstep,
                            threadVClock = vClock } =
-  thread { threadStep   = tstep+1,
-           threadEffect = mempty,
-           threadVClock = insertVClock tid (tstep+1) vClock
-         }
-
--- As we run a simulation, we collect info about each previous step
-data StepInfo = StepInfo {
-    stepInfoStep       :: Step,
-    -- Control information when we reached this step
-    stepInfoControl    :: ScheduleControl,
-    -- threads that are still concurrent with this step
-    stepInfoConcurrent :: Set ThreadId,
-    -- steps following this one that did not happen after it
-    -- (in reverse order)
-    stepInfoNonDep     :: [Step],
-    -- later steps that race with this one
-    stepInfoRaces      :: [Step]
-  }
-  deriving Show
-
---
--- Races
---
-
-data Races = Races { -- These steps may still race with future steps
-                     activeRaces   :: ![StepInfo],
-                     -- These steps cannot be concurrent with future steps
-                     completeRaces :: ![StepInfo]
-                   }
-  deriving Show
-
-noRaces :: Races
-noRaces = Races [] []
-
-updateRacesInSimState :: Thread s a -> SimState s a -> Races
-updateRacesInSimState thread SimState{ control, threads, races } =
-    traceRaces $
-    updateRaces step
-                (isThreadBlocked thread)
-                control
-                (Map.keysSet (Map.filter (\t -> not (isThreadDone t)
-                                             && threadId t `Set.notMember`
-                                                effectForks (stepEffect step)
-                                         ) threads))
-                races
-  where
-    step = currentStep thread
+  ( thread { threadStep   = tstep+1,
+             threadEffect = mempty,
+             threadVClock = insertVClock tid (tstep+1) vClock
+           },
+    threadEffect thread
+  )
 
 -- | 'updateRaces' turns a current 'Step' into 'StepInfo', and updates all
 -- 'activeRaces'.
@@ -1726,88 +1733,123 @@ updateRacesInSimState thread SimState{ control, threads, races } =
 -- concurrent set. When this becomes empty, a step can be retired into
 -- the "complete" category, but only if there are some steps racing
 -- with it.
-updateRaces :: Step -> Bool -> ScheduleControl -> Set ThreadId -> Races -> Races
-updateRaces newStep@Step{ stepThreadId = tid, stepEffect = newEffect }
-            blocking
-            control
-            newConcurrent0
-            races@Races{ activeRaces } =
+updateRaces :: Thread s a -> SimState s a -> Races
+updateRaces thread@Thread { threadId = tid }
+            SimState{ control, threads, races = races@Races { activeRaces } } =
+    let 
+        newStep@Step{ stepEffect = newEffect } = currentStep thread
 
-  let justBlocking :: Bool
-      justBlocking = blocking && onlyReadEffect newEffect
+        concurrent0 = 
+          Map.keysSet (Map.filter (\t -> not (isThreadDone t)
+                                      && threadId t `Set.notMember`
+                                         effectForks (stepEffect newStep)
+                                  ) threads)
 
-      -- a new step cannot race with any threads that it just woke up
-      new :: [StepInfo]
-      !new | isNotRacyThreadId tid  = []  -- non-racy threads do not race
-           | Set.null newConcurrent = []  -- cannot race with anything
-           | justBlocking           = []  -- no need to defer a blocking transaction
-           | otherwise              =
-               [StepInfo { stepInfoStep       = newStep,
-                           stepInfoControl    = control,
-                           stepInfoConcurrent = newConcurrent,
-                           stepInfoNonDep     = [],
-                           stepInfoRaces      = []
-                         }]
-        where
-          newConcurrent :: Set ThreadId
-          newConcurrent = foldr Set.delete newConcurrent0 (effectWakeup newEffect)
+        -- A new step to add to the `activeRaces` list.
+        newStepInfo :: Maybe StepInfo
+        !newStepInfo | isNotRacyThreadId tid = Nothing
+                       -- non-racy threads do not race
 
-      activeRaces' :: [StepInfo]
-      !activeRaces' =
-        [ -- if this step depends on the previous step, or is not concurrent,
+                     | Set.null concurrent   = Nothing
+                       -- cannot race with nothing
+
+                     | isBlocking            = Nothing
+                     -- no need to defer a blocking transaction
+
+                     | otherwise =
+            Just $! StepInfo { stepInfoStep       = newStep,
+                               stepInfoControl    = control,
+                               stepInfoConcurrent = concurrent,
+                               stepInfoNonDep     = [],
+                               stepInfoRaces      = []
+                             }
+          where
+            concurrent :: Set IOSimThreadId
+            concurrent = concurrent0 Set.\\ effectWakeup newEffect
+
+            isBlocking :: Bool
+            isBlocking = isThreadBlocked thread && onlyReadEffect newEffect
+
+        -- Used to update each `StepInfo` in `activeRaces`.
+        updateStepInfo :: StepInfo -> StepInfo
+        updateStepInfo stepInfo@StepInfo { stepInfoStep       = step,
+                                           stepInfoConcurrent = concurrent,
+                                           stepInfoNonDep,
+                                           stepInfoRaces  } =
+          -- if this step depends on the previous step, or is not concurrent,
           -- then any threads that it wakes up become non-concurrent also.
-          let !lessConcurrent = foldr Set.delete concurrent (effectWakeup newEffect) in
-          if tid `elem` concurrent then
-            let theseStepsRace = isRacyThreadId tid && racingSteps step newStep
-                happensBefore  = step `happensBeforeStep` newStep
-                !nondep' | happensBefore = nondep
-                         | otherwise     = newStep : nondep
-                -- We will only record the first race with each thread---reversing
-                -- the first race makes the next race detectable. Thus we remove a
-                -- thread from the concurrent set after the first race.
-                concurrent' | happensBefore  = Set.delete tid lessConcurrent
-                            | theseStepsRace = Set.delete tid concurrent
-                            | otherwise      = concurrent
-                -- Here we record discovered races.
-                -- We only record a new race if we are following the default schedule,
-                -- to avoid finding the same race in different parts of the search space.
-                !stepRaces' | (control == ControlDefault ||
-                               control == ControlFollow [] []) &&
-                              theseStepsRace  = newStep : stepRaces
-                            | otherwise       = stepRaces
+          let !lessConcurrent = concurrent Set.\\ effectWakeup newEffect in
+
+          if tid `notElem` concurrent
+            then stepInfo { stepInfoConcurrent = lessConcurrent }
+
+            -- The core of IOSimPOR.  Detect if `newStep` is racing with any
+            -- previous steps and update each `StepInfo`.
+            else let theseStepsRace = step `racingSteps` newStep
+                     -- `step` happened before `newStep` (`newStep` happened after
+                     -- `step`)
+                     happensBefore   = step `happensBeforeStep` newStep
+                     -- `newStep` happens after any of the racing steps
+                     afterRacingStep = any (`happensBeforeStep` newStep) stepInfoRaces
+
+                     -- We will only record the first race with each thread.
+                     -- Reversing the first race makes the next race detectable.
+                     -- Thus we remove a thread from the concurrent set after the
+                     -- first race.
+                     !concurrent'
+                       | happensBefore   = Set.delete tid lessConcurrent
+                       | theseStepsRace  = Set.delete tid concurrent
+                       | afterRacingStep = Set.delete tid concurrent
+                       | otherwise       = concurrent
+
+                     !stepInfoNonDep'
+                       -- `newStep` happened after `step`
+                       | happensBefore =           stepInfoNonDep
+                       -- `newStep` did not happen after `step`
+                       | otherwise     = newStep : stepInfoNonDep
+
+                     -- Here we record discovered races.  We only record a new
+                     -- race if we are following the default schedule, to avoid
+                     -- finding the same race in different parts of the search
+                     -- space.
+                     !stepInfoRaces'
+                       | theseStepsRace && isDefaultSchedule control
+                                   = newStep : stepInfoRaces
+                       | otherwise =           stepInfoRaces
 
             in stepInfo { stepInfoConcurrent = effectForks newEffect
-                                             `Set.union` concurrent',
-                          stepInfoNonDep     = nondep',
-                          stepInfoRaces      = stepRaces'
+                                               `Set.union` concurrent',
+                          stepInfoNonDep     = stepInfoNonDep',
+                          stepInfoRaces      = stepInfoRaces'
                         }
 
-          else stepInfo { stepInfoConcurrent = lessConcurrent }
+        activeRaces' :: [StepInfo]
+        !activeRaces' =
+          case newStepInfo of
+            Nothing ->       updateStepInfo <$> activeRaces
+            Just si -> si : (updateStepInfo <$> activeRaces)
 
-        | !stepInfo@StepInfo { stepInfoStep       = step,
-                               stepInfoConcurrent = concurrent,
-                               stepInfoNonDep     = nondep,
-                               stepInfoRaces      = stepRaces
-                            }
-            <- activeRaces ]
-  in normalizeRaces $ races { activeRaces = new ++ activeRaces' }
+    in normalizeRaces races { activeRaces = activeRaces' }
+
+
+normalizeRaces :: Races -> Races
+normalizeRaces Races{ activeRaces, completeRaces } =
+  let !activeRaces'   =   filter (not . null . stepInfoConcurrent) activeRaces
+      !completeRaces' = ( filter (not . null . stepInfoRaces)
+                        . filter (null . stepInfoConcurrent)
+                        $ activeRaces
+                        )
+                     ++ completeRaces
+  in Races{ activeRaces = activeRaces', completeRaces = completeRaces' }
+
 
 -- When a thread terminates, we remove it from the concurrent thread
 -- sets of active races.
-
-threadTerminatesRaces :: ThreadId -> Races -> Races
+threadTerminatesRaces :: IOSimThreadId -> Races -> Races
 threadTerminatesRaces tid races@Races{ activeRaces } =
   let activeRaces' = [ s{stepInfoConcurrent = Set.delete tid stepInfoConcurrent}
                      | s@StepInfo{ stepInfoConcurrent } <- activeRaces ]
   in normalizeRaces $ races{ activeRaces = activeRaces' }
-
-normalizeRaces :: Races -> Races
-normalizeRaces Races{ activeRaces, completeRaces } =
-  let !activeRaces'   = filter (not . null. stepInfoConcurrent) activeRaces
-      !completeRaces' = filter (not . null. stepInfoRaces)
-                          (filter (null . stepInfoConcurrent) activeRaces)
-                     ++ completeRaces
-  in Races{ activeRaces = activeRaces', completeRaces = completeRaces' }
 
 -- We assume that steps do not race with later steps after a quiescent
 -- period. Quiescent periods end when simulated time advances, thus we
@@ -1821,11 +1863,6 @@ quiescentRaces Races{ activeRaces, completeRaces } =
                          | s <- activeRaces
                          , not (null (stepInfoRaces s))
                          ] ++ completeRaces }
-
-traceRaces :: Races -> Races
-traceRaces r = r
--- traceRaces r@Races{activeRaces,completeRaces} =
---   Debug.trace ("Tracking "++show (length (concatMap stepInfoRaces activeRaces)) ++" races") r
 
 
 --
@@ -1878,7 +1915,7 @@ advanceControl stepId control =
 -- Schedule modifications
 --
 
-stepStepId :: Step -> (ThreadId, Int)
+stepStepId :: Step -> (IOSimThreadId, Int)
 stepStepId Step{ stepThreadId = tid, stepStep = n } = (tid,n)
 
 stepInfoToScheduleMods :: StepInfo -> [ScheduleMod]
@@ -1954,4 +1991,4 @@ extendScheduleControl control m =
                         "Extending "++show control,
                         "     with "++show m,
                         "   yields "++show control']) -}
-              control'
+  control'

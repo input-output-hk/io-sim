@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -10,24 +11,24 @@
 module Test.Control.Monad.IOSimPOR (tests) where
 
 import           Data.Fixed (Micro)
-import           Data.Foldable (foldl')
+import           Data.Foldable (foldl', traverse_)
 import           Data.Functor (($>))
-import           Data.IORef
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.STRef.Lazy
 
 import           System.Exit
 import           System.IO.Error (ioeGetErrorString, isUserError)
-import           System.IO.Unsafe
 
 import           Control.Exception (ArithException (..), AsyncException)
 import           Control.Monad
 import           Control.Monad.Fix
-import           Control.Parallel
+import           Control.Monad.ST.Lazy (ST, runST)
 
-import           Control.Monad.Class.MonadFork
 import           Control.Concurrent.Class.MonadSTM
+import           Control.Monad.Class.MonadAsync
+import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow
@@ -47,13 +48,21 @@ import           Test.Control.Monad.STM
 import           Test.QuickCheck
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck
+import qualified Data.List.Trace as Trace
 
 tests :: TestTree
 tests =
-  testGroup "IO simulator POR"
-  [ testProperty "propSimulates"    propSimulates
-  , testProperty "propExploration"  propExploration
-  -- , testProperty "propPermutations" propPermutations
+  testGroup "IOSimPOR"
+  [ testGroup "schedule exploration"
+    [ testProperty "propSimulates"    propSimulates
+    , testProperty "propExploration"  propExploration
+    , testGroup "issue113"
+      [ testProperty "wakeup"         unit_issue113_wakeup
+      , testProperty "racy"           unit_issue113_racy
+      , testProperty "nonDep"         unit_issue113_nonDep
+      ]
+    -- , testProperty "propPermutations" propPermutations
+    ]
   , testGroup "IO simulator properties"
     [ testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
     , testGroup "timeouts"
@@ -256,39 +265,64 @@ sortTasks (x:y:xs) | x>y = [y:x:xs] ++ ((x:) <$> sortTasks (y:xs))
 sortTasks (x:xs)         = (x:) <$> sortTasks xs
 sortTasks []             = []
 
-interpret :: forall s. TVar (IOSim s) Int -> TVar (IOSim s) [ThreadId (IOSim s)] -> Task -> IOSim s (ThreadId (IOSim s))
-interpret r t (Task steps) = forkIO $ do
-    context <- atomically $ do
+data Compare = AreEqual | AreNotEqual
+  deriving Show
+
+instance Arbitrary Compare where
+  arbitrary = frequency [(8, pure AreEqual),
+                         (2, pure AreNotEqual)]
+
+  shrink AreEqual    = []
+  shrink AreNotEqual = [AreEqual]
+
+
+interpret :: forall s.
+             Compare
+          -> TVar (IOSim s) Int
+          -> TVar (IOSim s) [ThreadId (IOSim s)]
+          -> (Int, Task)
+          -> IOSim s (Async (IOSim s) ())
+interpret cmp r t (tlbl, Task steps) = async $ do
+    labelThisThread (show tlbl)
+    (ts, timer) <- atomically $ do
       ts <- readTVar t
-      when (null ts) retry
+      check (not (null ts))
       timer <- newTVar Nothing
       return (ts,timer)
-    mapM_ (interpretStep context) steps
-  where interpretStep _ (WhenSet m n) = atomically $ do
-          a <- readTVar r
-          when (a/=m) retry
-          writeTVar r n
-        interpretStep (ts,_) (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
-        interpretStep _      (Delay i)   = threadDelay (fromIntegral i)
-        interpretStep (_,timer) (Timeout tstep) = do
-          timerVal <- atomically $ readTVar timer
-          case (timerVal,tstep) of
-            (_,NewTimeout n)            -> do tout <- newTimeout (fromIntegral n)
-                                              atomically $ writeTVar timer (Just tout)
-            (Just tout,CancelTimeout)   -> cancelTimeout tout
-            (Just tout,AwaitTimeout)    -> atomically $ awaitTimeout tout >> return ()
-            (Nothing,_)                 -> return ()
+    mapM_ (interpretStep ts timer) steps
+  where
+    compareFn = case cmp of
+      AreEqual    -> (==)
+      AreNotEqual -> (/=)
+    interpretStep :: [ThreadId (IOSim s)]
+                  -> TVar (IOSim s) (Maybe (Timeout s))
+                  -> Step
+                  -> IOSim s ()
+    interpretStep _ _ (WhenSet m n) = atomically $ do
+      readTVar r >>= check . compareFn m
+      writeTVar r n
+    interpretStep ts _     (ThrowTo i) = throwTo (ts !! i) (ExitFailure 0)
+    interpretStep _  _     (Delay i)   = threadDelay (fromIntegral i)
+    interpretStep _  timer (Timeout tstep) = do
+      timerVal <- readTVarIO timer
+      case (timerVal,tstep) of
+        (_,NewTimeout n)          -> do tout <- newTimeout (fromIntegral n)
+                                        atomically $ writeTVar timer (Just tout)
+        (Just tout,CancelTimeout) -> cancelTimeout tout
+        (Just tout,AwaitTimeout)  -> atomically $ awaitTimeout tout >> return ()
+        (Nothing,_)               -> return ()
 
-runTasks :: [Task] -> IOSim s (Int,Int)
-runTasks tasks = do
+runTasks :: Compare -> [Task] -> IOSim s (Int,Int)
+runTasks cmp tasks = do
   let m = maximum [maxTaskValue t | Task t <- tasks]
-  r  <- atomically $ newTVar m
-  t  <- atomically $ newTVar []
+  r  <- newTVarIO m
+  traceTVarIO r (\_ a -> return (TraceString (show a)))
+  t  <- newTVarIO []
   exploreRaces
-  ts <- mapM (interpret r t) tasks
-  atomically $ writeTVar t ts
-  threadDelay 1000000000  -- allow the SUT threads to run
-  a  <- atomically $ readTVar r
+  ts <- mapM (interpret cmp r t) (zip [1..] tasks)
+  atomically $ writeTVar t (asyncThreadId <$> ts)
+  traverse_ wait ts -- allow the SUT threads to run
+  a  <- readTVarIO r
   return (m,a)
 
 maxTaskValue :: [Step] -> Int
@@ -296,83 +330,115 @@ maxTaskValue (WhenSet m _:_) = m
 maxTaskValue (_:t)           = maxTaskValue t
 maxTaskValue []              = 0
 
-propSimulates :: Tasks -> Property
-propSimulates (Tasks tasks) =
+propSimulates :: Compare -> Shrink2 Tasks -> Property
+propSimulates cmp (Shrink2 (Tasks tasks)) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
-    let Right (m,a) = runSim (runTasks tasks) in
-    m>=a
-
-propExploration :: Tasks -> Property
-propExploration (Tasks tasks) =
-  -- Debug.trace ("\nTasks:\n"++ show tasks) $
-  any (not . null . (\(Task steps)->steps)) tasks ==>
-    traceNoDuplicates $ \addTrace ->
-    --traceCounter $ \addTrace ->
-    exploreSimTrace id (runTasks tasks) $ \_ trace ->
-    --Debug.trace (("\nTrace:\n"++) . splitTrace . noExceptions $ show trace) $
-    addTrace trace $
-    counterexample (splitTrace . noExceptions $ show trace) $
+    let trace = runSimTrace (runTasks cmp tasks) in
     case traceResult False trace of
-      Right (m,a) -> property $ m>=a
-      Left e      -> counterexample (show e) False
+      Right (m,a) -> property (m >= a)
+      Left (FailureInternal msg)
+                  -> counterexample msg False
+      Left x      -> counterexample (ppTrace trace)
+                   $ counterexample (show x) True 
+
+-- NOTE: This property needs to be executed sequentially, otherwise it fails
+-- undeterministically, which `exploreSimTraceST` does.
+--
+propExploration :: Compare -> (Shrink2 Tasks) -> Property
+propExploration cmp (Shrink2 ts@(Tasks tasks)) =
+  any (not . null . (\(Task steps)->steps)) tasks ==>
+    runST $
+    -- traceNoDuplicates $ \addTrace->
+    exploreSimTraceST (\a -> a { explorationDebugLevel = 0 })
+                      (say (show ts) >> runTasks cmp tasks)
+                    $ \_ trace -> do
+    -- addTrace trace
+    -- TODO: for now @coot is leaving `Trace.ppTrace`, but once we change all
+    -- assertions into `FailureInternal`, we can use `ppTrace` instead
+    return $ counterexample (Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
+             case traceResult False trace of
+               Right (m,a) -> property (m >= a)
+               Left (FailureInternal msg)
+                           -> counterexample msg False
+               Left _      -> property True
+
+
+-- | This is a counterexample for a fix included in the commit: "io-sim-por:
+-- fixed counterexample in issue #113".  There was a missing wakeup effect when
+-- a thread terminates, for threads that were blocked on `throwTo`.
+--
+unit_issue113_wakeup :: Property
+unit_issue113_wakeup =
+    propExploration AreEqual (Shrink2 tasks)
+  where
+    tasks = Tasks [Task [ThrowTo 1, WhenSet 0 0],
+                   Task [Delay 1],
+                   Task [WhenSet 0 0],
+                   Task [WhenSet 1 0, ThrowTo 1]]
+
+
+-- | This test checks that we don't build a schedule which execute a racing
+-- step that depends on something that wasn't added to `stepInfoNonDep`.
+--
+unit_issue113_racy :: Property
+unit_issue113_racy =
+    propExploration AreNotEqual (Shrink2 tasks)
+  where
+    tasks = Tasks [Task [WhenSet 1 0,ThrowTo 1],
+                   Task [],
+                   Task [ThrowTo 1,WhenSet 0 0],
+                   Task [ThrowTo 1]]
+
+
+-- | This test checks that we don't build a schedule which execute a non
+-- dependent step that depends on something that wasn't added to
+-- `stepInfoNonDep`.
+--
+unit_issue113_nonDep :: Property
+unit_issue113_nonDep =
+    propExploration AreNotEqual (Shrink2 tasks)
+  where
+    tasks = Tasks [Task [WhenSet 0 0],
+                   Task [],
+                   Task [WhenSet 0 0],
+                   Task [ThrowTo 1,WhenSet 1 1],
+                   Task [ThrowTo 5],
+                   Task [ThrowTo 1]]
+
 
 -- Testing propPermutations n should collect every permutation of [1..n] once only.
 -- Test manually, and supply a small value of n.
 propPermutations :: Int -> Property
 propPermutations n =
+  runST $
   traceNoDuplicates $ \addTrace ->
-  exploreSimTrace (withScheduleBound 10000) (doit n) $ \_ trace ->
-    addTrace trace $
-    let Right result = traceResult False trace in
-    tabulate "Result" [noExceptions $ show $ result] $
-      True
+  exploreSimTraceST (withScheduleBound 10000) (doit n) $ \_ trace -> do
+    addTrace trace
+    let Right result = traceResult False trace
+    return $ tabulate "Result" [show $ result] $ True
 
 doit :: Int -> IOSim s [Int]
 doit n = do
-          r <- atomically $ newTVar []
-          exploreRaces
-          mapM_ (\i -> forkIO $ atomically $ modifyTVar r (++[i])) [1..n]
-          threadDelay 1
-          atomically $ readTVar r
+  r <- atomically $ newTVar []
+  exploreRaces
+  mapM_ (\i -> forkIO $ atomically $ modifyTVar r (++[i])) [1..n]
+  threadDelay 1
+  atomically $ readTVar r
 
-ordered :: Ord a => [a] -> Bool
-ordered xs = and (zipWith (<) xs (drop 1 xs))
 
-noExceptions :: [Char] -> [Char]
-noExceptions xs = unsafePerformIO $ try (evaluate xs) >>= \case
-  Right []     -> return []
-  Right (x:ys) -> return (x:noExceptions ys)
-  Left e       -> return ("\n"++show (e :: SomeException))
+traceNoDuplicates :: forall s a prop. (Show a, Testable prop)
+                  => ((a -> ST s ()) -> ST s prop)
+                  -> ST s Property
+traceNoDuplicates k = do
+  v <- newSTRef Map.empty :: ST s (STRef s (Map String Int))
+  prop <- k (\a -> modifySTRef v (Map.insertWith (+) (show a) 1))
+  m <- readSTRef v
+  return $ prop .&&. counterexample (show (Map.keys $ Map.filter (> 1) m)) (maximum m === 1)
 
-splitTrace :: [Char] -> [Char]
-splitTrace [] = []
-splitTrace (x:xs) | begins "(Trace" = "\n(" ++ splitTrace xs
-                  | otherwise       = x:splitTrace xs
-  where begins s = take (length s) (x:xs) == s
-
-traceCounter :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
-traceCounter k = r `pseq` (k addTrace .&&.
-                           tabulate "Trace repetitions" (map show $ traceCounts ()) True)
-  where
-    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
-    addTrace t x = unsafePerformIO $ do
-      atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
-      return x
-    traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
-
-traceNoDuplicates :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
-traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
-  where
-    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
-    addTrace t x = unsafePerformIO $ do
-      atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
-      return x
-    traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
 
 --
 -- IOSim reused properties
 --
-
 
 --
 -- Read/Write graph
@@ -380,16 +446,17 @@ traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
 
 prop_stm_graph_sim :: TestThreadGraph -> Property
 prop_stm_graph_sim g =
+  runST $
   traceNoDuplicates $ \addTrace ->
-    exploreSimTrace id (prop_stm_graph g) $ \_ trace ->
-      addTrace trace $
-      counterexample (splitTrace . noExceptions $ show trace) $
-      case traceResult False trace of
-        Right () -> property True
-        Left e   -> counterexample (show e) False
-      -- TODO: Note that we do not use runSimStrictShutdown here to check
-      -- that all other threads finished, but perhaps we should and structure
-      -- the graph tests so that's the case.
+    exploreSimTraceST id (prop_stm_graph g) $ \_ trace -> do
+      addTrace trace
+      return $ counterexample (Trace.ppTrace show show trace) $
+        case traceResult False trace of
+          Right () -> property True
+          Left e   -> counterexample (show e) False
+        -- TODO: Note that we do not use runSimStrictShutdown here to check
+        -- that all other threads finished, but perhaps we should and structure
+        -- the graph tests so that's the case.
 
 prop_timers_ST :: TestMicro -> Property
 prop_timers_ST (TestMicro xs) =

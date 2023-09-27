@@ -11,7 +11,7 @@ main = defaultMain tests
 
 tests :: TestTree
 tests =
-  testGroup "IO Sim"
+  testGroup "io-sim-tests"
   [ Test.Control.Concurrent.Class.MonadMVar.tests
   , Test.Control.Monad.IOSim.tests
   , Test.Control.Monad.IOSimPOR.tests

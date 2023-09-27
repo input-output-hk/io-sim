@@ -52,7 +52,7 @@ import           Test.Tasty.QuickCheck
 
 tests :: TestTree
 tests =
-  testGroup "IO simulator"
+  testGroup "IOSim"
   [ testProperty "read/write graph (IO)"    prop_stm_graph_io
   , testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
   , testGroup "timeouts"
