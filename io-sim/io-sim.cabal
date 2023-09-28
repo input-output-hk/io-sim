@@ -75,14 +75,14 @@ library
                        ScopedTypeVariables,
                        TypeFamilies
   build-depends:       base              >=4.9 && <4.19,
-                       io-classes       ^>=1.2,
+                       io-classes:{io-classes,strict-stm}
+                                        ^>=1.2,
                        exceptions        >=0.10,
                        containers,
                        deepseq,
                        nothunks,
                        psqueues          >=0.2 && <0.3,
-                       strict-stm       ^>=1.2,
-                       si-timers        ^>=1.2,
+                       io-classes:si-timers ^>=1.2,
                        time              >=1.9.1 && <1.13,
                        quiet,
                        QuickCheck,
@@ -105,11 +105,9 @@ test-suite test
   build-depends:       base,
                        array,
                        containers,
-                       io-classes,
+                       io-classes:{io-classes,strict-stm,si-timers},
                        io-sim,
                        QuickCheck,
-                       si-timers,
-                       strict-stm,
                        tasty,
                        tasty-quickcheck,
                        tasty-hunit,
@@ -127,7 +125,7 @@ benchmark bench
   build-depends:       base,
                        criterion,
 
-                       io-classes,
+                       io-classes:io-classes,
                        io-sim,
   ghc-options:         -Wall
                        -Wcompat

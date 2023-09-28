@@ -1,5 +1,22 @@
 # Revsion history of io-classes
 
+##
+
+### Breaking changes
+
+* `strict-stm`, `strict-mvar` and `si-timers` were moved to `io-classes` as
+  **public sublibraries**.  You can import then in `*.cabal` files with the
+  following syntax `io-classes:strict-stm` or `io-classes:{strict-stm,
+  si-timers}`.  See the _Multiple public libraries_ subsection of [_Internal
+  Libraries_][sublibs] section in the `cabal` documentation.
+
+  Note: some time in the future we will deprecate `Hackage` packages
+  `strict-stm`, `strict-mvar` and `si-timers`.  If one will want to use the
+  namespace for a non `io-classes` related packages please contact the
+  maintainer.
+
+[sublibs]: https://cabal.readthedocs.io/en/stable/cabal-package.html#sublibs
+
 ## 1.2.0.0
 
 ### Non-breaking changes

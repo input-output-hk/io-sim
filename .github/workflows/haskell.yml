@@ -13,8 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.8", "9.4.4", "9.6.2"]
-        cabal: ["3.8.1.0"]
+        ghc: ["8.10.7", "9.2.8", "9.4.7", "9.6.3"]
+        cabal: ["3.10.1.0"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     defaults:
@@ -116,7 +116,9 @@ jobs:
 
     - name: Build dependencies
       run: |
-        cabal build --only-dependencies all
+        cabal build --only-dependencies io-classes
+        cabal build --only-dependencies io-sim
+        cabal build --only-dependencies test-strict-mvar
 
     - name: Build projects [build]
       run: cabal build all
@@ -127,11 +129,11 @@ jobs:
     - name: io-sim [test]
       run: cabal run io-sim:test
 
-    - name: si-timers [test]
-      run: cabal run si-timers:test
+    - name: io-classes:si-timers [test]
+      run: cabal run io-classes:test-si-timers
 
-    - name: strict-mvar [test]
-      run: cabal run strict-mvar:test
+    - name: test-strict-mvar [test]
+      run: cabal run test-strict-mvar
 
 
   stylish-haskell:
@@ -154,8 +156,8 @@ jobs:
       uses: haskell/actions/setup@v2
       id: setup-haskell
       with:
-        ghc-version: 9.2.8
-        cabal-version: 3.8.1.0
+        ghc-version: 9.6.3
+        cabal-version: 3.10.1.0
 
     - name: "Setup cabal bin path"
       run: |
