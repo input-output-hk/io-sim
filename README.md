@@ -18,23 +18,23 @@
 * tracing committed changes to `TVar`, `TMVar`s, etc.
 * labeling of threads, `TVar`'s, etc.
 
-[`io-classes`] provides an interface, which allows writing code that can be run
-in both real `IO` and [`IOSim`].  It is a drop-in replacement for `IO`, and
-supports interfaces commonly known from `base`, `exceptions`, `stm`, `async`,
-or `time` packages.
+[`io-classes:io-classes`] provides an interface, which allows writing code that
+can be run in both real `IO` and [`IOSim`].  It is a drop-in replacement for
+`IO`, and supports interfaces commonly known from `base`, `exceptions`, `stm`,
+`async`, or `time` packages.
 
-One of the principles of `io-classes` was to stay as close to `IO` as possible,
-thus most of the `IO` instances are directly referring to `base` or `async`
-API.  However, we made some distinctions, which are reported below.
+One of the principles of `io-classes:io-classes` was to stay as close to `IO`
+as possible, thus most of the `IO` instances are directly referring to `base`
+or `async` API.  However, we made some distinctions, which are reported below.
 
-[`io-classes`] supports a novel hierarchy for error-handling monads as well as
-more familiar `exception` style.  The new hierarchy provides `bracket` and
-`finally` functions in the `MonadThrow` class, while `catch` style operators
-are provided by a super-class `MonadCatch`.  Both `bracket` and `finally` are
-the most common functions used to write code with robust exception handling,
-exposing them through the more basic `MonadThrow` class informs the reader
-/ reviewer that no tricky error handling is done in that section of the code
-base.
+[`io-classes:io-classes`] supports a novel hierarchy for error-handling monads
+as well as more familiar `exception` style.  The new hierarchy provides
+`bracket` and `finally` functions in the `MonadThrow` class, while `catch`
+style operators are provided by a super-class `MonadCatch`.  Both `bracket` and
+`finally` are the most common functions used to write code with robust
+exception handling, exposing them through the more basic `MonadThrow` class
+informs the reader / reviewer that no tricky error handling is done in that
+section of the code base.
 
 [`IOSim`] exposes a detailed trace, which can be enhanced by labeling threads, or
 mutable variables, tracing `Dynamic` values (which can be recovered from the
@@ -58,16 +58,18 @@ a complex, highly concurrent, distributed system
 * [`io-sim`]: provides two simulator interpreters: [`IOSim`] and
   `IOSimPOR` - an enhanced [`IOSim`] version with schedule discovery
   capabilities.
-* [`io-classes`]: class bases interface, which allows to to abstract over the
+* [`io-classes:io-classes`]: class bases interface, which allows to to abstract over the
     monad
-* [`strict-stm`]: strict STM operations
-* [`si-timers`]: non-standard timers API
+* [`io-classes:strict-stm`]: strict STM operations
+* [`io-classes:si-timers`]: non-standard timers API
 
 ### Issues
 
 New issues should be reported in [this][io-sim-issues] repository.
 
-[`io-classes`]: https://hackage.haskell.org/package/io-classes
+[`io-classes:io-classes`]: https://hackage.haskell.org/package/io-classes
+[`io-classes:strict-stm`]:  https://hackage.haskell.org/package/io-classes
+[`io-classes:si-timers`]:  https://hackage.haskell.org/package/io-classes
 [`io-sim`]: https://hackage.haskell.org/package/io-sim
 
 [contra-tracer]: https://hackage.haskell.org/package/contra-tracer

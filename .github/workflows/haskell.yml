@@ -85,7 +85,9 @@ jobs:
 
     - name: Build dependencies
       run: |
-        cabal build --only-dependencies all
+        cabal build --only-dependencies io-classes
+        cabal build --only-dependencies io-sim
+        cabal build --only-dependencies test-strict-mvar
 
     - uses: actions/cache/save@v4
       name: "Save cabal store"
@@ -103,8 +105,8 @@ jobs:
     - name: io-sim [test]
       run: cabal run io-sim:test
 
-    - name: si-timers [test]
-      run: cabal run si-timers:test
+    - name: io-classes:si-timers [test]
+      run: cabal run io-classes:test-si-timers
 
-    - name: strict-mvar [test]
-      run: cabal run strict-mvar:test
+    - name: test-strict-mvar [test]
+      run: cabal run test-strict-mvar
