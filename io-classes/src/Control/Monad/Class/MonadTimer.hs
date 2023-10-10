@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 
+-- | Provides classes to handle delays and timeouts.
 module Control.Monad.Class.MonadTimer
   ( MonadDelay (..)
   , MonadTimer (..)
@@ -18,13 +19,22 @@ import           Control.Monad.Trans (lift)
 
 import qualified System.Timeout as IO
 
+-- | A typeclass to delay current thread.
 class Monad m => MonadDelay m where
+
+  -- | Suspends the current thread for a given number of microseconds
+  -- (GHC only).
+  --
+  -- See `IO.threadDelay`.
   threadDelay :: Int -> m ()
 
+-- | A typeclass providing utilities for /timeouts/.
 class (MonadDelay m, MonadSTM m) => MonadTimer m where
 
+  -- | See `STM.registerDelay`.
   registerDelay :: Int -> m (TVar m Bool)
 
+  -- | See `IO.timeout`.
   timeout :: Int -> m a -> m (Maybe a)
 
 --
