@@ -1,6 +1,6 @@
 # Revsion history of io-classes
 
-##
+## 1.3.0.0
 
 ### Breaking changes
 

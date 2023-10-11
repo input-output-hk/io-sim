@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                io-classes
-version:             1.2.0.0
+version:             1.3.0.0
 synopsis:            Type classes for concurrency with STM, ST and timing
 description:
   IO Monad class hierarchy with extensions compatible with
@@ -177,7 +177,7 @@ library si-timers
                        time              >=1.9.1 && <1.13,
 
                        io-classes:io-classes
-                                        ^>=1.2
+                                        ^>=1.3
   if flag(asserts)
      ghc-options:      -fno-ignore-asserts
 
