@@ -21,9 +21,7 @@ allow-newer: strict-list:semigroupoids
 packages: ./io-sim
           ./io-classes
           ./io-classes-mtl
-          ./strict-mvar
-          ./strict-stm
-          ./si-timers
+          ./test-strict-mvar
 
 package io-sim
   flags: +asserts

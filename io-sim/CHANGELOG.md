@@ -1,6 +1,6 @@
 # Revsion history of io-sim
 
-## next
+## 1.3.0.0
 
 ### Breaking changes
 
@@ -9,7 +9,8 @@
 * Renamed `ThreadId` to `IOSimThreadId` to avoid a clash with `ThreadId`
   associated type family of `MonadFork`.  It makes it much simpler to paste
   failing `ScheduleControl` in `ghci` or tests.
-* `BlockedReason` was modified: `BlockedOnOther` was removed, in favour of `BlockedOnDelay` and `BlockOnThrowTo`.
+* `BlockedReason` was modified: `BlockedOnOther` was removed, in favour of
+  `BlockedOnDelay` and `BlockOnThrowTo`.
 * The `Failure` type (for example returned by `runSim`) now also contains
   a constructor for internal failures.  This improved error reporting when
   there's a bug in `IOSimPOR`.  Currently it's only used by some of the
