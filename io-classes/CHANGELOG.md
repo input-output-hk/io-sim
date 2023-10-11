@@ -9,6 +9,8 @@
   `io-sim`, since the underlying monad is `ST`. `IO` has no underlying monad, so
   the provided instance for `IO` defaults `inspectMVar` to `tryReadMVar`.
 
+* Add some Haddock documentation to `MonadDelay`
+
 ## 1.1.0.0
 
 ### Breaking changes
