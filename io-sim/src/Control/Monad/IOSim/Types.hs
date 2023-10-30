@@ -468,6 +468,10 @@ instance MonadSay (STMSim s) where
 
 instance MonadLabelledSTM (IOSim s) where
   labelTVar tvar label = STM $ \k -> LabelTVar label tvar (k ())
+  labelTVarIO tvar label = IOSim $ oneShot $ \k ->
+                                   LiftST ( lazyToStrictST $
+                                            writeSTRef (tvarLabel tvar) $! (Just label)
+                                          ) k
   labelTQueue  = labelTQueueDefault
   labelTBQueue = labelTBQueueDefault
 
@@ -552,6 +556,10 @@ instance MonadInspectSTM (IOSim s) where
 --
 instance MonadTraceSTM (IOSim s) where
   traceTVar _ tvar f = STM $ \k -> TraceTVar tvar f (k ())
+  traceTVarIO tvar f = IOSim $ oneShot $ \k ->
+                               LiftST ( lazyToStrictST $
+                                        writeSTRef (tvarTrace tvar) $! Just f
+                                      ) k
   traceTQueue  = traceTQueueDefault
   traceTBQueue = traceTBQueueDefault
 
