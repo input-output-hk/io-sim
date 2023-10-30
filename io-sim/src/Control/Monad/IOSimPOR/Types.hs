@@ -48,13 +48,14 @@ data Effect = Effect {
 
 ppEffect :: Effect -> String
 ppEffect Effect { effectReads, effectWrites, effectForks, effectThrows, effectWakeup } =
-  concat $ [ "Effect { " ]
-        ++ [ "reads = "  ++ show effectReads  ++ ", " | not (null effectReads)  ]
-        ++ [ "writes = " ++ show effectWrites ++ ", " | not (null effectWrites) ]
-        ++ [ "forks = "  ++ ppList ppIOSimThreadId (Set.toList effectForks)  ++ ", " | not (null effectForks)  ]
-        ++ [ "throws = " ++ ppList ppIOSimThreadId             effectThrows  ++ ", " | not (null effectThrows) ]
-        ++ [ "wakeup = " ++ ppList ppIOSimThreadId (Set.toList effectWakeup) ++ ", " | not (null effectWakeup) ]
-        ++ [ "}" ]
+  "Effect { " ++
+    concat (List.intersperse ", " $
+           [ "reads = "  ++ show effectReads  | not (null effectReads)  ]
+        ++ [ "writes = " ++ show effectWrites | not (null effectWrites) ]
+        ++ [ "forks = "  ++ ppList ppIOSimThreadId (Set.toList effectForks)  | not (null effectForks)  ]
+        ++ [ "throws = " ++ ppList ppIOSimThreadId             effectThrows  | not (null effectThrows) ]
+        ++ [ "wakeup = " ++ ppList ppIOSimThreadId (Set.toList effectWakeup) | not (null effectWakeup) ])
+        ++ " }"
 
 
 instance Semigroup Effect where

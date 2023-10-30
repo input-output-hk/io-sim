@@ -314,10 +314,11 @@ schedule thread@Thread{
         -- even if other threads are still running
         return $ SimPORTrace time tid tstep tlbl EventThreadFinished
                $ traceFinalRacesFound simstate
-               $ TraceMainReturn time x ( labelledThreads
-                                        . Map.filter (not . isThreadDone)
-                                        $ threads
-                                        )
+               $ TraceMainReturn time (Labelled tid tlbl) x
+                                      ( labelledThreads
+                                      . Map.filter (not . isThreadDone)
+                                      $ threads
+                                      )
 
       ForkFrame -> do
         -- this thread is done
@@ -397,7 +398,7 @@ schedule thread@Thread{
           return (SimPORTrace time tid tstep tlbl (EventThrow e) $
                   SimPORTrace time tid tstep tlbl (EventThreadUnhandled e) $
                   traceFinalRacesFound simstate { threads = Map.insert tid thread' threads } $
-                  TraceMainException time e (labelledThreads threads))
+                  TraceMainException time (Labelled tid tlbl) e (labelledThreads threads))
 
         | otherwise -> do
           -- An unhandled exception in any other thread terminates the thread

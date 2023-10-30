@@ -211,7 +211,7 @@ schedule !thread@Thread{
         -- the main thread is done, so we're done
         -- even if other threads are still running
         return $ SimTrace time tid tlbl EventThreadFinished
-               $ TraceMainReturn time x (labelledThreads threads)
+               $ TraceMainReturn time (Labelled tid tlbl) x (labelledThreads threads)
 
       ForkFrame -> do
         -- this thread is done
@@ -278,7 +278,7 @@ schedule !thread@Thread{
           -- An unhandled exception in the main thread terminates the program
           return (SimTrace time tid tlbl (EventThrow e) $
                   SimTrace time tid tlbl (EventThreadUnhandled e) $
-                  TraceMainException time e (labelledThreads threads))
+                  TraceMainException time (Labelled tid tlbl) e (labelledThreads threads))
 
         | otherwise -> do
           -- An unhandled exception in any other thread terminates the thread
