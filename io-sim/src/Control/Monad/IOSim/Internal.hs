@@ -460,6 +460,9 @@ schedule !thread@Thread{
       let !timers' = PSQ.delete tmid timers
           !thread' = thread { threadControl = ThreadControl k ctl }
       !written <- execAtomically' (runSTM $ writeTVar tvar TimeoutCancelled)
+      -- note: we are not running traceTVar on 'tvar', since its not exposed to
+      -- the user, and thus it cannot have an attached callback.
+      !_ <- traverse_ (\(SomeTVar tvar') -> commitTVar tvar') written
       (wakeup, wokeby) <- threadsUnblockedByWrites written
       mapM_ (\(SomeTVar var) -> unblockAllThreadsFromTVar var) written
       let (unblocked,
@@ -769,6 +772,10 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
         -- Reuse the STM functionality here to write all the timer TVars.
         -- Simplify to a special case that only reads and writes TVars.
         !written <- execAtomically' (runSTM $ mapM_ timeoutSTMAction fired)
+        !ds  <- traverse (\(SomeTVar tvar) -> do
+                            tr <- traceTVarST tvar False
+                            !_ <- commitTVar tvar
+                            return tr) written
         (wakeupSTM, wokeby) <- threadsUnblockedByWrites written
         !_ <- mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
@@ -794,6 +801,10 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
                   ++ [ ( time', ThreadId [-1], Just "register delay timer"
                        , EventRegisterDelayFired tmid)
                      | (tmid, TimerRegisterDelay _) <- zip tmids fired ]
+                  ++ [ (time', ThreadId [-1], Just "register delay timer", EventLog (toDyn a))
+                     | TraceValue { traceDynamic = Just a } <- ds ]
+                  ++ [ (time', ThreadId [-1], Just "register delay timer", EventSay a)
+                     | TraceValue { traceString = Just a } <- ds ]
                   ++ [ (time', tid', tlbl', EventTxWakeup vids)
                      | tid' <- wakeupSTM
                      , let tlbl' = lookupThreadLabel tid' threads
@@ -809,6 +820,7 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
                      | (tid, _, _) <- timeoutExpired ])
                     trace
   where
+    timeoutSTMAction :: TimerCompletionInfo s -> STM s ()
     timeoutSTMAction (Timer var) = do
       x <- readTVar var
       case x of
@@ -1244,7 +1256,6 @@ execAtomically' = go Map.empty
        -> ST s [SomeTVar s]
     go !written action = case action of
       ReturnStm () -> do
-        !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar) written
         return (Map.elems written)
       ReadTVar v k  -> do
         x <- execReadTVar v
@@ -1322,7 +1333,7 @@ readTVarUndos TVar{tvarUndo} = readSTRef tvarUndo
 traceTVarST :: TVar s a
             -> Bool -- true if it's a new 'TVar'
             -> ST s TraceValue
-traceTVarST TVar{tvarCurrent, tvarUndo, tvarTrace} new = do
+traceTVarST TVar{tvarId, tvarCurrent, tvarUndo, tvarTrace} new = do
     mf <- readSTRef tvarTrace
     case mf of
       Nothing -> return TraceValue { traceDynamic = (Nothing :: Maybe ())
@@ -1333,7 +1344,7 @@ traceTVarST TVar{tvarCurrent, tvarUndo, tvarTrace} new = do
         case (new, vs) of
           (True, _) -> f Nothing v
           (_, _:_)  -> f (Just $ last vs) v
-          _         -> error "traceTVarST: unexpected tvar state"
+          _         -> error ("traceTVarST: unexpected tvar state " ++ show tvarId)
 
 
 

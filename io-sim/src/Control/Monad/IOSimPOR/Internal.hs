@@ -1021,6 +1021,10 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         -- Reuse the STM functionality here to write all the timer TVars.
         -- Simplify to a special case that only reads and writes TVars.
         written <- execAtomically' (runSTM $ mapM_ timeoutAction fired)
+        !ds  <- traverse (\(SomeTVar tvar) -> do
+                            tr <- traceTVarST tvar False
+                            !_ <- commitTVar tvar
+                            return tr) written
         (wakeupSTM, wokeby) <- threadsUnblockedByWrites written
         mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
@@ -1046,6 +1050,10 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
                   ++ [ ( time', ThreadId [-1], -1, Just "register delay timer"
                        , EventRegisterDelayFired tmid)
                      | (tmid, TimerRegisterDelay _) <- zip tmids fired ]
+                  ++ [ (time', ThreadId [-1], -1, Just "register delay timer", EventLog (toDyn a))
+                     | TraceValue { traceDynamic = Just a } <- ds ]
+                  ++ [ (time', ThreadId [-1], -1, Just "register delay timer", EventSay a)
+                     | TraceValue { traceString = Just a } <- ds ]
                   ++ [ (time', tid', -1, tlbl', EventTxWakeup vids)
                      | tid' <- wakeupSTM
                      , let tlbl' = lookupThreadLabel tid' threads
