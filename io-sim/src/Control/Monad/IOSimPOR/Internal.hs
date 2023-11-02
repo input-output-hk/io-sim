@@ -1750,7 +1750,7 @@ updateRaces thread@Thread { threadId = tid }
         concurrent0 = 
           Map.keysSet (Map.filter (\t -> not (isThreadDone t)
                                       && threadId t `Set.notMember`
-                                         effectForks (stepEffect newStep)
+                                         effectForks newEffect
                                   ) threads)
 
         -- A new step to add to the `activeRaces` list.
@@ -1940,7 +1940,7 @@ stepInfoToScheduleMods
       { scheduleModTarget    = stepStepId step
       , scheduleModControl   = control
       , scheduleModInsertion = takeWhile (/=stepStepId step')
-                                         (map stepStepId (reverse nondep))
+                                         (stepStepId `map` reverse nondep)
                             ++ [stepStepId step']
                             -- It should be unnecessary to include the delayed
                             -- step in the insertion, since the default
