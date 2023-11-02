@@ -558,9 +558,9 @@ exploreSimTraceST optsf main k =
       traceWithRaces <- IOSimPOR.controlSimTraceST (explorationStepTimelimit opts) control main
       (readRaces, trace0) <- detachTraceRacesST traceWithRaces
       (readSleeperST, trace) <- compareTracesST passingTrace trace0
+      () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
       conjoinNoCatchST
         [ do sleeper <- readSleeperST
-             () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
              prop <- k passingTrace trace
              return $ counterexample ("Schedule control: " ++ show control)
                     $ counterexample
@@ -580,7 +580,6 @@ exploreSimTraceST optsf main k =
               -- node.
              races <- catMaybes
                   <$> (readRaces >>= traverse (cachedST cacheRef) . take limit)
-             () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
              let branching = length races
              -- tabulate "Races explored" (map show races) $
              tabulate "Branching factor" [bucket branching]
