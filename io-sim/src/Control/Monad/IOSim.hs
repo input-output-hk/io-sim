@@ -131,9 +131,9 @@ selectTraceEvents
 selectTraceEvents fn =
       bifoldr ( \ v _
                -> case v of
-                    MainException _ e _       -> throw (FailureException e)
+                    MainException _ _ e _     -> throw (FailureException e)
                     Deadlock      _   threads -> throw (FailureDeadlock threads)
-                    MainReturn    _ _ _       -> []
+                    MainReturn    _ _ _ _     -> []
                     Loop                      -> error "Impossible: selectTraceEvents _ TraceLoop{}"
                     InternalError msg         -> throw (FailureInternal msg)
               )
@@ -430,10 +430,10 @@ traceResult strict = unsafePerformIO . eval
     go (SimTrace _ _ _ _ t)             = eval t
     go (SimPORTrace _ _ _ _ _ t)        = eval t
     go (TraceRacesFound _ t)            = eval t
-    go (TraceMainReturn _ _ tids@(_:_))
+    go (TraceMainReturn _ _ _ tids@(_:_))
                                | strict = pure $ Left (FailureSloppyShutdown tids)
-    go (TraceMainReturn _ x _)          = pure $ Right x
-    go (TraceMainException _ e _)       = pure $ Left (FailureException e)
+    go (TraceMainReturn _ _ x _)        = pure $ Right x
+    go (TraceMainException _ _ e _)     = pure $ Left (FailureException e)
     go (TraceDeadlock   _   threads)    = pure $ Left (FailureDeadlock threads)
     go TraceLoop{}                      = error "Impossible: traceResult TraceLoop{}"
     go (TraceInternalError msg)         = pure $ Left (FailureInternal msg)
@@ -558,9 +558,9 @@ exploreSimTraceST optsf main k =
       traceWithRaces <- IOSimPOR.controlSimTraceST (explorationStepTimelimit opts) control main
       (readRaces, trace0) <- detachTraceRacesST traceWithRaces
       (readSleeperST, trace) <- compareTracesST passingTrace trace0
+      () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
       conjoinNoCatchST
         [ do sleeper <- readSleeperST
-             () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
              prop <- k passingTrace trace
              return $ counterexample ("Schedule control: " ++ show control)
                     $ counterexample
@@ -580,7 +580,6 @@ exploreSimTraceST optsf main k =
               -- node.
              races <- catMaybes
                   <$> (readRaces >>= traverse (cachedST cacheRef) . take limit)
-             () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
              let branching = length races
              -- tabulate "Races explored" (map show races) $
              tabulate "Branching factor" [bucket branching]

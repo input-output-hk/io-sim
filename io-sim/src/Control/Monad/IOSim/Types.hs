@@ -133,6 +133,7 @@ import           Control.Monad.IOSimPOR.Types
 
 
 import qualified System.IO.Error as IO.Error (userError)
+import Data.List (intercalate)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
 newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }
@@ -468,6 +469,10 @@ instance MonadSay (STMSim s) where
 
 instance MonadLabelledSTM (IOSim s) where
   labelTVar tvar label = STM $ \k -> LabelTVar label tvar (k ())
+  labelTVarIO tvar label = IOSim $ oneShot $ \k ->
+                                   LiftST ( lazyToStrictST $
+                                            writeSTRef (tvarLabel tvar) $! (Just label)
+                                          ) k
   labelTQueue  = labelTQueueDefault
   labelTBQueue = labelTBQueueDefault
 
@@ -552,6 +557,10 @@ instance MonadInspectSTM (IOSim s) where
 --
 instance MonadTraceSTM (IOSim s) where
   traceTVar _ tvar f = STM $ \k -> TraceTVar tvar f (k ())
+  traceTVarIO tvar f = IOSim $ oneShot $ \k ->
+                               LiftST ( lazyToStrictST $
+                                        writeSTRef (tvarTrace tvar) $! Just f
+                                      ) k
   traceTQueue  = traceTQueueDefault
   traceTBQueue = traceTBQueueDefault
 
@@ -799,9 +808,9 @@ ppSimEvent _ _ _ (SimRacesFound controls) =
 
 -- | A result type of a simulation.
 data SimResult a
-    = MainReturn    !Time a             ![Labelled IOSimThreadId]
+    = MainReturn    !Time !(Labelled IOSimThreadId) a ![Labelled IOSimThreadId]
     -- ^ Return value of the main thread.
-    | MainException !Time SomeException ![Labelled IOSimThreadId]
+    | MainException !Time !(Labelled IOSimThreadId) SomeException ![Labelled IOSimThreadId]
     -- ^ Exception thrown by the main thread.
     | Deadlock      !Time               ![Labelled IOSimThreadId]
     -- ^ Deadlock discovered in the simulation.  Deadlocks are discovered if
@@ -813,6 +822,47 @@ data SimResult a
     | InternalError String
     deriving (Show, Functor)
 
+ppSimResult :: Show a
+            => Int
+            -> Int
+            -> Int
+            -> SimResult a
+            -> String
+ppSimResult timeWidth tidWidth thLabelWidth r = case r of
+    MainReturn (Time time) tid a tids ->
+      printf "%-*s - %-*s %-*s - %s %s"
+             timeWidth
+             (show time)
+             tidWidth
+             (ppIOSimThreadId (l_labelled tid))
+             thLabelWidth
+             (fromMaybe "" $ l_label tid)
+             ("MainReturn " ++ show a)
+             ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
+    MainException (Time time) tid e tids ->
+      printf "%-*s - %-*s %-*s - %s %s"
+             timeWidth
+             (show time)
+             tidWidth
+             (ppIOSimThreadId (l_labelled tid))
+             thLabelWidth
+             (fromMaybe "" $ l_label tid)
+             ("MainException " ++ show e)
+             ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
+    Deadlock (Time time) tids ->
+      printf "%-*s - %-*s %-*s - %s %s"
+             timeWidth
+             (show time)
+             tidWidth
+             ""
+             thLabelWidth
+             "" 
+             "Deadlock"
+             ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
+    Loop -> "<<io-sim-por: step execution exceded explorationStepTimelimit>>"
+    InternalError e -> "<<io-sim internal error: " ++ show e ++ ">>"
+
+
 -- | A type alias for 'IOSim' simulation trace.  It comes with useful pattern
 -- synonyms.
 --
@@ -822,21 +872,21 @@ type SimTrace a = Trace.Trace (SimResult a) SimEvent
 --
 ppTrace :: Show a => SimTrace a -> String
 ppTrace tr = Trace.ppTrace
-               show
-               (ppSimEvent timeWidth tidWith labelWidth)
+               (ppSimResult timeWidth tidWidth labelWidth)
+               (ppSimEvent timeWidth tidWidth labelWidth)
                tr
   where
-    (Max timeWidth, Max tidWith, Max labelWidth) =
+    (Max timeWidth, Max tidWidth, Max labelWidth) =
         bimaximum
       . bimap (const (Max 0, Max 0, Max 0))
               (\a -> case a of
-                SimEvent {seTime, seThreadId, seThreadLabel} ->
-                  ( Max (length (show seTime))
+                SimEvent {seTime = Time time, seThreadId, seThreadLabel} ->
+                  ( Max (length (show time))
                   , Max (length (show (seThreadId)))
                   , Max (length seThreadLabel)
                   )
-                SimPOREvent {seTime, seThreadId, seThreadLabel} ->
-                  ( Max (length (show seTime))
+                SimPOREvent {seTime = Time time, seThreadId, seThreadLabel} ->
+                  ( Max (length (show time))
                   , Max (length (show (seThreadId)))
                   , Max (length seThreadLabel)
                   )
@@ -851,10 +901,10 @@ ppTrace tr = Trace.ppTrace
 ppTrace_ :: SimTrace a -> String
 ppTrace_ tr = Trace.ppTrace
                 (const "")
-                (ppSimEvent timeWidth tidWith labelWidth)
+                (ppSimEvent timeWidth tidWidth labelWidth)
                 tr
   where
-    (Max timeWidth, Max tidWith, Max labelWidth) =
+    (Max timeWidth, Max tidWidth, Max labelWidth) =
         bimaximum
       . bimap (const (Max 0, Max 0, Max 0))
               (\a -> case a of
@@ -902,13 +952,13 @@ pattern TraceRacesFound controls trace =
     Trace.Cons (SimRacesFound controls)
                trace
 
-pattern TraceMainReturn :: Time -> a -> [Labelled IOSimThreadId]
+pattern TraceMainReturn :: Time -> Labelled IOSimThreadId -> a -> [Labelled IOSimThreadId]
                         -> SimTrace a
-pattern TraceMainReturn time a threads = Trace.Nil (MainReturn time a threads)
+pattern TraceMainReturn time tid a threads = Trace.Nil (MainReturn time tid a threads)
 
-pattern TraceMainException :: Time -> SomeException -> [Labelled IOSimThreadId]
+pattern TraceMainException :: Time -> Labelled IOSimThreadId -> SomeException -> [Labelled IOSimThreadId]
                            -> SimTrace a
-pattern TraceMainException time err threads = Trace.Nil (MainException time err threads)
+pattern TraceMainException time tid err threads = Trace.Nil (MainException time tid err threads)
 
 pattern TraceDeadlock :: Time -> [Labelled IOSimThreadId]
                       -> SimTrace a
@@ -1124,7 +1174,7 @@ ppSimEventType = \case
     concat [ "Effect ",
              ppVectorClock clock, " ",
              ppEffect eff ]
-  EventRaces a -> "Races " ++ show a
+  EventRaces a -> show a
 
 -- | A labelled value.
 --
