@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+* `MainReturn`, `MainException` and the pattern synonyms `TraceMainReturn`,
+  `TraceMainException` changed their signature.  They will now also show the main thread id.
+
 #### Breaking changes
 
 * Renamed `ThreadId` to `IOSimThreadId` to avoid a clash with `ThreadId`
@@ -14,6 +17,7 @@
   a constructor for internal failures.  This improved error reporting when
   there's a bug in `IOSimPOR`.  Currently it's only used by some of the
   assertions in `IOSimPOR`.
+* added pretty printer for `SimResult`, and other pretty printer improvements.
 
 #### Non breaking changes
 
@@ -29,6 +33,10 @@
   {1,2}.2`, a non racy step is printed as `Thread [1,2].2`.
 * Fixed trace of calls to the `deschedule` function.
 * Exposed `Timeout` type as part of the `newTimeout` API.
+* When `explorationDebugLevel` is set, avoid printing the same trace twice.
+* Reimplemented `labelTVarIO` and `traceTVarIO` in `ST` monad, which simplifies
+  trace of these calls.
+* Fixed `traceTVar` for `TVar`'s created with `registerDelay`.
 
 ## 1.2.0.0
 
