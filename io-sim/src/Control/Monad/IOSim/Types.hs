@@ -49,6 +49,7 @@ module Control.Monad.IOSim.Types
   , ppSimEventType
   , SimEvent (..)
   , SimResult (..)
+  , ppSimResult
   , SimTrace
   , Trace.Trace (SimTrace, SimPORTrace, TraceMainReturn, TraceMainException, TraceDeadlock, TraceRacesFound, TraceLoop, TraceInternalError)
   , ppTrace

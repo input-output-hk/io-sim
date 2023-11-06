@@ -639,9 +639,9 @@ exploreSimTraceST optsf main k =
 traceDebugLog :: Int -> SimTrace a -> ST s ()
 traceDebugLog logLevel _trace | logLevel <= 0 = pure ()
 traceDebugLog 1 trace = Debug.traceM $ "Simulation trace with discovered schedules:\n"
-                                    ++ Trace.ppTrace show (ppSimEvent 0 0 0) (ignoreRaces $ void `first` trace)
+                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (ignoreRaces $ void `first` trace)
 traceDebugLog _ trace = Debug.traceM $ "Simulation trace with discovered schedules:\n"
-                                    ++ Trace.ppTrace show (ppSimEvent 0 0 0) (void `first` trace)
+                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (void `first` trace)
 
 
 -- | Run a simulation using a given schedule.  This is useful to reproduce
