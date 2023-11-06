@@ -15,6 +15,7 @@ A pure simulator monad built on top of the lazy `ST` monad which supports:
   * inspection of `STM` mutable data structures;
   * deadlock detection;
   * `MonadFix` instances for both `IOSim` and its corresponding `STM` monad.
+  * partial order reduction (see [IOSimPOR]).
 
 `io-sim` together with [`io-classes`] is a drop-in replacement for the `IO`
 monad (with some ramifications).  It was designed to write easily testable
@@ -42,3 +43,4 @@ specification.
 
 [`io-classes`]: https://hackage.haskell.org/package/io-classes
 [`si-timers`]: https://hackage.haskell.org/package/si-timers
+[IOSimPOR]: https://github.com/input-output-hk/io-sim/tree/main/io-sim/how-to-use-IOSimPOR.md
