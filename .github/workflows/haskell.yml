@@ -13,8 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.8", "9.4.4", "9.6.2"]
-        cabal: ["3.8.1.0"]
+        ghc: ["8.10", "9.2", "9.4", "9.6", "9.8"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     defaults:
@@ -41,12 +40,12 @@ jobs:
       run: echo "CACHE_VERSION=pu4Aevoo_v1" >> $GITHUB_ENV
 
     - name: "LINUX: Setup Haskell"
-      uses: haskell/actions/setup@v2
+      uses: haskell-actions/setup@v2
       if: runner.os != 'Windows'
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
-        cabal-version: ${{ matrix.cabal }}
+        cabal-version: "3.10.1.0"
 
     - name: "WIN: Setup Haskell"
       id: win-setup-haskell
@@ -151,11 +150,11 @@ jobs:
         sudo apt-get -y install fd-find
 
     - name: "Setup Haskell"
-      uses: haskell/actions/setup@v2
+      uses: haskell-actions/setup@v2
       id: setup-haskell
       with:
-        ghc-version: 9.2.8
-        cabal-version: 3.8.1.0
+        ghc-version: 9.6.3
+        cabal-version: 3.10.1.0
 
     - name: "Setup cabal bin path"
       run: |

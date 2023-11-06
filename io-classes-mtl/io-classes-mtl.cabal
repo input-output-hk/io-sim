@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               io-classes-mtl
-version:            0.1.0.1
+version:            0.1.0.2
 synopsis:           Experimental MTL instances for io-classes
 description:
     MTL instances for
@@ -15,7 +15,7 @@ category:           Control
 build-type:         Simple
 extra-doc-files:    README.md CHANGELOG.md
 bug-reports:        https://github.com/input-output-hk/io-sim/issues
-tested-with:        GHC == { 8.10, 9.2, 9.4, 9.6 }
+tested-with:        GHC == { 8.10, 9.2, 9.4, 9.6, 9.8 }
 
 common warnings
     ghc-options: -Wall
@@ -40,11 +40,11 @@ library
                    ,  Control.Monad.Class.MonadTime.SI.Trans
                    ,  Control.Monad.Class.MonadTimer.Trans
                    ,  Control.Monad.Class.MonadTimer.SI.Trans
-    build-depends:    base >=4.9 && <4.19,
+    build-depends:    base >=4.9 && <4.20,
                       array,
                       mtl,
 
-                      io-classes  >= 1.0 && < 1.3,
+                      io-classes  >= 1.0 && < 1.4,
                       si-timers,
 
 

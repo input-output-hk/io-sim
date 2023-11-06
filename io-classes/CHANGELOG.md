@@ -1,5 +1,16 @@
 # Revsion history of io-classes
 
+## next release
+
+### Breaking changes
+
+### Non-breaking changes
+
+## 1.3.0.0
+
+- `io-sim-1.3.0.0`.
+* Support `ghc-9.8`.
+
 ## 1.2.0.0
 
 ### Non-breaking changes
@@ -8,7 +19,6 @@
   an `MVar` in an underlying monad (if applicable). This is mainly useful for
   `io-sim`, since the underlying monad is `ST`. `IO` has no underlying monad, so
   the provided instance for `IO` defaults `inspectMVar` to `tryReadMVar`.
-
 * Add some Haddock documentation to `MonadDelay`
 
 ## 1.1.0.0

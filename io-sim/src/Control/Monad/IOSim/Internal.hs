@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns              #-}
+{-# LANGUAGE CPP                       #-}
 {-# LANGUAGE DerivingVia               #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances         #-}
@@ -12,6 +13,10 @@
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
 -- and 'reschedule'.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+#if __GLASGOW_HASKELL__ >= 908
+-- We use partial functions from `Data.List`.
+{-# OPTIONS_GHC -Wno-x-partial #-}
+#endif
 
 module Control.Monad.IOSim.Internal
   ( IOSim (..)
