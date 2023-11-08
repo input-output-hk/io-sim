@@ -111,12 +111,6 @@ jobs:
       run: |
         echo "$HOME/.cabal/bin" >> $GITHUB_PATH
 
-    - uses: actions/cache@v3
-      name: "Cache cabal store"
-      with:
-        path: ${{ steps.setup-haskell.outputs.cabal-store }}
-        key: cache-dependencies-${{ env.CACHE_VERSION }}
-
     - name: Download stylish-haskell
       run: |
         version="${{ env.STYLISH_HASKELL_VERSION }}"
