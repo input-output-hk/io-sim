@@ -1,6 +1,12 @@
 # Revsion history of io-sim
 
-## next
+## next release
+
+### Breaking changes
+
+### Non-breaking changes
+
+## 1.3.0.0
 
 ### Breaking changes
 
@@ -15,7 +21,7 @@
   there's a bug in `IOSimPOR`.  Currently it's only used by some of the
   assertions in `IOSimPOR`.
 
-#### Non breaking changes
+#### Non-breaking changes
 
 * Refactored the internal API to avoid `unsafePerformIO`.
 * Fixed bugs which lead to discovery of schedules which are impossible to run.
@@ -34,6 +40,7 @@
   trace of these calls.
 * Fixed `traceTVar` for `TVar`'s created with `registerDelay`.
 * Added pretty printer for `SimResult`, and other pretty printer improvements.
+* Support `ghc-9.8`.
 
 ## 1.2.0.0
 
@@ -46,20 +53,20 @@
   - `selectTraceEventsSayWithTime`
   - `selectTraceEventsSayWithTime'`
 
-### Non breaking changes
+### Non-breaking changes
 
 * Provide `MonadInspectMVar` instance for `IOSim`.
 - Added NFData & NoThunks instances for `ThreadId`
 
 ## 1.1.0.0
 
-### Non breaking changes
+### Non-breaking changes
 
 * `io-classes-1.1.0.0`
 
 ## 1.0.0.1
 
-### Non breaking changes
+### Non-breaking changes
 
 * Support `ghc-9.6`.
 
@@ -76,7 +83,7 @@
 
 * Added `TimeoutId` to `EventThreadDelay` and `EventThreadFired` events.
 
-### Non breaking changes
+### Non-breaking changes
 
 * Fixed `threadDelay` in presence of asynchronous exceptions (in `IOSim` and `IOSimPOR`) (#80).
 * Fixed bug in `IOSim` & `IOSimPOR` which resulted in reusing existing

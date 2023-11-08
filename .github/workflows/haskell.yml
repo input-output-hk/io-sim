@@ -13,73 +13,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.8", "9.4.4", "9.6.2"]
-        cabal: ["3.8.1.0"]
+        ghc: ["8.10", "9.2", "9.4", "9.6", "9.8"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     defaults:
       run:
-        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
+        shell: 'bash'
 
     steps:
-    - name: "WIN: Setup MSYS2 and libraries"
-      if: runner.os == 'Windows'
-      uses: msys2/setup-msys2@v2
-      with:
-        update: true
-        install: >-
-          base-devel
-          autoconf-wrapper
-          autoconf
-          automake
-          libtool
-          make
-          git
-          mingw-w64-x86_64-jq
-
     - name: Set cache version
       run: echo "CACHE_VERSION=pu4Aevoo_v1" >> $GITHUB_ENV
 
-    - name: "LINUX: Setup Haskell"
-      uses: haskell/actions/setup@v2
-      if: runner.os != 'Windows'
+    - name: "Setup Haskell"
+      uses: haskell-actions/setup@v2
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
-        cabal-version: ${{ matrix.cabal }}
-
-    - name: "WIN: Setup Haskell"
-      id: win-setup-haskell
-      if: runner.os == 'Windows'
-      run: |
-        # see https://gitlab.haskell.org/haskell/ghcup-hs/-/blob/master/scripts/bootstrap/bootstrap-haskell
-        curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | \
-          BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
-          BOOTSTRAP_HASKELL_ADJUST_CABAL_CONFIG=1 \
-          BOOTSTRAP_HASKELL_ADJUST_BASHRC=1 \
-          BOOTSTRAP_HASKELL_GHC_VERSION="${{ matrix.ghc }}" \
-          BOOTSTRAP_HASKELL_CABAL_VERSION="${{ matrix.cabal }}" \
-          sh
-
-        # MSYS2 doesn't inherit $GITHUB_PATH so this is needed
-        cat <(echo "source /c/ghcup/env") ~/.bashrc > ~/.bashrc.new
-        mv ~/.bashrc.new ~/.bashrc
-
-        source ~/.bashrc
-
-        # There is an issue with crt libraries, fixed by prepending the ghc
-        # mingw32 libraries directory to every other library directory.
-        echo "# Original cabal config extra-lib-dirs"
-        grep extra-lib-dirs /c/cabal/config
-
-        sed -i 's/C:\\msys64\\mingw64\\lib/C:\\ghcup\\ghc\\${{matrix.ghc}}\\mingw\\x86_64-w64-mingw32\\lib, C:\\msys64\\mingw64\\lib/g' /c/cabal/config
-
-        echo "# Modified cabal config extra-lib-dirs"
-        grep extra-lib-dirs /c/cabal/config
-
-        ghc --version
-        cabal --version
-        echo "cabal-store=$(dirname $(cabal --help | tail -1 | tr -d ' '))\\store" >> $GITHUB_OUTPUT
+        cabal-version: "3.10.1.0"
 
     - uses: actions/checkout@v3
 
@@ -151,11 +101,11 @@ jobs:
         sudo apt-get -y install fd-find
 
     - name: "Setup Haskell"
-      uses: haskell/actions/setup@v2
+      uses: haskell-actions/setup@v2
       id: setup-haskell
       with:
-        ghc-version: 9.2.8
-        cabal-version: 3.8.1.0
+        ghc-version: 9.6.3
+        cabal-version: 3.10.1.0
 
     - name: "Setup cabal bin path"
       run: |
