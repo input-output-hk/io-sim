@@ -458,6 +458,8 @@ instance MonadFork (IOSim s) where
   forkIO task        = IOSim $ oneShot $ \k -> Fork task k
   forkOn _ task      = IOSim $ oneShot $ \k -> Fork task k
   forkIOWithUnmask f = forkIO (f unblock)
+  forkFinally task k = mask $ \restore ->
+                       forkIO $ try (restore task) >>= k
   throwTo tid e      = IOSim $ oneShot $ \k -> ThrowTo (toException e) tid (k ())
   yield              = IOSim $ oneShot $ \k -> YieldSim (k ())
 

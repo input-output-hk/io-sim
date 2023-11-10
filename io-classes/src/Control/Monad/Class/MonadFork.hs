@@ -10,7 +10,7 @@ module Control.Monad.Class.MonadFork
   ) where
 
 import qualified Control.Concurrent as IO
-import           Control.Exception (AsyncException (ThreadKilled), Exception)
+import           Control.Exception (AsyncException (ThreadKilled), Exception, SomeException)
 import           Control.Monad.Reader (ReaderT (..), lift)
 import           Data.Kind (Type)
 import qualified GHC.Conc.Sync as IO (labelThread)
@@ -35,6 +35,7 @@ class MonadThread m => MonadFork m where
   forkIO           :: m () -> m (ThreadId m)
   forkOn           :: Int -> m () -> m (ThreadId m)
   forkIOWithUnmask :: ((forall a. m a -> m a) -> m ()) -> m (ThreadId m)
+  forkFinally      :: m a -> (Either SomeException a -> m ()) -> m (ThreadId m)
   throwTo          :: Exception e => ThreadId m -> e -> m ()
 
   killThread       :: ThreadId m -> m ()
@@ -52,6 +53,7 @@ instance MonadFork IO where
   forkIO           = IO.forkIO
   forkOn           = IO.forkOn
   forkIOWithUnmask = IO.forkIOWithUnmask
+  forkFinally      = IO.forkFinally
   throwTo          = IO.throwTo
   killThread       = IO.killThread
   yield            = IO.yield
@@ -68,5 +70,7 @@ instance MonadFork m => MonadFork (ReaderT e m) where
                          let restore' :: ReaderT e m a -> ReaderT e m a
                              restore' (ReaderT f) = ReaderT $ restore . f
                          in runReaderT (k restore') e
+  forkFinally f k     = ReaderT $ \e -> forkFinally (runReaderT f e)
+                                      $ \err -> runReaderT (k err) e
   throwTo e t = lift (throwTo e t)
   yield       = lift yield

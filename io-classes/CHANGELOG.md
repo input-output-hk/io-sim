@@ -6,6 +6,8 @@
 
 ### Non-breaking changes
 
+* Added `forkFinally` to `MonadFork`.
+
 ## 1.3.0.0
 
 - `io-sim-1.3.0.0`.
