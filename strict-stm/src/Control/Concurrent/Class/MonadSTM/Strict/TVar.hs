@@ -56,6 +56,11 @@ traceTVarIO :: MonadTraceSTM m
             -> m ()
 traceTVarIO StrictTVar {tvar} = Lazy.traceTVarIO tvar
 
+-- | Cast the monad if both use the same representation of `TVar`s.
+--
+-- This function is useful for monad transformers stacks if the `TVar` is used
+-- in different monad stacks.
+--
 castStrictTVar :: LazyTVar m ~ LazyTVar n
                => StrictTVar m a -> StrictTVar n a
 castStrictTVar StrictTVar {tvar} = StrictTVar {tvar}
