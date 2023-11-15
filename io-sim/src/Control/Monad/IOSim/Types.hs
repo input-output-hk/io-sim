@@ -161,7 +161,7 @@ data SimA s a where
   Return       :: a -> SimA s a
 
   Say          :: String -> SimA s b -> SimA s b
-  Output       :: Dynamic -> SimA s b -> SimA s b
+  Output       :: !Dynamic -> SimA s b -> SimA s b
 
   LiftST       :: StrictST.ST s a -> (a -> SimA s b) -> SimA s b
 
