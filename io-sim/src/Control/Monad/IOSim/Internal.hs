@@ -105,7 +105,7 @@ isThreadBlocked t = case threadStatus t of
     _                -> False
 
 labelledTVarId :: TVar s a -> ST s (Labelled TVarId)
-labelledTVarId TVar { tvarId, tvarLabel } = (Labelled tvarId) <$> readSTRef tvarLabel
+labelledTVarId TVar { tvarId, tvarLabel } = Labelled tvarId <$> readSTRef tvarLabel
 
 labelledThreads :: Map IOSimThreadId (Thread s a) -> [Labelled IOSimThreadId]
 labelledThreads threadMap =
@@ -1037,8 +1037,9 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
        -> TVarId                   -- var fresh name supply
        -> StmA s b
        -> ST s (SimTrace c)
-    go !ctl !read !written !writtenSeq !createdSeq !nextVid action = assert localInvariant $
-                                                       case action of
+    go !ctl !read !written !writtenSeq !createdSeq !nextVid action =
+      assert localInvariant $
+      case action of
       ReturnStm x ->
         case ctl of
         AtomicallyFrame -> do

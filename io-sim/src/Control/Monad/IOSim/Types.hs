@@ -473,7 +473,7 @@ instance MonadLabelledSTM (IOSim s) where
   labelTVar tvar label = STM $ \k -> LabelTVar label tvar (k ())
   labelTVarIO tvar label = IOSim $ oneShot $ \k ->
                                    LiftST ( lazyToStrictST $
-                                            writeSTRef (tvarLabel tvar) $! (Just label)
+                                            writeSTRef (tvarLabel tvar) $! Just label
                                           ) k
   labelTQueue  = labelTQueueDefault
   labelTBQueue = labelTBQueueDefault
