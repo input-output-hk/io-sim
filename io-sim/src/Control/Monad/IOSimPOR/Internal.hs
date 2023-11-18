@@ -1598,23 +1598,23 @@ execTryPutTMVar (TMVar var) a = do
 saveTVar :: TVar s a -> ST s ()
 saveTVar TVar{tvarCurrent, tvarUndo} = do
     -- push the current value onto the undo stack
-    v  <- readSTRef tvarCurrent
-    vs <- readSTRef tvarUndo
-    writeSTRef tvarUndo (v:vs)
+    v   <- readSTRef tvarCurrent
+    !vs <- readSTRef tvarUndo
+    writeSTRef tvarUndo $! v:vs
 
 revertTVar :: TVar s a -> ST s ()
 revertTVar TVar{tvarCurrent, tvarUndo} = do
     -- pop the undo stack, and revert the current value
-    vs <- readSTRef tvarUndo
-    writeSTRef tvarCurrent (head vs)
-    writeSTRef tvarUndo    (tail vs)
+    !vs <- readSTRef tvarUndo
+    !_  <- writeSTRef tvarCurrent (head vs)
+    writeSTRef tvarUndo $! tail vs
 {-# INLINE revertTVar #-}
 
 commitTVar :: TVar s a -> ST s ()
 commitTVar TVar{tvarUndo} = do
-    vs <- readSTRef tvarUndo
+    !vs <- readSTRef tvarUndo
     -- pop the undo stack, leaving the current value unchanged
-    writeSTRef tvarUndo (tail vs)
+    writeSTRef tvarUndo $! tail vs
 {-# INLINE commitTVar #-}
 
 readTVarUndos :: TVar s a -> ST s [a]
@@ -1630,8 +1630,8 @@ traceTVarST TVar{tvarCurrent, tvarUndo, tvarTrace} new = do
     case mf of
       Nothing -> return TraceValue { traceDynamic = (Nothing :: Maybe ()), traceString = Nothing }
       Just f  -> do
-        vs <- readSTRef tvarUndo
-        v <-  readSTRef tvarCurrent
+        !vs <- readSTRef tvarUndo
+        v   <- readSTRef tvarCurrent
         case (new, vs) of
           (True, _) -> f Nothing v
           (_, _:_)  -> f (Just $ last vs) v
