@@ -358,7 +358,7 @@ schedule !thread@Thread{
       error "schedule: StartTimeout: Impossible happened"
 
     StartTimeout d action' k -> do
-      !lock <- TMVar <$> execNewTVar nextVid (Just $ "lock-" ++ show nextTmid) Nothing
+      !lock <- TMVar <$> execNewTVar nextVid (Just $! "lock-" ++ show nextTmid) Nothing
       let !expiry    = d `addTime` time
           !timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           !thread'   = thread { threadControl =
@@ -377,7 +377,7 @@ schedule !thread@Thread{
 
     RegisterDelay d k | d < 0 -> do
       !tvar <- execNewTVar nextVid
-                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           True
       let !expiry  = d `addTime` time
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
@@ -388,7 +388,7 @@ schedule !thread@Thread{
 
     RegisterDelay d k -> do
       !tvar <- execNewTVar nextVid
-                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
       let !expiry  = d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
@@ -430,7 +430,7 @@ schedule !thread@Thread{
 
     NewTimeout d k -> do
       !tvar  <- execNewTVar nextVid
-                           (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
+                           (Just $! "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
       let !expiry  = d `addTime` time
           !t       = Timeout tvar nextTmid
