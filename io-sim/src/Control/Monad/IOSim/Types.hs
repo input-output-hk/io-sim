@@ -1212,22 +1212,22 @@ data StmTxResult s a =
        --
        -- It also includes the updated TVarId name supply.
        --
-       StmTxCommitted a [SomeTVar s] -- ^ written tvars
-                        [SomeTVar s] -- ^ read tvars
-                        [SomeTVar s] -- ^ created tvars
-                        [Dynamic]
-                        [String]
-                        TVarId -- updated TVarId name supply
+       StmTxCommitted a ![SomeTVar s] -- ^ written tvars
+                        ![SomeTVar s] -- ^ read tvars
+                        ![SomeTVar s] -- ^ created tvars
+                        ![Dynamic]
+                        ![String]
+                        !TVarId -- updated TVarId name supply
 
        -- | A blocked transaction reports the vars that were read so that the
        -- scheduler can block the thread on those vars.
        --
-     | StmTxBlocked  [SomeTVar s]
+     | StmTxBlocked  ![SomeTVar s]
 
        -- | An aborted transaction reports the vars that were read so that the
        -- vector clock can be updated.
        --
-     | StmTxAborted  [SomeTVar s] SomeException
+     | StmTxAborted  ![SomeTVar s] SomeException
 
 
 -- | A branch indicates that an alternative statement is available in the current
