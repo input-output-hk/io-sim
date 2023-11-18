@@ -370,7 +370,7 @@ schedule !thread@Thread{
 
     StartTimeout d action' k ->
       {-# SCC "schedule.StartTimeout" #-} do
-      lock <- TMVar <$> execNewTVar nextVid (Just $ "lock-" ++ show nextTmid) Nothing
+      !lock <- TMVar <$> execNewTVar nextVid (Just $ "lock-" ++ show nextTmid) Nothing
       let !expiry    = d `addTime` time
           !timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           !thread'   = thread { threadControl =
