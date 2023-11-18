@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -147,7 +148,7 @@ runIOSim (IOSim k) = k Return
 -- `selectTraceEventsDynamic'`.
 --
 traceM :: Typeable a => a -> IOSim s ()
-traceM x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())
+traceM !x = IOSim $ oneShot $ \k -> Output (toDyn x) (k ())
 
 -- | Trace a value, in the same was as `traceM` does, but from the `STM` monad.
 -- This is primarily useful for debugging.
