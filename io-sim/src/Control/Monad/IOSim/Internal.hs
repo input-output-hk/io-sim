@@ -1025,7 +1025,7 @@ execAtomically :: forall s a c.
                -> StmA s a
                -> (StmTxResult s a -> ST s (SimTrace c))
                -> ST s (SimTrace c)
-execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
+execAtomically !time !tid !tlbl !nextVid0 !action0 !k0 =
     go AtomicallyFrame Map.empty Map.empty [] [] nextVid0 action0
   where
     go :: forall b.
