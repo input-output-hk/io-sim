@@ -1362,7 +1362,7 @@ execAtomically !time !tid !tlbl !nextVid0 !action0 !k0 =
        -> TVarId                   -- var fresh name supply
        -> StmA s b
        -> ST s (SimTrace c)
-    go !ctl !read !written !writtenSeq !createdSeq !nextVid action =
+    go !ctl !read !written !writtenSeq !createdSeq !nextVid !action =
       assert localInvariant $
       case action of
       ReturnStm x ->
