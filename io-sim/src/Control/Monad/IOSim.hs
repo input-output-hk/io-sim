@@ -133,6 +133,9 @@ import           System.IO.Unsafe
 import qualified Debug.Trace as Debug
 
 
+-- | Select events according to the predicate function.  It throws an error if
+-- the simulation ends with 'Failure'.
+--
 selectTraceEvents
     :: (Time -> SimEventType -> Maybe b)
     -> SimTrace a
@@ -150,6 +153,9 @@ selectTraceEvents fn =
               []
     . traceSelectTraceEvents fn
 
+-- | Like 'selectTraceEvents', but it returns even if the simulation trace ends
+-- with 'Failure'.
+--
 selectTraceEvents'
     :: (Time ->  SimEventType -> Maybe b)
     -> SimTrace a
@@ -216,10 +222,10 @@ detachTraceRaces = Trace.filter (\a -> case a of
                                          SimRacesFound {} -> False
                                          _                -> True)
 
--- | Select all the traced values matching the expected type. This relies on
--- the sim's dynamic trace facility.
+-- | Select all the traced values matching the expected type.  It relies on the
+-- sim's dynamic trace facility.
 --
--- For convenience, this throws exceptions for abnormal sim termination.
+-- For convenience, it throws exceptions for abnormal sim termination.
 --
 selectTraceEventsDynamic :: forall a b. Typeable b => SimTrace a -> [b]
 selectTraceEventsDynamic = selectTraceEvents fn
@@ -228,7 +234,8 @@ selectTraceEventsDynamic = selectTraceEvents fn
     fn _ (EventLog dyn) = fromDynamic dyn
     fn _ _              = Nothing
 
--- | Like 'selectTraceEventsDynamic' but also captures time of the trace event.
+-- | Like 'selectTraceEventsDynamic' but it also captures time of the trace
+-- event.
 --
 selectTraceEventsDynamicWithTime :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
 selectTraceEventsDynamicWithTime = selectTraceEvents fn
@@ -237,8 +244,8 @@ selectTraceEventsDynamicWithTime = selectTraceEvents fn
     fn t (EventLog dyn) = (t,) <$> fromDynamic dyn
     fn _ _              = Nothing
 
--- | Like 'selectTraceEventsDynamic' but returns partial trace if an exception
--- is found in it.
+-- | Like 'selectTraceEventsDynamic' but it returns even if the simulation trace
+-- ends with 'Failure'.
 --
 selectTraceEventsDynamic' :: forall a b. Typeable b => SimTrace a -> [b]
 selectTraceEventsDynamic' = selectTraceEvents' fn
@@ -247,7 +254,8 @@ selectTraceEventsDynamic' = selectTraceEvents' fn
     fn _ (EventLog dyn) = fromDynamic dyn
     fn _ _              = Nothing
 
--- | Like `selectTraceEventsDynamic'` but also captures time of the trace event.
+-- | Like `selectTraceEventsDynamic'` but it also captures time of the trace
+-- event.
 --
 selectTraceEventsDynamicWithTime' :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
 selectTraceEventsDynamicWithTime' = selectTraceEvents' fn
@@ -258,7 +266,7 @@ selectTraceEventsDynamicWithTime' = selectTraceEvents' fn
 
 -- | Get a trace of 'EventSay'.
 --
--- For convenience, this throws exceptions for abnormal sim termination.
+-- For convenience, it throws exceptions for abnormal sim termination.
 --
 selectTraceEventsSay :: SimTrace a -> [String]
 selectTraceEventsSay = selectTraceEvents fn
@@ -267,7 +275,7 @@ selectTraceEventsSay = selectTraceEvents fn
     fn _ (EventSay s) = Just s
     fn _ _            = Nothing
 
--- | Like 'selectTraceEventsSay' but also captures time of the trace event.
+-- | Like 'selectTraceEventsSay' but it also captures time of the trace event.
 --
 selectTraceEventsSayWithTime :: SimTrace a -> [(Time, String)]
 selectTraceEventsSayWithTime = selectTraceEvents fn
@@ -276,8 +284,8 @@ selectTraceEventsSayWithTime = selectTraceEvents fn
     fn t (EventSay s) = Just (t, s)
     fn _ _            = Nothing
 
--- | Like 'selectTraceEventsSay' but return partial trace if an exception is
--- found in it.
+-- | Like 'selectTraceEventsSay' but it returns even if the simulation trace
+-- ends with 'Failure'.
 --
 selectTraceEventsSay' :: SimTrace a -> [String]
 selectTraceEventsSay' = selectTraceEvents' fn
@@ -286,7 +294,7 @@ selectTraceEventsSay' = selectTraceEvents' fn
     fn _ (EventSay s) = Just s
     fn _ _            = Nothing
 
--- | Like `selectTraceEventsSay'` but also captures time of the trace event.
+-- | Like `selectTraceEventsSay'` but it also captures time of the trace event.
 --
 selectTraceEventsSayWithTime' :: SimTrace a -> [(Time, String)]
 selectTraceEventsSayWithTime' = selectTraceEvents' fn
@@ -297,13 +305,13 @@ selectTraceEventsSayWithTime' = selectTraceEvents' fn
 
 -- | Print all 'EventSay' to the console.
 --
--- For convenience, this throws exceptions for abnormal sim termination.
+-- For convenience, it throws exceptions for abnormal sim termination.
 --
 printTraceEventsSay :: SimTrace a -> IO ()
 printTraceEventsSay = mapM_ print . selectTraceEventsSay
 
 
--- | The most general select function.  It is a _total_ function.
+-- | The most general select function.  It is a /total function/.
 --
 traceSelectTraceEvents
     :: (Time -> SimEventType -> Maybe b)
@@ -324,7 +332,7 @@ traceSelectTraceEvents fn = bifoldr ( \ v _acc -> Nil v )
                                     )
                                     undefined -- it is ignored
 
--- | Select dynamic events.  It is a _total_ function.
+-- | Select dynamic events.  It is a /total function/.
 --
 traceSelectTraceEventsDynamic :: forall a b. Typeable b
                               => SimTrace a -> Trace (SimResult a) b
@@ -335,7 +343,7 @@ traceSelectTraceEventsDynamic = traceSelectTraceEvents fn
     fn _ _              = Nothing
 
 
--- | Select say events.  It is a _total_ function.
+-- | Select say events.  It is a /total function/.
 --
 traceSelectTraceEventsSay :: forall a.  SimTrace a -> Trace (SimResult a) String
 traceSelectTraceEventsSay = traceSelectTraceEvents fn
@@ -417,7 +425,7 @@ runSimOrThrow mainAction =
 runSimStrictShutdown :: forall a. (forall s. IOSim s a) -> Either Failure a
 runSimStrictShutdown mainAction = traceResult True (runSimTrace mainAction)
 
--- | Fold through the trace and return either a 'Failure' or the simulation
+-- | Fold through the trace and return either 'Failure' or a simulation
 -- result, i.e. the return value of the main thread.
 --
 traceResult :: Bool
@@ -502,19 +510,18 @@ runSimTrace mainAction = runST (runSimTraceST mainAction)
 -- slot.  In /IOSim/ and /IOSimPOR/ time only moves explicitly through timer
 -- events, e.g. things like `Control.Monad.Class.MonadTimer.SI.threadDelay`,
 -- `Control.Monad.Class.MonadTimer.SI.registerDelay` or the
--- `Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` API.  The usual
+-- `Control.Monad.Class.MonadTimer.MonadTimeout.NonStandard` API.  The usual
 -- QuickCheck techniques can help explore different schedules of
 -- threads too.
 
 -- | Execute a simulation, discover & revert races.  Note that this will execute
 -- the simulation multiple times with different schedules, and thus it's much
 -- more costly than a simple `runSimTrace` (also the simulation environments has
--- much more state to track and hence is slower).
+-- much more state to track and hence it is slower).
 --
 -- On property failure it will show the failing schedule (`ScheduleControl`)
--- which can be plugged to `controlSimTrace`.
---
--- Note: `exploreSimTrace` evaluates each schedule in parallel (using `par`).
+-- which can be passed to `controlSimTrace` to reproduce the failure without
+-- discovering the schedule.
 --
 exploreSimTrace
   :: forall a test. Testable test
@@ -532,8 +539,6 @@ exploreSimTrace optsf main k =
 
 -- | An 'ST' version of 'exploreSimTrace'. The callback also receives
 -- 'ScheduleControl'.  This is mostly useful for testing /IOSimPOR/ itself.
---
--- Note: `exploreSimTraceST` evaluates each schedule sequentially.
 --
 exploreSimTraceST
   :: forall s a test. Testable test
@@ -689,7 +694,7 @@ raceReversals ControlDefault      = 0
 raceReversals (ControlAwait mods) = length mods
 raceReversals ControlFollow{}     = error "Impossible: raceReversals ControlFollow{}"
 
--- compareTraces is given (maybe) a passing trace and a failing trace,
+-- `compareTracesST` is given (maybe) a passing trace and a failing trace,
 -- and identifies the point at which they diverge, where it inserts a
 -- "sleep" event for the thread that is delayed in the failing case,
 -- and a "wake" event before its next action. It also returns the
@@ -697,7 +702,7 @@ raceReversals ControlFollow{}     = error "Impossible: raceReversals ControlFoll
 -- to be consumed lazily (and perhaps only partially), and since the
 -- sleeping thread is not of interest unless the trace is consumed
 -- this far, then we collect its identity only if it is reached using
--- unsafePerformIO.
+-- `unsafePerformIO`.
 
 -- TODO: return StepId
 compareTracesST :: forall a b s.
