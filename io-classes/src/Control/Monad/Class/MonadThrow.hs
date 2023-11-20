@@ -7,6 +7,10 @@
 {-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE TypeFamilies              #-}
 
+-- | A generalisation of
+-- <https://hackage.haskell.org/package/base/docs/Control-Exception.html Control.Exception>
+-- API to both 'IO' and <https://hackage.haskell.org/package/io-sim IOSim>.
+--
 module Control.Monad.Class.MonadThrow
   ( MonadThrow (..)
   , MonadCatch (..)

@@ -1,5 +1,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | <https://hackage.haskell.org/package/time time> and
+-- <https://hackage.haskell.org/package/base base> time API compatible with both
+-- 'IO' and <https://hackage.haskell.org/package/io-sim IOSim>.
+--
 module Control.Monad.Class.MonadTime
   ( MonadTime (..)
   , MonadMonotonicTimeNSec (..)

@@ -3,6 +3,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 
+-- | A generalisation of
+-- <https://hackage.haskell.org/package/base/docs/Control-Concurrent.html Control.Concurrent>
+-- API to both 'IO' and <https://hackage.haskell.org/package/io-sim IOSim>.
+--
 module Control.Monad.Class.MonadFork
   ( MonadThread (..)
   , labelThisThread

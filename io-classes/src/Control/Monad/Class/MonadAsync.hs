@@ -10,6 +10,10 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 -- MonadAsync's ReaderT instance is undecidable.
 {-# LANGUAGE UndecidableInstances   #-}
+
+-- | <https://hackage.haskell.org/package/async async> API compatible with both
+-- 'IO' and <https://hackage.haskell.org/package/io-sim IOSim>.
+--
 module Control.Monad.Class.MonadAsync
   ( MonadAsync (..)
   , AsyncCancelled (..)
