@@ -6,6 +6,13 @@
 
 ### Non-breaking changes
 
+## 1.3.1.0
+
+### Non-breaking changes
+
+* Optimised `io-sim` performance (improved memory footprint).
+* Fixed a bug in `io-sim-por`: `execAtomically'` should not commit tvars.
+
 ## 1.3.0.0
 
 ### Breaking changes
