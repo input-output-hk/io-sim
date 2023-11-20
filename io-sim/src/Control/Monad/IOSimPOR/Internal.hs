@@ -1531,7 +1531,6 @@ execAtomically' = go Map.empty
        -> ST s [SomeTVar s]
     go !written action = case action of
       ReturnStm () -> do
-        !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar) written
         return (Map.elems written)
       ReadTVar v k  -> do
         x <- execReadTVar v
