@@ -1047,8 +1047,6 @@ data SimEventType
 
   | EventTimerCreated         TimeoutId TVarId Time
   -- ^ a new 'Timeout' created (via `newTimeout`)
-  | EventTimerUpdated         TimeoutId        Time
-  -- ^ a 'Timeout' was updated (via `updateTimeout`)
   | EventTimerCancelled       TimeoutId
   -- ^ a 'Timeout' was cancelled (via `cancelTimeout`)
   | EventTimerFired           TimeoutId
@@ -1153,10 +1151,6 @@ ppSimEventType = \case
               show timer, " ",
               show tvarId, " ",
               show t ]
-  EventTimerUpdated timer t ->
-    concat [ "TimerUpdated ",
-             show timer, " ",
-             show t ]
   EventTimerCancelled timer -> "TimerCancelled " ++ show timer
   EventTimerFired timer -> "TimerFired " ++ show timer
   EventThreadStatus  tid tid' ->

@@ -4,6 +4,8 @@
 
 ### Breaking changes
 
+* Removed `EventTimerUpdated` constructor (not used anymore).
+
 ### Non-breaking changes
 
 ## 1.3.1.0
