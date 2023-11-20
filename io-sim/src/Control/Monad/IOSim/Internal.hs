@@ -105,7 +105,7 @@ isThreadBlocked t = case threadStatus t of
     _                -> False
 
 labelledTVarId :: TVar s a -> ST s (Labelled TVarId)
-labelledTVarId TVar { tvarId, tvarLabel } = (Labelled tvarId) <$> readSTRef tvarLabel
+labelledTVarId TVar { tvarId, tvarLabel } = Labelled tvarId <$> readSTRef tvarLabel
 
 labelledThreads :: Map IOSimThreadId (Thread s a) -> [Labelled IOSimThreadId]
 labelledThreads threadMap =
@@ -210,8 +210,7 @@ schedule !thread@Thread{
   invariant (Just thread) simstate $
   case action of
 
-    Return x -> {-# SCC "schedule.Return" #-}
-                case ctl of
+    Return x -> case ctl of
       MainFrame ->
         -- the main thread is done, so we're done
         -- even if other threads are still running
@@ -267,8 +266,7 @@ schedule !thread@Thread{
             timers' = PSQ.delete tmid timers
         schedule thread' simstate { timers = timers' }
 
-    Throw e -> {-# SCC "schedule.Throw" #-}
-               case unwindControlStack e thread timers of
+    Throw e -> case unwindControlStack e thread timers of
       -- Found a CatchFrame
       (Right thread'@Thread { threadMasking = maskst' }, timers'') -> do
         -- We found a suitable exception handler, continue with that
@@ -293,15 +291,13 @@ schedule !thread@Thread{
                  $ SimTrace time tid tlbl (EventDeschedule Terminated)
                  $ trace
 
-    Catch action' handler k ->
-      {-# SCC "schedule.Catch" #-} do
+    Catch action' handler k -> do
       -- push the failure and success continuations onto the control stack
       let thread' = thread { threadControl = ThreadControl action'
                                                (CatchFrame handler k ctl) }
       schedule thread' simstate
 
-    Evaluate expr k ->
-      {-# SCC "schedule.Evaulate" #-} do
+    Evaluate expr k -> do
       mbWHNF <- unsafeIOToST $ try $ evaluate expr
       case mbWHNF of
         Left e -> do
@@ -313,39 +309,33 @@ schedule !thread@Thread{
           let thread' = thread { threadControl = ThreadControl (k whnf) ctl }
           schedule thread' simstate
 
-    Say msg k ->
-      {-# SCC "schedule.Say" #-} do
+    Say msg k -> do
       let thread' = thread { threadControl = ThreadControl k ctl }
       trace <- schedule thread' simstate
       return (SimTrace time tid tlbl (EventSay msg) trace)
 
-    Output x k ->
-      {-# SCC "schedule.Output" #-} do
+    Output x k -> do
       let thread' = thread { threadControl = ThreadControl k ctl }
       trace <- schedule thread' simstate
       return (SimTrace time tid tlbl (EventLog x) trace)
 
-    LiftST st k ->
-      {-# SCC "schedule.LiftST" #-} do
+    LiftST st k -> do
       x <- strictToLazyST st
       let thread' = thread { threadControl = ThreadControl (k x) ctl }
       schedule thread' simstate
 
-    GetMonoTime k ->
-      {-# SCC "schedule.GetMonoTime" #-} do
+    GetMonoTime k -> do
       let thread' = thread { threadControl = ThreadControl (k time) ctl }
       schedule thread' simstate
 
-    GetWallTime k ->
-      {-# SCC "schedule.GetWallTime" #-} do
+    GetWallTime k -> do
       let !clockid  = threadClockId thread
           !clockoff = clocks Map.! clockid
           !walltime = timeSinceEpoch time `addUTCTime` clockoff
           !thread'  = thread { threadControl = ThreadControl (k walltime) ctl }
       schedule thread' simstate
 
-    SetWallTime walltime' k ->
-      {-# SCC "schedule.SetWallTime" #-} do
+    SetWallTime walltime' k -> do
       let !clockid   = threadClockId thread
           !clockoff  = clocks Map.! clockid
           !walltime  = timeSinceEpoch time `addUTCTime` clockoff
@@ -354,8 +344,7 @@ schedule !thread@Thread{
           !simstate' = simstate { clocks = Map.insert clockid clockoff' clocks }
       schedule thread' simstate'
 
-    UnshareClock k ->
-      {-# SCC "schedule.UnshareClock" #-} do
+    UnshareClock k -> do
       let !clockid   = threadClockId thread
           !clockoff  = clocks Map.! clockid
           !clockid'  = let ThreadId i = tid in ClockId i -- reuse the thread id
@@ -368,9 +357,8 @@ schedule !thread@Thread{
     StartTimeout d _ _ | d <= 0 ->
       error "schedule: StartTimeout: Impossible happened"
 
-    StartTimeout d action' k ->
-      {-# SCC "schedule.StartTimeout" #-} do
-      lock <- TMVar <$> execNewTVar nextVid (Just $ "lock-" ++ show nextTmid) Nothing
+    StartTimeout d action' k -> do
+      !lock <- TMVar <$> execNewTVar nextVid (Just $! "lock-" ++ show nextTmid) Nothing
       let !expiry    = d `addTime` time
           !timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           !thread'   = thread { threadControl =
@@ -383,15 +371,13 @@ schedule !thread@Thread{
                                                   }
       return (SimTrace time tid tlbl (EventTimeoutCreated nextTmid tid expiry) trace)
 
-    UnregisterTimeout tmid k ->
-      {-# SCC "schedule.UnregisterTimeout" #-} do
+    UnregisterTimeout tmid k -> do
       let thread' = thread { threadControl = ThreadControl k ctl }
       schedule thread' simstate { timers = PSQ.delete tmid timers }
 
-    RegisterDelay d k | d < 0 ->
-      {-# SCC "schedule.NewRegisterDelay.1" #-} do
+    RegisterDelay d k | d < 0 -> do
       !tvar <- execNewTVar nextVid
-                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           True
       let !expiry  = d `addTime` time
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
@@ -400,10 +386,9 @@ schedule !thread@Thread{
               SimTrace time tid tlbl (EventRegisterDelayFired nextTmid) $
               trace)
 
-    RegisterDelay d k ->
-      {-# SCC "schedule.NewRegisterDelay.2" #-} do
+    RegisterDelay d k -> do
       !tvar <- execNewTVar nextVid
-                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
       let !expiry  = d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
@@ -414,8 +399,7 @@ schedule !thread@Thread{
       return (SimTrace time tid tlbl
                 (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
 
-    ThreadDelay d k | d < 0 ->
-      {-# SCC "schedule.NewThreadDelay" #-} do
+    ThreadDelay d k | d < 0 -> do
       let !expiry    = d `addTime` time
           !thread'   = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
           !simstate' = simstate { nextTmid = succ nextTmid }
@@ -424,8 +408,7 @@ schedule !thread@Thread{
               SimTrace time tid tlbl (EventThreadDelayFired nextTmid) $
               trace)
 
-    ThreadDelay d k ->
-      {-# SCC "schedule.NewThreadDelay" #-} do
+    ThreadDelay d k -> do
       let !expiry  = d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           !thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
@@ -436,8 +419,7 @@ schedule !thread@Thread{
     -- we treat negative timers as cancelled ones; for the record we put
     -- `EventTimerCreated` and `EventTimerCancelled` in the trace; This differs
     -- from `GHC.Event` behaviour.
-    NewTimeout d k | d < 0 ->
-      {-# SCC "schedule.NewTimeout.1" #-} do
+    NewTimeout d k | d < 0 -> do
       let !t       = NegativeTimeout nextTmid
           !expiry  = d `addTime` time
           !thread' = thread { threadControl = ThreadControl (k t) ctl }
@@ -446,10 +428,9 @@ schedule !thread@Thread{
               SimTrace time tid tlbl (EventTimerCancelled nextTmid) $
               trace)
 
-    NewTimeout d k ->
-      {-# SCC "schedule.NewTimeout.2" #-} do
+    NewTimeout d k -> do
       !tvar  <- execNewTVar nextVid
-                           (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
+                           (Just $! "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
       let !expiry  = d `addTime` time
           !t       = Timeout tvar nextTmid
@@ -460,8 +441,7 @@ schedule !thread@Thread{
                                          , nextTmid = succ nextTmid }
       return (SimTrace time tid tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
 
-    CancelTimeout (Timeout tvar tmid) k ->
-      {-# SCC "schedule.CancelTimeout" #-} do
+    CancelTimeout (Timeout tvar tmid) k -> do
       let !timers' = PSQ.delete tmid timers
           !thread' = thread { threadControl = ThreadControl k ctl }
       !written <- execAtomically' (runSTM $ writeTVar tvar TimeoutCancelled)
@@ -482,14 +462,12 @@ schedule !thread@Thread{
              $ trace
 
     -- cancelling a negative timer is a no-op
-    CancelTimeout (NegativeTimeout _tmid) k ->
-      {-# SCC "schedule.CancelTimeout" #-} do
+    CancelTimeout (NegativeTimeout _tmid) k -> do
       -- negative timers are promptly removed from the state
       let thread' = thread { threadControl = ThreadControl k ctl }
       schedule thread' simstate
 
-    Fork a k ->
-      {-# SCC "schedule.Fork" #-} do
+    Fork a k -> do
       let !nextId   = threadNextTId thread
           !tid'     = childThreadId tid nextId
           !thread'  = thread { threadControl = ThreadControl (k tid') ctl
@@ -510,7 +488,7 @@ schedule !thread@Thread{
       return (SimTrace time tid tlbl (EventThreadForked tid') trace)
 
     Atomically a k ->
-      {-# SCC "schedule.Atomically" #-} execAtomically time tid tlbl nextVid (runSTM a) $ \res ->
+      execAtomically time tid tlbl nextVid (runSTM a) $ \res ->
       case res of
         StmTxCommitted x written _read created
                          tvarDynamicTraces tvarStringTraces nextVid' -> do
@@ -560,30 +538,25 @@ schedule !thread@Thread{
                  $ SimTrace time tid tlbl (EventDeschedule (Blocked BlockedOnSTM))
                  $ trace
 
-    GetThreadId k ->
-      {-# SCC "schedule.GetThreadId" #-} do
+    GetThreadId k -> do
       let thread' = thread { threadControl = ThreadControl (k tid) ctl }
       schedule thread' simstate
 
-    LabelThread tid' l k | tid' == tid ->
-      {-# SCC "schedule.LabelThread" #-} do
+    LabelThread tid' l k | tid' == tid -> do
       let thread' = thread { threadControl = ThreadControl k ctl
                            , threadLabel   = Just l }
       schedule thread' simstate
 
-    LabelThread tid' l k ->
-      {-# SCC "schedule.LabelThread" #-} do
+    LabelThread tid' l k -> do
       let thread'  = thread { threadControl = ThreadControl k ctl }
           threads' = Map.adjust (\t -> t { threadLabel = Just l }) tid' threads
       schedule thread' simstate { threads = threads' }
 
-    GetMaskState k ->
-      {-# SCC "schedule.GetMaskState" #-} do
+    GetMaskState k -> do
       let thread' = thread { threadControl = ThreadControl (k maskst) ctl }
       schedule thread' simstate
 
-    SetMaskState maskst' action' k ->
-      {-# SCC "schedule.SetMaskState" #-} do
+    SetMaskState maskst' action' k -> do
       let thread' = thread { threadControl = ThreadControl
                                                (runIOSim action')
                                                (MaskFrame k maskst ctl)
@@ -597,16 +570,14 @@ schedule !thread@Thread{
       return $ SimTrace time tid tlbl (EventMask maskst')
              $ trace
 
-    ThrowTo e tid' _ | tid' == tid ->
-      {-# SCC "schedule.ThrowTo" #-} do
+    ThrowTo e tid' _ | tid' == tid -> do
       -- Throw to ourself is equivalent to a synchronous throw,
       -- and works irrespective of masking state since it does not block.
       let thread' = thread { threadControl = ThreadControl (Throw e) ctl }
       trace <- schedule thread' simstate
       return (SimTrace time tid tlbl (EventThrowTo e tid) trace)
 
-    ThrowTo e tid' k ->
-      {-# SCC "schedule.ThrowTo" #-} do
+    ThrowTo e tid' k -> do
       let thread'   = thread { threadControl = ThreadControl k ctl }
           willBlock = case Map.lookup tid' threads of
                         Just t -> not (threadInterruptible t)
@@ -650,11 +621,9 @@ schedule !thread@Thread{
 
     -- ExploreRaces is ignored by this simulator
     ExploreRaces k ->
-      {-# SCC "schedule.ExploreRaces" #-}
       schedule thread{ threadControl = ThreadControl k ctl } simstate
 
-    Fix f k ->
-      {-# SCC "schedule.Fix" #-} do
+    Fix f k -> do
       r <- newSTRef (throw NonTermination)
       x <- unsafeInterleaveST $ readSTRef r
       let k' = unIOSim (f x) $ \x' ->
@@ -683,7 +652,6 @@ deschedule Yield !thread !simstate@SimState{runqueue, threads} =
     -- algorithms are not sensitive to the exact policy, so long as it is a
     -- fair policy (all runnable threads eventually run).
 
-    {-# SCC "deschedule.Yield" #-}
     let runqueue' = Deque.snoc (threadId thread) runqueue
         threads'  = Map.insert (threadId thread) thread threads in
     reschedule simstate { runqueue = runqueue', threads  = threads' }
@@ -700,7 +668,6 @@ deschedule Interruptable !thread@Thread {
     -- We're unmasking, but there are pending blocked async exceptions.
     -- So immediately raise the exception and unblock the blocked thread
     -- if possible.
-    {-# SCC "deschedule.Interruptable.Unmasked" #-}
     let thread' = thread { threadControl = ThreadControl (Throw e) ctl
                          , threadMasking = MaskedInterruptible
                          , threadThrowTo = etids }
@@ -717,7 +684,6 @@ deschedule Interruptable !thread@Thread {
 deschedule Interruptable !thread !simstate =
     -- Either masked or unmasked but no pending async exceptions.
     -- Either way, just carry on.
-    {-# SCC "deschedule.Interruptable.Masked" #-}
     schedule thread simstate
 
 deschedule (Blocked _blockedReason) !thread@Thread { threadThrowTo = _ : _
@@ -727,11 +693,9 @@ deschedule (Blocked _blockedReason) !thread@Thread { threadThrowTo = _ : _
     -- we have async exceptions masked, and there are pending blocked async
     -- exceptions. So immediately raise the exception and unblock the blocked
     -- thread if possible.
-    {-# SCC "deschedule.Interruptable.Blocked.1" #-}
     deschedule Interruptable thread { threadMasking = Unmasked } simstate
 
 deschedule (Blocked blockedReason) !thread !simstate@SimState{threads} =
-    {-# SCC "deschedule.Interruptable.Blocked.2" #-}
     let thread'  = thread { threadStatus = ThreadBlocked blockedReason }
         threads' = Map.insert (threadId thread') thread' threads in
     reschedule simstate { threads = threads' }
@@ -739,7 +703,6 @@ deschedule (Blocked blockedReason) !thread !simstate@SimState{threads} =
 deschedule Terminated !thread !simstate@SimState{ curTime = time, threads } =
     -- This thread is done. If there are other threads blocked in a
     -- ThrowTo targeted at this thread then we can wake them up now.
-    {-# SCC "deschedule.Terminated" #-}
     let !wakeup      = map (l_labelled . snd) (reverse (threadThrowTo thread))
         (unblocked,
          !simstate') = unblockThreads False wakeup simstate
@@ -759,7 +722,6 @@ deschedule Sleep _thread _simstate =
 reschedule :: SimState s a -> ST s (SimTrace a)
 reschedule !simstate@SimState{ runqueue, threads }
   | Just (!tid, runqueue') <- Deque.uncons runqueue =
-    {-# SCC "reschedule.Just" #-}
     let thread = threads Map.! tid in
     schedule thread simstate { runqueue = runqueue'
                              , threads  = Map.delete tid threads }
@@ -767,7 +729,6 @@ reschedule !simstate@SimState{ runqueue, threads }
 -- But when there are no runnable threads, we advance the time to the next
 -- timer event, or stop.
 reschedule !simstate@SimState{ threads, timers, curTime = time } =
-    {-# SCC "reschedule.Nothing" #-}
 
     -- important to get all events that expire at this time
     case removeMinimums timers of
@@ -1064,7 +1025,7 @@ execAtomically :: forall s a c.
                -> StmA s a
                -> (StmTxResult s a -> ST s (SimTrace c))
                -> ST s (SimTrace c)
-execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
+execAtomically !time !tid !tlbl !nextVid0 !action0 !k0 =
     go AtomicallyFrame Map.empty Map.empty [] [] nextVid0 action0
   where
     go :: forall b.
@@ -1076,10 +1037,10 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
        -> TVarId                   -- var fresh name supply
        -> StmA s b
        -> ST s (SimTrace c)
-    go !ctl !read !written !writtenSeq !createdSeq !nextVid action = assert localInvariant $
-                                                       case action of
+    go !ctl !read !written !writtenSeq !createdSeq !nextVid !action =
+      assert localInvariant $
+      case action of
       ReturnStm x ->
-        {-# SCC "execAtomically.go.ReturnStm" #-}
         case ctl of
         AtomicallyFrame -> do
           -- Trace each created TVar
@@ -1122,32 +1083,27 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
           -- Skip the right hand alternative and continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
-      ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} do
+      ThrowStm e -> do
         -- Rollback `TVar`s written since catch handler was installed
         !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
         case ctl of
           AtomicallyFrame -> do
             k0 $ StmTxAborted (Map.elems read) (toException e)
 
-          BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             -- Execute the left side in a new frame with an empty written set.
             -- but preserve ones that were set prior to it, as specified in the
             -- [stm](https://hackage.haskell.org/package/stm/docs/Control-Monad-STM.html#v:catchSTM) package.
             let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
             go ctl'' read Map.empty [] [] nextVid (h e)
 
-          BranchFrame (OrElseStmA _r) _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame (OrElseStmA _r) _k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
-          BranchFrame NoOpStmA _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame NoOpStmA _k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
-      CatchStm a h k ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} do
+      CatchStm a h k -> do
         -- Execute the catch handler with an empty written set.
         -- but preserve ones that were set prior to it, as specified in the
         -- [stm](https://hackage.haskell.org/package/stm/docs/Control-Monad-STM.html#v:catchSTM) package.
@@ -1155,8 +1111,7 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
         go ctl' read Map.empty [] [] nextVid a
 
 
-      Retry ->
-        {-# SCC "execAtomically.go.Retry" #-} do
+      Retry -> do
           -- Always revert all the TVar writes for the retry
           !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
           case ctl of
@@ -1164,81 +1119,68 @@ execAtomically !time !tid !tlbl !nextVid0 action0 k0 =
               -- Return vars read, so the thread can block on them
               k0 $! StmTxBlocked $! Map.elems read
 
-            BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-              {-# SCC "execAtomically.go.BranchFrame.OrElseStmA" #-} do
+            BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
               -- Execute the orElse right hand with an empty written set
               let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
               go ctl'' read Map.empty [] [] nextVid b
 
-            BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-              {-# SCC "execAtomically.go.BranchFrame" #-} do
+            BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
               -- Retry makes sense only within a OrElse context. If it is a branch other than
               -- OrElse left side, then bubble up the `retry` to the frame above.
               -- Skip the continuation and propagate the retry into the outer frame
               -- using the written set for the outer frame
               go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
-      OrElse a b k ->
-        {-# SCC "execAtomically.go.OrElse" #-} do
+      OrElse a b k -> do
         -- Execute the left side in a new frame with an empty written set
         let ctl' = BranchFrame (OrElseStmA b) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
 
-      NewTVar !mbLabel x k ->
-        {-# SCC "execAtomically.go.NewTVar" #-} do
+      NewTVar !mbLabel x k -> do
         !v <- execNewTVar nextVid mbLabel x
         go ctl read written writtenSeq (SomeTVar v : createdSeq) (succ nextVid) (k v)
 
-      LabelTVar !label tvar k ->
-        {-# SCC "execAtomically.go.LabelTVar" #-} do
+      LabelTVar !label tvar k -> do
         !_ <- writeSTRef (tvarLabel tvar) $! (Just label)
         go ctl read written writtenSeq createdSeq nextVid k
 
-      TraceTVar tvar f k ->
-        {-# SCC "execAtomically.go.TraceTVar" #-} do
+      TraceTVar tvar f k -> do
         !_ <- writeSTRef (tvarTrace tvar) (Just f)
         go ctl read written writtenSeq createdSeq nextVid k
 
       ReadTVar v k
-        | tvarId v `Map.member` read ->
-            {-# SCC "execAtomically.go.ReadTVar" #-} do
+        | tvarId v `Map.member` read -> do
             x <- execReadTVar v
             go ctl read written writtenSeq createdSeq nextVid (k x)
         | otherwise ->
-            {-# SCC "execAtomically.go.ReadTVar" #-} do
+             do
             x <- execReadTVar v
             let read' = Map.insert (tvarId v) (SomeTVar v) read
             go ctl read' written writtenSeq createdSeq nextVid (k x)
 
       WriteTVar v x k
-        | tvarId v `Map.member` written ->
-            {-# SCC "execAtomically.go.WriteTVar" #-} do
+        | tvarId v `Map.member` written -> do
             !_ <- execWriteTVar v x
             go ctl read written writtenSeq createdSeq nextVid k
-        | otherwise ->
-            {-# SCC "execAtomically.go.WriteTVar" #-} do
+        | otherwise -> do
             !_ <- saveTVar v
             !_ <- execWriteTVar v x
             let written' = Map.insert (tvarId v) (SomeTVar v) written
             go ctl read written' (SomeTVar v : writtenSeq) createdSeq nextVid k
 
-      SayStm msg k ->
-        {-# SCC "execAtomically.go.SayStm" #-} do
+      SayStm msg k -> do
         trace <- go ctl read written writtenSeq createdSeq nextVid k
         return $ SimTrace time tid tlbl (EventSay msg) trace
 
-      OutputStm x k ->
-        {-# SCC "execAtomically.go.OutputStm" #-} do
+      OutputStm x k -> do
         trace <- go ctl read written writtenSeq createdSeq nextVid k
         return $ SimTrace time tid tlbl (EventLog x) trace
 
-      LiftSTStm st k ->
-        {-# SCC "schedule.LiftSTStm" #-} do
+      LiftSTStm st k -> do
         x <- strictToLazyST st
         go ctl read written writtenSeq createdSeq nextVid (k x)
 
-      FixStm f k ->
-        {-# SCC "execAtomically.go.FixStm" #-} do
+      FixStm f k -> do
         r <- newSTRef (throw NonTermination)
         x <- unsafeInterleaveST $ readSTRef r
         let k' = unSTM (f x) $ \x' ->
@@ -1308,26 +1250,23 @@ execTryPutTMVar (TMVar var) a = do
 saveTVar :: TVar s a -> ST s ()
 saveTVar TVar{tvarCurrent, tvarUndo} = do
     -- push the current value onto the undo stack
-    v  <- readSTRef tvarCurrent
-    vs <- readSTRef tvarUndo
-    !_ <- writeSTRef tvarUndo (v:vs)
-    return ()
+    v   <- readSTRef tvarCurrent
+    !vs <- readSTRef tvarUndo
+    writeSTRef tvarUndo $! v:vs
 
 revertTVar :: TVar s a -> ST s ()
 revertTVar TVar{tvarCurrent, tvarUndo} = do
     -- pop the undo stack, and revert the current value
-    vs <- readSTRef tvarUndo
-    !_ <- writeSTRef tvarCurrent (head vs)
-    !_ <- writeSTRef tvarUndo    (tail vs)
-    return ()
+    !vs <- readSTRef tvarUndo
+    !_  <- writeSTRef tvarCurrent (head vs)
+    writeSTRef tvarUndo $! tail vs
 {-# INLINE revertTVar #-}
 
 commitTVar :: TVar s a -> ST s ()
 commitTVar TVar{tvarUndo} = do
-    vs <- readSTRef tvarUndo
+    !vs <- readSTRef tvarUndo
     -- pop the undo stack, leaving the current value unchanged
-    !_ <- writeSTRef tvarUndo (tail vs)
-    return ()
+    writeSTRef tvarUndo $! tail vs
 {-# INLINE commitTVar #-}
 
 readTVarUndos :: TVar s a -> ST s [a]
@@ -1344,8 +1283,8 @@ traceTVarST TVar{tvarId, tvarCurrent, tvarUndo, tvarTrace} new = do
       Nothing -> return TraceValue { traceDynamic = (Nothing :: Maybe ())
                                    , traceString = Nothing }
       Just f  -> do
-        vs <- readSTRef tvarUndo
-        v  <- readSTRef tvarCurrent
+        !vs <- readSTRef tvarUndo
+        v   <- readSTRef tvarCurrent
         case (new, vs) of
           (True, _) -> f Nothing v
           (_, _:_)  -> f (Just $ last vs) v

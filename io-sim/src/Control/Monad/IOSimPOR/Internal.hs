@@ -482,7 +482,7 @@ schedule thread@Thread{
       error "schedule: StartTimeout: Impossible happened"
 
     StartTimeout d action' k -> do
-      lock <- TMVar <$> execNewTVar nextVid (Just $ "lock-" ++ show nextTmid) Nothing
+      lock <- TMVar <$> execNewTVar nextVid (Just $! "lock-" ++ show nextTmid) Nothing
       let expiry    = d `addTime` time
           timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           thread'   = thread { threadControl =
@@ -499,7 +499,7 @@ schedule thread@Thread{
 
     RegisterDelay d k | d < 0 -> do
       tvar <- execNewTVar nextVid
-                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           True
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
       let !expiry  = d `addTime` time
@@ -511,7 +511,7 @@ schedule thread@Thread{
 
     RegisterDelay d k -> do
       tvar <- execNewTVar nextVid
-                          (Just $ "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
+                          (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
       let !expiry  = d `addTime` time
@@ -555,7 +555,7 @@ schedule thread@Thread{
 
     NewTimeout d k -> do
       tvar  <- execNewTVar nextVid
-                           (Just $ "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
+                           (Just $! "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
       let expiry  = d `addTime` time
@@ -1350,7 +1350,7 @@ execAtomically :: forall s a c.
                -> StmA s a
                -> (StmTxResult s a -> ST s (SimTrace c))
                -> ST s (SimTrace c)
-execAtomically time tid tlbl nextVid0 action0 k0 =
+execAtomically !time !tid !tlbl !nextVid0 !action0 !k0 =
     go AtomicallyFrame Map.empty Map.empty [] [] nextVid0 action0
   where
     go :: forall b.
@@ -1362,10 +1362,10 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
        -> TVarId                   -- var fresh name supply
        -> StmA s b
        -> ST s (SimTrace c)
-    go !ctl !read !written !writtenSeq !createdSeq !nextVid action = assert localInvariant $
-                                                       case action of
+    go !ctl !read !written !writtenSeq !createdSeq !nextVid !action =
+      assert localInvariant $
+      case action of
       ReturnStm x ->
-        {-# SCC "execAtomically.go.ReturnStm" #-}
         case ctl of
         AtomicallyFrame -> do
           -- Trace each created TVar
@@ -1408,38 +1408,32 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
           -- Skip the orElse right hand and continue with the k continuation
           go ctl' read written' writtenSeq' createdSeq' nextVid (k x)
 
-      ThrowStm e ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} do
+      ThrowStm e -> do
         -- Revert all the TVar writes
         !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
         case ctl of
           AtomicallyFrame -> do
             k0 $ StmTxAborted (Map.elems read) (toException e)
 
-          BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame (CatchStmA h) k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             -- Execute the left side in a new frame with an empty written set.
             -- but preserve ones that were set prior to it, as specified in the
             -- [stm](https://hackage.haskell.org/package/stm/docs/Control-Monad-STM.html#v:catchSTM) package.
             let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
             go ctl'' read Map.empty [] [] nextVid (h e)
 
-          BranchFrame (OrElseStmA _r) _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame (OrElseStmA _r) _k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
-          BranchFrame NoOpStmA _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame NoOpStmA _k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid (ThrowStm e)
 
-      CatchStm a h k ->
-        {-# SCC "execAtomically.go.ThrowStm" #-} do
+      CatchStm a h k -> do
         -- Execute the left side in a new frame with an empty written set
         let ctl' = BranchFrame (CatchStmA h) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
 
-      Retry ->
-        {-# SCC "execAtomically.go.Retry" #-} do
+      Retry -> do
         -- Always revert all the TVar writes for the retry
         !_ <- traverse_ (\(SomeTVar tvar) -> revertTVar tvar) written
         case ctl of
@@ -1447,28 +1441,24 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
             -- Return vars read, so the thread can block on them
             k0 $! StmTxBlocked $! Map.elems read
 
-          BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame.OrElseStmA" #-} do
+          BranchFrame (OrElseStmA b) k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             -- Execute the orElse right hand with an empty written set
             let ctl'' = BranchFrame NoOpStmA k writtenOuter writtenOuterSeq createdOuterSeq ctl'
             go ctl'' read Map.empty [] [] nextVid b
 
-          BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' ->
-            {-# SCC "execAtomically.go.BranchFrame" #-} do
+          BranchFrame _ _k writtenOuter writtenOuterSeq createdOuterSeq ctl' -> do
             -- Retry makes sense only within a OrElse context. If it is a branch other than
             -- OrElse left side, then bubble up the `retry` to the frame above.
             -- Skip the continuation and propagate the retry into the outer frame
             -- using the written set for the outer frame
             go ctl' read writtenOuter writtenOuterSeq createdOuterSeq nextVid Retry
 
-      OrElse a b k ->
-        {-# SCC "execAtomically.go.OrElse" #-} do
+      OrElse a b k -> do
         -- Execute the left side in a new frame with an empty written set
         let ctl' = BranchFrame (OrElseStmA b) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
 
-      NewTVar !mbLabel x k ->
-        {-# SCC "execAtomically.go.NewTVar" #-} do
+      NewTVar !mbLabel x k -> do
         !v <- execNewTVar nextVid mbLabel x
         -- record a write to the TVar so we know to update its VClock
         let written' = Map.insert (tvarId v) (SomeTVar v) written
@@ -1476,58 +1466,48 @@ execAtomically time tid tlbl nextVid0 action0 k0 =
         !_ <- saveTVar v
         go ctl read written' writtenSeq (SomeTVar v : createdSeq) (succ nextVid) (k v)
 
-      LabelTVar !label tvar k ->
-        {-# SCC "execAtomically.go.LabelTVar" #-} do
+      LabelTVar !label tvar k -> do
         !_ <- writeSTRef (tvarLabel tvar) $! (Just label)
         go ctl read written writtenSeq createdSeq nextVid k
 
-      TraceTVar tvar f k ->
-        {-# SCC "execAtomically.go.TraceTVar" #-} do
+      TraceTVar tvar f k -> do
         !_ <- writeSTRef (tvarTrace tvar) (Just f)
         go ctl read written writtenSeq createdSeq nextVid k
 
       ReadTVar v k
-        | tvarId v `Map.member` read ->
-            {-# SCC "execAtomically.go.ReadTVar" #-} do
+        | tvarId v `Map.member` read -> do
             x <- execReadTVar v
             go ctl read written writtenSeq createdSeq nextVid (k x)
-        | otherwise ->
-            {-# SCC "execAtomically.go.ReadTVar" #-} do
+        | otherwise -> do
             x <- execReadTVar v
             let read' = Map.insert (tvarId v) (SomeTVar v) read
             go ctl read' written writtenSeq createdSeq nextVid (k x)
 
       WriteTVar v x k
-        | tvarId v `Map.member` written ->
-            {-# SCC "execAtomically.go.WriteTVar" #-} do
+        | tvarId v `Map.member` written -> do
             !_ <- execWriteTVar v x
             go ctl read written writtenSeq createdSeq nextVid k
-        | otherwise ->
-            {-# SCC "execAtomically.go.WriteTVar" #-} do
+        | otherwise -> do
             !_ <- saveTVar v
             !_ <- execWriteTVar v x
             let written' = Map.insert (tvarId v) (SomeTVar v) written
             go ctl read written' (SomeTVar v : writtenSeq) createdSeq nextVid k
 
-      SayStm msg k ->
-        {-# SCC "execAtomically.go.SayStm" #-} do
+      SayStm msg k -> do
         trace <- go ctl read written writtenSeq createdSeq nextVid k
         -- TODO: step
         return $ SimPORTrace time tid (-1) tlbl (EventSay msg) trace
 
-      OutputStm x k ->
-        {-# SCC "execAtomically.go.OutputStm" #-} do
+      OutputStm x k -> do
         trace <- go ctl read written writtenSeq createdSeq nextVid k
         -- TODO: step
         return $ SimPORTrace time tid (-1) tlbl (EventLog x) trace
 
-      LiftSTStm st k ->
-        {-# SCC "schedule.LiftSTStm" #-} do
+      LiftSTStm st k -> do
         x <- strictToLazyST st
         go ctl read written writtenSeq createdSeq nextVid (k x)
 
-      FixStm f k ->
-        {-# SCC "execAtomically.go.FixStm" #-} do
+      FixStm f k -> do
         r <- newSTRef (throw NonTermination)
         x <- unsafeInterleaveST $ readSTRef r
         let k' = unSTM (f x) $ \x' ->
@@ -1551,7 +1531,6 @@ execAtomically' = go Map.empty
        -> ST s [SomeTVar s]
     go !written action = case action of
       ReturnStm () -> do
-        !_ <- traverse_ (\(SomeTVar tvar) -> commitTVar tvar) written
         return (Map.elems written)
       ReadTVar v k  -> do
         x <- execReadTVar v
@@ -1598,23 +1577,23 @@ execTryPutTMVar (TMVar var) a = do
 saveTVar :: TVar s a -> ST s ()
 saveTVar TVar{tvarCurrent, tvarUndo} = do
     -- push the current value onto the undo stack
-    v  <- readSTRef tvarCurrent
-    vs <- readSTRef tvarUndo
-    writeSTRef tvarUndo (v:vs)
+    v   <- readSTRef tvarCurrent
+    !vs <- readSTRef tvarUndo
+    writeSTRef tvarUndo $! v:vs
 
 revertTVar :: TVar s a -> ST s ()
 revertTVar TVar{tvarCurrent, tvarUndo} = do
     -- pop the undo stack, and revert the current value
-    vs <- readSTRef tvarUndo
-    writeSTRef tvarCurrent (head vs)
-    writeSTRef tvarUndo    (tail vs)
+    !vs <- readSTRef tvarUndo
+    !_  <- writeSTRef tvarCurrent (head vs)
+    writeSTRef tvarUndo $! tail vs
 {-# INLINE revertTVar #-}
 
 commitTVar :: TVar s a -> ST s ()
 commitTVar TVar{tvarUndo} = do
-    vs <- readSTRef tvarUndo
+    !vs <- readSTRef tvarUndo
     -- pop the undo stack, leaving the current value unchanged
-    writeSTRef tvarUndo (tail vs)
+    writeSTRef tvarUndo $! tail vs
 {-# INLINE commitTVar #-}
 
 readTVarUndos :: TVar s a -> ST s [a]
@@ -1630,8 +1609,8 @@ traceTVarST TVar{tvarCurrent, tvarUndo, tvarTrace} new = do
     case mf of
       Nothing -> return TraceValue { traceDynamic = (Nothing :: Maybe ()), traceString = Nothing }
       Just f  -> do
-        vs <- readSTRef tvarUndo
-        v <-  readSTRef tvarCurrent
+        !vs <- readSTRef tvarUndo
+        v   <- readSTRef tvarCurrent
         case (new, vs) of
           (True, _) -> f Nothing v
           (_, _:_)  -> f (Just $ last vs) v
