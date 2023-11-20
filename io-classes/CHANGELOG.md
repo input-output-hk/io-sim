@@ -6,6 +6,10 @@
 
 ### Non-breaking changes
 
+## 1.3.1.0
+
+### Non-breaking changes
+
 * Added `forkFinally` to `MonadFork`.
 
 ## 1.3.0.0
