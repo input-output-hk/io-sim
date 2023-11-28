@@ -812,7 +812,7 @@ ppSimEvent _ _ _ (SimRacesFound controls) =
 
 -- | A result type of a simulation.
 data SimResult a
-    = MainReturn    !Time !(Labelled IOSimThreadId) a ![Labelled IOSimThreadId]
+    = MainReturn    !Time !(Labelled IOSimThreadId) !a ![Labelled IOSimThreadId]
     -- ^ Return value of the main thread.
     | MainException !Time !(Labelled IOSimThreadId) SomeException ![Labelled IOSimThreadId]
     -- ^ Exception thrown by the main thread.
@@ -860,7 +860,7 @@ ppSimResult timeWidth tidWidth thLabelWidth r = case r of
              tidWidth
              ""
              thLabelWidth
-             "" 
+             ""
              "Deadlock"
              ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
     Loop -> "<<io-sim-por: step execution exceded explorationStepTimelimit>>"
@@ -1086,7 +1086,7 @@ data SimEventType
   -- ^ /IOSimPOR/ event: perform action of the given step
   | EventReschedule           ScheduleControl
 
-  | EventEffect VectorClock Effect
+  | EventEffect !VectorClock !Effect
   -- ^ /IOSimPOR/ event: executed effect; Useful for debugging IOSimPOR or
   -- showing compact information about thread execution.
   | EventRaces Races
@@ -1214,12 +1214,12 @@ data StmTxResult s a =
        --
        -- It also includes the updated TVarId name supply.
        --
-       StmTxCommitted a ![SomeTVar s] -- ^ written tvars
-                        ![SomeTVar s] -- ^ read tvars
-                        ![SomeTVar s] -- ^ created tvars
-                        ![Dynamic]
-                        ![String]
-                        !TVarId -- updated TVarId name supply
+       StmTxCommitted !a ![SomeTVar s] -- ^ written tvars
+                         ![SomeTVar s] -- ^ read tvars
+                         ![SomeTVar s] -- ^ created tvars
+                         ![Dynamic]
+                         ![String]
+                         !TVarId -- updated TVarId name supply
 
        -- | A blocked transaction reports the vars that were read so that the
        -- scheduler can block the thread on those vars.
@@ -1238,7 +1238,7 @@ data StmTxResult s a =
 -- that the right branch is still available, in case the left statement fails.
 data BranchStmA s a =
        -- | `OrElse` statement with its 'right' alternative.
-       OrElseStmA (StmA s a)
+       OrElseStmA !(StmA s a)
        -- | `CatchStm` statement with the 'catch' handler.
      | CatchStmA (SomeException -> StmA s a)
        -- | Unlike the other two branches, the no-op branch is not an explicit
@@ -1257,10 +1257,10 @@ data StmStack s b a where
   -- A right branch is represented by a frame containing empty statement.
   BranchFrame      :: !(BranchStmA s a)       -- right alternative, can be empty
                    -> (a -> StmA s b)         -- subsequent continuation
-                   -> Map TVarId (SomeTVar s) -- saved written vars set
-                   -> [SomeTVar s]            -- saved written vars list
-                   -> [SomeTVar s]            -- created vars list
-                   -> StmStack s b c
+                   -> !(Map TVarId (SomeTVar s)) -- saved written vars set
+                   -> ![SomeTVar s]            -- saved written vars list
+                   -> ![SomeTVar s]            -- created vars list
+                   -> !(StmStack s b c)
                    -> StmStack s a c
 
 ---
@@ -1270,7 +1270,7 @@ data StmStack s b a where
 -- | Race exploration options.
 --
 data ExplorationOptions = ExplorationOptions{
-    explorationScheduleBound :: Int,
+    explorationScheduleBound :: !Int,
     -- ^ This is an upper bound on the number of schedules with race reversals
     -- that will be explored; a bound of zero means that the default schedule
     -- will be explored, but no others. Setting the bound to zero makes
@@ -1281,7 +1281,7 @@ data ExplorationOptions = ExplorationOptions{
     -- and plays better with shrinking.
     --
     -- The default value is `100`.
-    explorationBranching     :: Int,
+    explorationBranching     :: !Int,
     -- ^ The branching factor. This is the number of alternative schedules that
     -- IOSimPOR tries to run, per race reversal. With the default parameters,
     -- IOSimPOR will try to reverse the first 33 (100 div 3) races discovered
@@ -1294,16 +1294,16 @@ data ExplorationOptions = ExplorationOptions{
     -- available to be reversed than the schedule bound).
     --
     -- The default value is `3`.
-    explorationStepTimelimit :: Maybe Int,
+    explorationStepTimelimit :: !(Maybe Int),
     -- ^ Limit on the computation time allowed per scheduling step, for
     -- catching infinite loops etc.
     --
     -- The default value is `Nothing`.
-    explorationReplay        :: Maybe ScheduleControl,
+    explorationReplay        :: !(Maybe ScheduleControl),
     -- ^ A schedule to replay.
     --
     -- The default value is `Nothing`.
-    explorationDebugLevel    :: Int
+    explorationDebugLevel    :: !Int
     -- ^ Log detailed trace to stderr containing information on discovered
     -- races.  The trace does not contain the result of the simulation, unless
     -- one will do that explicitly inside the simulation.

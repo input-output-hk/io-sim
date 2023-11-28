@@ -95,7 +95,7 @@ data Thread s a = Thread {
     -- other threads blocked in a ThrowTo to us because we are or were masked
     threadThrowTo :: ![(SomeException, Labelled IOSimThreadId)],
     threadClockId :: !ClockId,
-    threadLabel   ::  Maybe ThreadLabel,
+    threadLabel   :: !(Maybe ThreadLabel),
     threadNextTId :: !Int
   }
 
@@ -861,9 +861,9 @@ forkTimeoutInterruptThreads timeoutExpired simState =
   where
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)] 
+    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)]
 
-    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired 
+    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
         fn :: SimState s a
            -> (IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)

@@ -133,13 +133,13 @@ racingEffects e e' =
 --
 data ScheduleControl = ControlDefault
                      -- ^ default scheduling mode
-                     | ControlAwait [ScheduleMod]
+                     | ControlAwait ![ScheduleMod]
                      -- ^ if the current control is 'ControlAwait', the normal
                      -- scheduling will proceed, until the thread found in the
                      -- first 'ScheduleMod' reaches the given step.  At this
                      -- point the thread is put to sleep, until after all the
                      -- steps are followed.
-                     | ControlFollow [StepId] [ScheduleMod]
+                     | ControlFollow ![StepId] ![ScheduleMod]
                      -- ^ follow the steps then continue with schedule
                      -- modifications.  This control is set by 'followControl'
                      -- when 'controlTargets' returns true.
@@ -155,14 +155,14 @@ isDefaultSchedule _                     = False
 --
 data ScheduleMod = ScheduleMod{
     -- | Step at which the 'ScheduleMod' is activated.
-    scheduleModTarget    :: StepId,
+    scheduleModTarget    :: !StepId,
     -- | 'ScheduleControl' at the activation step.  It is needed by
     -- 'extendScheduleControl' when combining the discovered schedule with the
     -- initial one.
-    scheduleModControl   :: ScheduleControl,
+    scheduleModControl   :: !ScheduleControl,
     -- | Series of steps which are executed at the target step.  This *includes*
     -- the target step, not necessarily as the last step.
-    scheduleModInsertion :: [StepId]
+    scheduleModInsertion :: ![StepId]
   }
   deriving (Eq, Ord)
 

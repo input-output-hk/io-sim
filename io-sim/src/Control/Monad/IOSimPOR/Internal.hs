@@ -100,11 +100,11 @@ data Thread s a = Thread {
     -- other threads blocked in a ThrowTo to us because we are or were masked
     threadThrowTo :: ![(SomeException, Labelled IOSimThreadId, VectorClock)],
     threadClockId :: !ClockId,
-    threadLabel   :: Maybe ThreadLabel,
+    threadLabel   :: !(Maybe ThreadLabel),
     threadNextTId :: !Int,
     threadStep    :: !Int,
-    threadVClock  :: VectorClock,
-    threadEffect  :: Effect,  -- in the current step
+    threadVClock  :: !VectorClock,
+    threadEffect  :: !Effect,  -- in the current step
     threadRacy    :: !Bool
   }
   deriving Show
@@ -207,7 +207,7 @@ data SimState s a = SimState {
        control0         :: !ScheduleControl,
        -- | limit on the computation time allowed per scheduling step, for
        -- catching infinite loops etc
-       perStepTimeLimit :: Maybe Int
+       perStepTimeLimit :: !(Maybe Int)
 
      }
 
@@ -1729,10 +1729,10 @@ stepThread thread@Thread { threadId     = tid,
 updateRaces :: Thread s a -> SimState s a -> Races
 updateRaces thread@Thread { threadId = tid }
             SimState{ control, threads, races = races@Races { activeRaces } } =
-    let 
+    let
         newStep@Step{ stepEffect = newEffect } = currentStep thread
 
-        concurrent0 = 
+        concurrent0 =
           Map.keysSet (Map.filter (\t -> not (isThreadDone t)
                                       && threadId t `Set.notMember`
                                          effectForks newEffect

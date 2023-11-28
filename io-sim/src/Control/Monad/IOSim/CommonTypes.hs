@@ -39,8 +39,8 @@ import           Control.Monad.ST.Lazy
 import           NoThunks.Class
 
 import           Data.List (intercalate, intersperse)
-import           Data.Map (Map)
-import qualified Data.Map as Map
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import           Data.STRef.Lazy
 import           Data.Set (Set)
 import           GHC.Generics
@@ -57,10 +57,10 @@ import           Quiet
 data IOSimThreadId =
     -- | A racy thread (`IOSimPOR` only), shown in the trace with curly braces,
     -- e.g. `Thread {2,3}`.
-    RacyThreadId [Int]
+    RacyThreadId ![Int]
     -- | A non racy thread.  They have higher priority than racy threads in
     -- `IOSimPOR` scheduler.
-  | ThreadId     [Int]
+  | ThreadId     ![Int]
   deriving stock    (Eq, Ord, Show, Generic)
   deriving anyclass NFData
   deriving anyclass NoThunks
@@ -147,13 +147,13 @@ data SomeTVar s where
 
 data Deschedule = Yield
                 | Interruptable
-                | Blocked BlockedReason
+                | Blocked !BlockedReason
                 | Terminated
                 | Sleep
   deriving Show
 
 data ThreadStatus = ThreadRunning
-                  | ThreadBlocked BlockedReason
+                  | ThreadBlocked !BlockedReason
                   | ThreadDone
   deriving (Eq, Show)
 
