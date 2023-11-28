@@ -201,7 +201,7 @@ detachTraceRacesST trace0 = do
       go (SimPORTrace _ _ _ _ EventRaces {} trace)
                                        = go trace
       go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e <$> go trace
-      go (TraceRacesFound rs trace)    = saveRaces rs >> go trace
+      go (TraceRacesFound rs trace)    = saveRaces rs >>= \() -> go trace
       go t                             = return t
 
   trace <- go trace0
