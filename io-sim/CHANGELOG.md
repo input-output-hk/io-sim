@@ -8,6 +8,8 @@
 
 ### Non-breaking changes
 
+* `Alternative` & `MonadPlus` instances for `IOSim`.
+
 ## 1.3.1.0
 
 ### Non-breaking changes

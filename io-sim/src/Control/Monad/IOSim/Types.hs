@@ -12,6 +12,7 @@
 {-# LANGUAGE NumericUnderscores         #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 -- Needed for `SimEvent` type.
@@ -136,6 +137,7 @@ import           Control.Monad.IOSimPOR.Types
 
 import qualified System.IO.Error as IO.Error (userError)
 import Data.List (intercalate)
+import GHC.IO (mkUserError)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
 newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }
@@ -287,6 +289,11 @@ instance Fail.MonadFail (IOSim s) where
 instance MonadFix (IOSim s) where
     mfix f = IOSim $ oneShot $ \k -> Fix f k
 
+instance Alternative (IOSim s) where
+    empty = throwIO (mkUserError "mzero")
+    (<|>) !a b = a `catch` \(_ :: IOError) -> b
+
+instance MonadPlus (IOSim s)
 
 instance Functor (STM s) where
     {-# INLINE fmap #-}
