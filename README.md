@@ -62,40 +62,6 @@ a complex, highly concurrent, distributed system
 * `strict-stm`: strict STM operations
 * `si-timers`: non-standard timers API
 
-
-## Differences from `base`, `async`, or `exceptions` packages
-
-### Major differences
-
-* `threadDelay` is using `DiffTime` (which is measured in _seconds_ rather than _microseconds_).
-* `registerDelay` is using `DiffTime`
-* `timeout` is using `DiffTime`
-* `getMonotonicTime` returns `Time` (a newtype wrapper around `DiffTime`)
-
-
-### Minor differences
-
-Some of the types have more general kind signatures, e.g.
-
-```
-type Async :: (Type -> Type) -> Type -> Type
-```
-
-The first type of kind `Type -> Type` describes the monad which could be
-instantiated to `IO`, `IOSim` or some other monad stacks built with monad
-transformers.  The same applies to many other types, e.g. `TVar`, `TMVar`.
-
-The following types although similar to the originals are not the same as the
-ones that come from `base`, `async`, or `exceptions` packages:
-
-* `Handler` (origin: `base`)
-* `MaskingState` (origin: `base`)
-* `Concurrently` (origin: `async`)
-* `ExceptionInLinkedThread` (origin: `async`): `io-class`es version does not
-  store `Async`
-* `ExitCase` (origin: `exceptions`)
-
-
 ### Issues
 
 New issues should be reported in this repository, we still have a list
