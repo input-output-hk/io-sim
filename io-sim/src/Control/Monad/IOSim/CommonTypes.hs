@@ -1,15 +1,18 @@
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs               #-}
+{-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 -- | Common types shared between `IOSim` and `IOSimPOR`.
 --
 module Control.Monad.IOSim.CommonTypes
   ( IOSimThreadId (..)
+  , IOSimThreadIdMap
   , ppIOSimThreadId
   , StepId
   , ppStepId
@@ -38,14 +41,16 @@ import           Control.Monad.ST.Lazy
 
 import           NoThunks.Class
 
-import           Data.List (intercalate, intersperse)
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import           Data.STRef.Lazy
+import           Data.List (intercalate)
 import           Data.Set (Set)
+import           Data.STRef.Lazy
 import           GHC.Generics
 import           Quiet
 
+import           Data.Bifunctor (first)
+import           Data.IntMap.Strict (IntMap)
+import           Data.TrieMap.Class
+import           Data.TrieMap.ListMap
 
 -- | A thread id.
 --
@@ -77,6 +82,83 @@ setRacyThread :: IOSimThreadId -> IOSimThreadId
 setRacyThread (ThreadId is)      = RacyThreadId is
 setRacyThread tid@RacyThreadId{} = tid
 
+-- IOSimThreadId TrieMap data type
+--
+data IOSimThreadIdMap v
+  = IOSimThreadIdMap { ioSimRacyThreadId :: !(ListMap IntMap v)
+                     , ioSimThreadId     :: !(ListMap IntMap v)
+                     }
+
+instance (Show v) => Show (IOSimThreadIdMap v) where
+  show m = "fromListTM " ++ show (assocsTM m)
+
+instance Functor IOSimThreadIdMap where
+  fmap :: forall a b. (a -> b) -> IOSimThreadIdMap a -> IOSimThreadIdMap b
+  fmap f IOSimThreadIdMap { ioSimRacyThreadId
+                          , ioSimThreadId
+                          } =
+    IOSimThreadIdMap { ioSimRacyThreadId = fmap f ioSimRacyThreadId
+                     , ioSimThreadId     = fmap f ioSimThreadId
+                     }
+
+instance TrieMap IOSimThreadIdMap where
+   type Key IOSimThreadIdMap = IOSimThreadId
+
+   emptyTM :: forall a. IOSimThreadIdMap a
+   emptyTM  = IOSimThreadIdMap { ioSimRacyThreadId = emptyTM
+                               , ioSimThreadId     = emptyTM
+                               }
+
+   lookupTM :: forall b. IOSimThreadId -> IOSimThreadIdMap b -> Maybe b
+   lookupTM (RacyThreadId l)
+            IOSimThreadIdMap { ioSimRacyThreadId } = lookupTM l ioSimRacyThreadId
+   lookupTM (ThreadId l)
+            IOSimThreadIdMap { ioSimThreadId }     = lookupTM l ioSimThreadId
+
+   alterTM :: forall b. IOSimThreadId -> (Maybe b -> Maybe b) -> IOSimThreadIdMap b -> IOSimThreadIdMap b
+   alterTM  (RacyThreadId l) f ioSimThreadIdMap@IOSimThreadIdMap { ioSimRacyThreadId } =
+     ioSimThreadIdMap { ioSimRacyThreadId = alterTM l f ioSimRacyThreadId }
+   alterTM  (ThreadId l)     f ioSimThreadIdMap@IOSimThreadIdMap { ioSimThreadId }     =
+     ioSimThreadIdMap { ioSimThreadId = alterTM l f ioSimThreadId }
+
+   foldTM :: forall a b. (a -> b -> b) -> IOSimThreadIdMap a -> b -> b
+   foldTM f IOSimThreadIdMap
+              { ioSimRacyThreadId
+              , ioSimThreadId
+              } = foldTM f ioSimRacyThreadId
+                . foldTM f ioSimThreadId
+
+   filterTM :: forall a. (a -> Bool) -> IOSimThreadIdMap a -> IOSimThreadIdMap a
+   filterTM p IOSimThreadIdMap
+                { ioSimRacyThreadId
+                , ioSimThreadId
+                } =
+     IOSimThreadIdMap { ioSimRacyThreadId = filterTM p ioSimRacyThreadId
+                      , ioSimThreadId     = filterTM p ioSimThreadId
+                      }
+
+   unionWithTM :: (a -> a -> a) -> IOSimThreadIdMap a -> IOSimThreadIdMap a -> IOSimThreadIdMap a
+   unionWithTM f IOSimThreadIdMap { ioSimRacyThreadId = rtid1
+                                  , ioSimThreadId     = tid1
+                                  }
+                 IOSimThreadIdMap { ioSimRacyThreadId = rtid2
+                                  , ioSimThreadId     = tid2
+                                  } =
+     IOSimThreadIdMap { ioSimRacyThreadId = unionWithTM f rtid1 rtid2
+                      , ioSimThreadId     = unionWithTM f tid1 tid2
+                      }
+
+   assocsTM :: IOSimThreadIdMap a -> [(IOSimThreadId, a)]
+   assocsTM IOSimThreadIdMap { ioSimRacyThreadId
+                             , ioSimThreadId
+                             } =
+       fmap (first ThreadId)     (assocsTM ioSimThreadId)
+    ++ fmap (first RacyThreadId) (assocsTM ioSimRacyThreadId)
+
+instance Foldable IOSimThreadIdMap where
+  foldMap :: forall m a. Monoid m => (a -> m) -> IOSimThreadIdMap a -> m
+  foldMap = foldMapTM
+
 -- | Execution step in `IOSimPOR` is identified by the thread id and
 -- a monotonically increasing number (thread specific).
 --
@@ -91,12 +173,12 @@ ppStepId (tid, step) = concat [ppIOSimThreadId tid, ".", show step]
 newtype TVarId      = TVarId    Int   deriving (Eq, Ord, Enum, Show)
 newtype TimeoutId   = TimeoutId Int   deriving (Eq, Ord, Enum, Show)
 newtype ClockId     = ClockId   [Int] deriving (Eq, Ord, Show)
-newtype VectorClock = VectorClock { getVectorClock :: Map IOSimThreadId Int }
+newtype VectorClock = VectorClock { getVectorClock :: IOSimThreadIdMap Int }
   deriving Generic
   deriving Show via Quiet VectorClock
 
 ppVectorClock :: VectorClock -> String
-ppVectorClock (VectorClock m) = "VectorClock " ++ "[" ++ concat (intersperse ", " (ppStepId <$> Map.toList m)) ++ "]"
+ppVectorClock (VectorClock m) = "VectorClock " ++ "[" ++ intercalate ", " (ppStepId <$> assocsTM m) ++ "]"
 
 unTimeoutId :: TimeoutId -> Int
 unTimeoutId (TimeoutId a) = a
@@ -167,4 +249,4 @@ data BlockedReason = BlockedOnSTM
 --
 
 ppList :: (a -> String) -> [a] -> String
-ppList pp as = "[" ++ concat (intersperse ", " (map pp as)) ++ "]"
+ppList pp as = "[" ++ intercalate ", " (map pp as) ++ "]"

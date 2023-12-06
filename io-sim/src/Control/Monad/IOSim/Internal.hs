@@ -82,6 +82,7 @@ import           Control.Monad.IOSim.InternalTypes
 import           Control.Monad.IOSim.Types hiding (SimEvent (SimPOREvent),
                      Trace (SimPORTrace))
 import           Control.Monad.IOSim.Types (SimEvent)
+import           Data.TrieMap.Class
 
 --
 -- Simulation interpreter
@@ -1225,7 +1226,7 @@ execNewTVar nextVid !mbLabel x = do
     !tvarCurrent <- newSTRef x
     !tvarUndo    <- newSTRef $! []
     !tvarBlocked <- newSTRef ([], Set.empty)
-    !tvarVClock  <- newSTRef $! VectorClock Map.empty
+    !tvarVClock  <- newSTRef $! VectorClock emptyTM
     !tvarTrace   <- newSTRef $! Nothing
     return TVar {tvarId = nextVid, tvarLabel,
                  tvarCurrent, tvarUndo, tvarBlocked, tvarVClock,

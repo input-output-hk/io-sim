@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ExplicitNamespaces  #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}

@@ -55,7 +55,9 @@ library
                        Control.Monad.IOSimPOR.Types,
                        Control.Monad.IOSimPOR.QuickCheckUtils,
                        Control.Monad.IOSimPOR.Timeout,
-                       Data.Deque.Strict
+                       Data.Deque.Strict,
+                       Data.TrieMap.Class,
+                       Data.TrieMap.ListMap,
   default-language:    Haskell2010
   other-extensions:    BangPatterns,
                        CPP,

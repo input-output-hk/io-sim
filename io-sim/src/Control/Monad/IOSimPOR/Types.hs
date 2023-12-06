@@ -63,7 +63,7 @@ instance Semigroup Effect where
     Effect (r <> r') (w <> w') (s <> s') (ts ++ ts') (wu <> wu')
 
 instance Monoid Effect where
-  mempty = Effect Set.empty Set.empty Set.empty [] Set.empty
+  mempty = (((Effect $! Set.empty) $! Set.empty) $! Set.empty) [] $! Set.empty
 
 --
 -- Effect smart constructors
