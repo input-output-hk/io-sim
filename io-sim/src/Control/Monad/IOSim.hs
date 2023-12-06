@@ -129,8 +129,8 @@ import           Control.Monad.IOSimPOR.QuickCheckUtils
 
 import           Test.QuickCheck
 
-import           System.IO.Unsafe
 import qualified Debug.Trace as Debug
+import           System.IO.Unsafe
 
 
 selectTraceEvents
@@ -394,7 +394,7 @@ instance Exception Failure where
              , "please report the issue at\n"
              , "https://github.com/input-output-hk/io-sim/issues"
              ]
-    
+
 
 -- | 'IOSim' is a pure monad.
 --

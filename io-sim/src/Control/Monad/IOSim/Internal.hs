@@ -48,6 +48,8 @@ module Control.Monad.IOSim.Internal
 
 import           Prelude hiding (read)
 
+import           Data.Deque.Strict (Deque)
+import qualified Data.Deque.Strict as Deque
 import           Data.Dynamic
 import           Data.Foldable (foldlM, toList, traverse_)
 import qualified Data.List as List
@@ -60,8 +62,6 @@ import qualified Data.OrdPSQ as PSQ
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
-import           Data.Deque.Strict (Deque)
-import qualified Data.Deque.Strict as Deque
 
 import           Control.Exception (NonTermination (..), assert, throw)
 import           Control.Monad (join, when)

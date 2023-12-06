@@ -19,7 +19,7 @@ module Control.Monad.Class.MonadTimer.SI
   , TimeoutState (..)
     -- * Default implementations
   , defaultRegisterDelay
-  , defaultRegisterDelayCancellable  
+  , defaultRegisterDelayCancellable
   ) where
 
 import           Control.Concurrent.Class.MonadSTM
@@ -248,7 +248,7 @@ instance MonadTimer IO where
       maxDelay = microsecondsAsIntToDiffTime maxBound
 
   registerDelayCancellable =
-    defaultRegisterDelayCancellable 
+    defaultRegisterDelayCancellable
       NonStandard.newTimeout
       NonStandard.readTimeout
       NonStandard.cancelTimeout

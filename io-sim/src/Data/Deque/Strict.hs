@@ -4,9 +4,9 @@
 --
 module Data.Deque.Strict where
 
-import           Prelude hiding (head, init, tail)
 import           Data.Foldable (foldl', foldr')
 import qualified Data.List as List
+import           Prelude hiding (head, init, tail)
 
 data Deque a = Deque ![a] ![a]
 

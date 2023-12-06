@@ -43,8 +43,8 @@ import           Control.Monad.Class.MonadTime.SI
 import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.IOSim
 
-import           Test.Control.Monad.Utils
 import           Test.Control.Monad.STM
+import           Test.Control.Monad.Utils
 
 import           Test.QuickCheck
 import           Test.Tasty hiding (after)
@@ -995,7 +995,7 @@ prop_timeout
     :: TimeoutDuration
     -> ActionDuration
     -> Property
-prop_timeout intendedTimeoutDuration intendedActionDuration = 
+prop_timeout intendedTimeoutDuration intendedActionDuration =
     runSimOrThrow (withSanityCheck <$>
                     singleTimeoutExperiment
                       intendedTimeoutDuration
@@ -1077,7 +1077,7 @@ unit_timeouts_and_async_exceptions_1 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_2 :: Property
@@ -1098,7 +1098,7 @@ unit_timeouts_and_async_exceptions_2 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_3 :: Property
@@ -1119,7 +1119,7 @@ unit_timeouts_and_async_exceptions_3 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 -- | Verify that a thread blocked on `threadDelay` is not unblocked by an STM
@@ -1289,7 +1289,7 @@ instance Arbitrary DelayWithCancel where
 
 prop_registerDelayCancellable
     :: (forall s. DiffTime -> IOSim s (STM (IOSim s) TimeoutState, IOSim s ()))
-    -- ^ implementation 
+    -- ^ implementation
     -> DelayWithCancel
     -> Property
 prop_registerDelayCancellable registerDelayCancellableImpl

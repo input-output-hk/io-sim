@@ -1,6 +1,4 @@
-module Control.Monad.Class.MonadEventlog
-  ( MonadEventlog (..)
-  ) where
+module Control.Monad.Class.MonadEventlog (MonadEventlog (..)) where
 
 import           Control.Monad.Reader
 

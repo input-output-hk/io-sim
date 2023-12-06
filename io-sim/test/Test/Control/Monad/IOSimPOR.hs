@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
@@ -38,17 +38,17 @@ import           Control.Monad.IOSim
 
 import           GHC.Generics
 
-import           Test.Control.Monad.IOSim (TimeoutDuration, ActionDuration,
-                   WithSanityCheck (..), ignoreSanityCheck,
-                   isSanityCheckIgnored, singleTimeoutExperiment,
-                   withSanityCheck)
-import           Test.Control.Monad.Utils
+import           Test.Control.Monad.IOSim (ActionDuration, TimeoutDuration,
+                     WithSanityCheck (..), ignoreSanityCheck,
+                     isSanityCheckIgnored, singleTimeoutExperiment,
+                     withSanityCheck)
 import           Test.Control.Monad.STM
+import           Test.Control.Monad.Utils
 
+import qualified Data.List.Trace as Trace
 import           Test.QuickCheck
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck
-import qualified Data.List.Trace as Trace
 
 tests :: TestTree
 tests =
@@ -339,7 +339,7 @@ propSimulates cmp (Shrink2 (Tasks tasks)) =
       Left (FailureInternal msg)
                   -> counterexample msg False
       Left x      -> counterexample (ppTrace trace)
-                   $ counterexample (show x) True 
+                   $ counterexample (show x) True
 
 -- NOTE: This property needs to be executed sequentially, otherwise it fails
 -- undeterministically, which `exploreSimTraceST` does.
@@ -899,7 +899,7 @@ prop_timeout
     :: TimeoutDuration
     -> ActionDuration
     -> Property
-prop_timeout intendedTimeoutDuration intendedActionDuration = 
+prop_timeout intendedTimeoutDuration intendedActionDuration =
     exploreSimTrace id experiment $ \_ trace ->
         case traceResult False trace of
           Right a -> a
@@ -990,7 +990,7 @@ unit_timeouts_and_async_exceptions_1 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_2 :: Property
@@ -1012,7 +1012,7 @@ unit_timeouts_and_async_exceptions_2 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_3 :: Property
@@ -1034,7 +1034,7 @@ unit_timeouts_and_async_exceptions_3 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 --
 -- MonadMask properties

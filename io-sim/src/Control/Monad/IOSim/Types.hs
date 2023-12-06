@@ -1,18 +1,18 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTSyntax                 #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE NumericUnderscores         #-}
-{-# LANGUAGE PatternSynonyms            #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE BangPatterns              #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DeriveFunctor             #-}
+{-# LANGUAGE DeriveGeneric             #-}
+{-# LANGUAGE DerivingVia               #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTSyntax                #-}
+{-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE NamedFieldPuns            #-}
+{-# LANGUAGE NumericUnderscores        #-}
+{-# LANGUAGE PatternSynonyms           #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 -- Needed for `SimEvent` type.
 {-# OPTIONS_GHC -Wno-partial-fields     #-}
@@ -86,13 +86,13 @@ import           Control.Monad.Class.MonadAsync hiding (Async)
 import qualified Control.Monad.Class.MonadAsync as MonadAsync
 import           Control.Monad.Class.MonadEventlog
 import           Control.Monad.Class.MonadFork
+import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadST
 import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
                      MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
                      TArrayDefault, TChanDefault, TMVarDefault, TSemDefault,
                      TraceValue, atomically, retry)
 import qualified Control.Monad.Class.MonadSTM.Internal as MonadSTM
-import           Control.Monad.Class.MonadSay
 import           Control.Monad.Class.MonadTest
 import           Control.Monad.Class.MonadThrow as MonadThrow hiding
                      (getMaskingState)
@@ -116,8 +116,8 @@ import qualified Data.List.Trace as Trace
 import           Data.Map.Strict (Map)
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid (Endo (..))
-import           Data.STRef.Lazy
 import           Data.Semigroup (Max (..))
+import           Data.STRef.Lazy
 import           Data.Time.Clock (diffTimeToPicoseconds)
 import           Data.Typeable
 import           Data.Word (Word64)
@@ -134,8 +134,8 @@ import           Control.Monad.IOSim.STM
 import           Control.Monad.IOSimPOR.Types
 
 
+import           Data.List (intercalate)
 import qualified System.IO.Error as IO.Error (userError)
-import Data.List (intercalate)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
 newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }

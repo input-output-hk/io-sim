@@ -1,9 +1,9 @@
-{-# LANGUAGE DefaultSignatures  #-}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE NumericUnderscores         #-}
 
 module Control.Monad.Class.MonadTime.SI
   ( MonadTime (..)
@@ -20,19 +20,19 @@ module Control.Monad.Class.MonadTime.SI
   , NominalDiffTime
   ) where
 
-import           Control.Monad.Reader
 import           Control.DeepSeq (NFData (..))
+import           Control.Monad.Reader
 
-import           Control.Monad.Class.MonadTime ( MonadMonotonicTimeNSec,
-                     MonadTime (..), NominalDiffTime, UTCTime, diffUTCTime,
-                     addUTCTime)
+import           Control.Monad.Class.MonadTime (MonadMonotonicTimeNSec,
+                     MonadTime (..), NominalDiffTime, UTCTime, addUTCTime,
+                     diffUTCTime)
 import qualified Control.Monad.Class.MonadTime as MonadTime
 
 import           NoThunks.Class (NoThunks (..))
 
-import           Data.Word (Word64)
 import           Data.Time.Clock (DiffTime)
 import qualified Data.Time.Clock as Time
+import           Data.Word (Word64)
 import           GHC.Generics (Generic (..))
 
 

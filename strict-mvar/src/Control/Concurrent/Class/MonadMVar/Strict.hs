@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE TypeFamilies  #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | This module corresponds to "Control.Concurrent.MVar" in the @base@ package.

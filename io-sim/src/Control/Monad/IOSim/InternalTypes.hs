@@ -11,11 +11,12 @@ module Control.Monad.IOSim.InternalTypes
   , unsafeUnregisterTimeout
   ) where
 
-import           Control.Exception (Exception)
 import           Control.Concurrent.Class.MonadSTM
+import           Control.Exception (Exception)
 import           Control.Monad.Class.MonadThrow (MaskingState (..))
 
-import           Control.Monad.IOSim.Types (IOSim (..), SimA (..), IOSimThreadId, TimeoutId)
+import           Control.Monad.IOSim.Types (IOSim (..), IOSimThreadId,
+                     SimA (..), TimeoutId)
 
 import           GHC.Exts (oneShot)
 

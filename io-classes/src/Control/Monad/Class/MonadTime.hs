@@ -12,8 +12,8 @@ module Control.Monad.Class.MonadTime
 
 import           Control.Monad.Reader
 
-import           Data.Time.Clock (NominalDiffTime, UTCTime,
-                     addUTCTime, diffUTCTime)
+import           Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime,
+                     diffUTCTime)
 import qualified Data.Time.Clock as Time
 import           Data.Word (Word64)
 import qualified GHC.Clock as IO (getMonotonicTimeNSec)

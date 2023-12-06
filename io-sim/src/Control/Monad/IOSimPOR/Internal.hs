@@ -65,8 +65,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Time (UTCTime (..), fromGregorian)
 
-import           Control.Exception (NonTermination (..),
-                     assert, throw)
+import           Control.Exception (NonTermination (..), assert, throw)
 import           Control.Monad (join, when)
 import           Control.Monad.ST.Lazy
 import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)

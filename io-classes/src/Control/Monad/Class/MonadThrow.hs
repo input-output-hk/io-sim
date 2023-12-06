@@ -25,7 +25,7 @@ import           Control.Exception (Exception (..), MaskingState, SomeException)
 import qualified Control.Exception as IO
 import           Control.Monad (liftM)
 
-import           Control.Monad.Reader (ReaderT (..), runReaderT, lift)
+import           Control.Monad.Reader (ReaderT (..), lift, runReaderT)
 
 import           Control.Monad.STM (STM)
 import qualified Control.Monad.STM as STM

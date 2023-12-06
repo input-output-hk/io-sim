@@ -436,7 +436,7 @@ class MonadInspectSTM m
   -- This is supported by 'IOSim' (and 'IOSimPOR'); 'IO' has a trivial instance.
   --
   -- The simplest example is:
-  -- 
+  --
   -- >
   -- > traceTVar (Proxy @m) tvar (\_ -> TraceString . show)
   -- >

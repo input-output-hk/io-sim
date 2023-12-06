@@ -93,7 +93,7 @@ type NewTimeout m timeout = Int -> m timeout
 -- You should consider the cancelled state if you plan to use 'cancelTimeout'.
 --
 readTimeout :: ReadTimeout IO Timeout
-type ReadTimeout m timeout = timeout -> STM m TimeoutState 
+type ReadTimeout m timeout = timeout -> STM m TimeoutState
 
 
 -- | Cancel a timeout (unless it has already fired), putting it into the

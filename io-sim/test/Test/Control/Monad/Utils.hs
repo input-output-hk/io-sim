@@ -12,8 +12,8 @@ import           Data.List (sortBy)
 
 import           Control.Monad
 
-import           Control.Monad.Class.MonadFork
 import           Control.Concurrent.Class.MonadSTM.Strict
+import           Control.Monad.Class.MonadFork
 import           Control.Monad.Class.MonadThrow
 import           Control.Monad.Class.MonadTimer.SI
 import           Control.Monad.IOSim
