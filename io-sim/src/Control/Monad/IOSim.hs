@@ -131,6 +131,7 @@ import           Test.QuickCheck
 
 import           System.IO.Unsafe
 import qualified Debug.Trace as Debug
+import System.Random (StdGen)
 
 
 selectTraceEvents
@@ -394,19 +395,19 @@ instance Exception Failure where
              , "please report the issue at\n"
              , "https://github.com/input-output-hk/io-sim/issues"
              ]
-    
+
 
 -- | 'IOSim' is a pure monad.
 --
-runSim :: forall a. (forall s. IOSim s a) -> Either Failure a
-runSim mainAction = traceResult False (runSimTrace mainAction)
+runSim :: forall a. StdGen -> (forall s. IOSim s a) -> Either Failure a
+runSim stdGen mainAction = traceResult False (runSimTrace stdGen mainAction)
 
 -- | For quick experiments and tests it is often appropriate and convenient to
 -- simply throw failures as exceptions.
 --
-runSimOrThrow :: forall a. (forall s. IOSim s a) -> a
-runSimOrThrow mainAction =
-    case runSim mainAction of
+runSimOrThrow :: forall a. StdGen -> (forall s. IOSim s a) -> a
+runSimOrThrow stdGen mainAction =
+    case runSim stdGen mainAction of
       Left  e -> throw e
       Right x -> x
 
@@ -414,8 +415,8 @@ runSimOrThrow mainAction =
 -- threads still running or blocked. If one is trying to follow a strict thread
 -- clean-up policy then this helps testing for that.
 --
-runSimStrictShutdown :: forall a. (forall s. IOSim s a) -> Either Failure a
-runSimStrictShutdown mainAction = traceResult True (runSimTrace mainAction)
+runSimStrictShutdown :: forall a. StdGen -> (forall s. IOSim s a) -> Either Failure a
+runSimStrictShutdown stdGen mainAction = traceResult True (runSimTrace stdGen mainAction)
 
 -- | Fold through the trace and return either a 'Failure' or the simulation
 -- result, i.e. the return value of the main thread.
@@ -484,8 +485,8 @@ ppEvents events =
 
 -- | See 'runSimTraceST' below.
 --
-runSimTrace :: forall a. (forall s. IOSim s a) -> SimTrace a
-runSimTrace mainAction = runST (runSimTraceST mainAction)
+runSimTrace :: forall a. StdGen -> (forall s. IOSim s a) -> SimTrace a
+runSimTrace stdGen mainAction = runST (runSimTraceST stdGen mainAction)
 
 --
 -- IOSimPOR

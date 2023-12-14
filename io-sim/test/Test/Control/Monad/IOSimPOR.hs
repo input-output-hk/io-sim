@@ -49,6 +49,7 @@ import           Test.QuickCheck
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck
 import qualified Data.List.Trace as Trace
+import System.Random (mkStdGen)
 
 tests :: TestTree
 tests =
@@ -330,16 +331,16 @@ maxTaskValue (WhenSet m _:_) = m
 maxTaskValue (_:t)           = maxTaskValue t
 maxTaskValue []              = 0
 
-propSimulates :: Compare -> Shrink2 Tasks -> Property
-propSimulates cmp (Shrink2 (Tasks tasks)) =
+propSimulates :: Int -> Compare -> Shrink2 Tasks -> Property
+propSimulates r cmp (Shrink2 (Tasks tasks)) =
   any (not . null . (\(Task steps)->steps)) tasks ==>
-    let trace = runSimTrace (runTasks cmp tasks) in
+    let trace = runSimTrace (mkStdGen r) (runTasks cmp tasks) in
     case traceResult False trace of
       Right (m,a) -> property (m >= a)
       Left (FailureInternal msg)
                   -> counterexample msg False
       Left x      -> counterexample (ppTrace trace)
-                   $ counterexample (show x) True 
+                   $ counterexample (show x) True
 
 -- NOTE: This property needs to be executed sequentially, otherwise it fails
 -- undeterministically, which `exploreSimTraceST` does.
@@ -736,7 +737,7 @@ unit_fork_1 =
 -- Asyncronous exceptions
 --
 
-unit_async_1, unit_async_2, unit_async_3, unit_async_4,
+unit_async_1, unit_async_3, unit_async_4,
   unit_async_5, unit_async_6, unit_async_7, unit_async_8,
   unit_async_9
   :: Property
@@ -751,9 +752,9 @@ unit_async_1 =
                   ) $ \_ trace ->
     selectTraceSay trace === ["before"]
 
-
-unit_async_2 =
-    runSimTraceSay
+unit_async_2 :: Int -> Property
+unit_async_2 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- myThreadId
           catch (do say "before"
                     throwTo tid DivideByZero
@@ -899,7 +900,7 @@ prop_timeout
     :: TimeoutDuration
     -> ActionDuration
     -> Property
-prop_timeout intendedTimeoutDuration intendedActionDuration = 
+prop_timeout intendedTimeoutDuration intendedActionDuration =
     exploreSimTrace id experiment $ \_ trace ->
         case traceResult False trace of
           Right a -> a
@@ -990,7 +991,7 @@ unit_timeouts_and_async_exceptions_1 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_2 :: Property
@@ -1012,7 +1013,7 @@ unit_timeouts_and_async_exceptions_2 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_3 :: Property
@@ -1034,7 +1035,7 @@ unit_timeouts_and_async_exceptions_3 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 --
 -- MonadMask properties

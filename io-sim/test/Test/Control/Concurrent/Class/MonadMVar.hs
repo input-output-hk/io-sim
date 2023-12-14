@@ -22,47 +22,48 @@ import           Test.QuickCheck
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck (testProperty)
+import System.Random (StdGen, mkStdGen)
 
 tests :: TestTree
 tests =
     testGroup "Control.Concurrent.Class.MonadMVar"
     [ testGroup "putMVar"
       [ testProperty "fairness (IOSim)" prop_putMVar_fairness_sim
-      , testCase "blocks on a full MVar (IOSim)"
+      , testProperty "blocks on a full MVar (IOSim)"
         unit_putMVar_blocks_on_full_sim
       , testCase "blocks on a full MVar (IO)"
         unit_putMVar_blocks_on_full_io
       ]
     , testGroup "takeMVar"
       [ testProperty "fairness (IOSim)" prop_takeMVar_fairness_sim
-      , testCase "blocks on an empty MVar (IOSim)"
+      , testProperty "blocks on an empty MVar (IOSim)"
         unit_takeMVar_blocks_on_empty_sim
       , testCase "blocks on an empty MVar (IO)"
         unit_takeMVar_blocks_on_empty_io
       ]
     , testGroup "tryTakeMVar"
-      [ testCase "does not block on an empty MVar (IOSim)"
+      [ testProperty "does not block on an empty MVar (IOSim)"
         unit_tryTakeMVar_empty
-      , testCase "does not block on a full MVar (IOSim)"
+      , testProperty "does not block on a full MVar (IOSim)"
         unit_tryTakeMVar_full
-      , testCase "return value on an empty MVar (IOSim)"
+      , testProperty "return value on an empty MVar (IOSim)"
         unit_tryTakeMVar_return_empty_sim
-      , testCase "return value on an full MVar (IOSim)"
+      , testProperty "return value on an full MVar (IOSim)"
         unit_tryTakeMVar_return_full_sim
       ]
     , testGroup "tryPutMVar"
-      [ testCase "does not block on an empty MVar (IOSim)"
+      [ testProperty "does not block on an empty MVar (IOSim)"
         unit_tryPutMVar_empty
-      , testCase "does not block on a full MVar (IOSim)"
+      , testProperty "does not block on a full MVar (IOSim)"
         unit_tryPutMVar_full
-      , testCase "return value on an empty MVar (IOSim)"
+      , testProperty "return value on an empty MVar (IOSim)"
         unit_tryPutMVar_return_empty_sim
-      , testCase "return value on an full MVar (IOSim)"
+      , testProperty "return value on an full MVar (IOSim)"
         unit_tryPutMVar_return_full_sim
       ]
     , testGroup "isEmptyMVar"
-      [ testCase "empty MVar is empty"    unit_isEmptyMVar_empty_sim
-      , testCase "full MVar is not empty" unit_isEmptyMVar_full_sim
+      [ testProperty "empty MVar is empty"    unit_isEmptyMVar_empty_sim
+      , testProperty "full MVar is not empty" unit_isEmptyMVar_full_sim
       ]
     ]
 
@@ -91,10 +92,11 @@ putMVar_fairness_property n = do
     results <- sequence (replicate n (takeMVar v))
     return $ results == [1..n]
 
-prop_putMVar_fairness_sim :: Positive (Small Int)
+prop_putMVar_fairness_sim :: Int
+                          -> Positive (Small Int)
                           -> Property
-prop_putMVar_fairness_sim (Positive (Small n)) =
-    let trace = runSimTrace (putMVar_fairness_property n)
+prop_putMVar_fairness_sim r (Positive (Small n)) =
+    let trace = runSimTrace (mkStdGen r) (putMVar_fairness_property n)
     in counterexample (ppTrace trace)
      $ case traceResult False trace of
         Left err -> counterexample (show err) False
@@ -118,9 +120,10 @@ unit_putMVar_blocks_on_full = do
     end <- getMonotonicTime
     return (end `diffTime` start >= delta)
 
-unit_putMVar_blocks_on_full_sim :: Assertion
-unit_putMVar_blocks_on_full_sim = assertBool "did not block on an full MVar" $
-    runSimOrThrow unit_putMVar_blocks_on_full
+unit_putMVar_blocks_on_full_sim :: Int -> Property
+unit_putMVar_blocks_on_full_sim r =
+    counterexample "did not block on an full MVar"
+  $ runSimOrThrow (mkStdGen r) unit_putMVar_blocks_on_full
 
 unit_putMVar_blocks_on_full_io :: Assertion
 unit_putMVar_blocks_on_full_io =
@@ -151,10 +154,11 @@ takeMVar_fairness_property n = do
     results <- waitAll ts
     return $ results === [1..n]
 
-prop_takeMVar_fairness_sim :: Positive (Small Int)
+prop_takeMVar_fairness_sim :: Int
+                           -> Positive (Small Int)
                            -> Property
-prop_takeMVar_fairness_sim (Positive (Small n)) =
-    runSimOrThrow (takeMVar_fairness_property n)
+prop_takeMVar_fairness_sim r (Positive (Small n)) =
+    runSimOrThrow (mkStdGen r) (takeMVar_fairness_property n)
 
 
 unit_takeMVar_blocks_on_empty
@@ -173,8 +177,10 @@ unit_takeMVar_blocks_on_empty = do
     end <- getMonotonicTime
     return (end `diffTime` start >= delta)
 
-unit_takeMVar_blocks_on_empty_sim :: Assertion
-unit_takeMVar_blocks_on_empty_sim = assertBool "did not block on an empty MVar" $ runSimOrThrow unit_takeMVar_blocks_on_empty
+unit_takeMVar_blocks_on_empty_sim :: Int -> Property
+unit_takeMVar_blocks_on_empty_sim r =
+    counterexample "did not block on an empty MVar"
+  $ runSimOrThrow (mkStdGen r) unit_takeMVar_blocks_on_empty
 
 unit_takeMVar_blocks_on_empty_io :: Assertion
 unit_takeMVar_blocks_on_empty_io =
@@ -188,9 +194,9 @@ unit_takeMVar_blocks_on_empty_io =
 -- | Check that `IOSim`'s `tryTakeMVar` is non blocking.
 --
 tryTakeMVar_non_blocking_property
-  :: Bool -> Bool
-tryTakeMVar_non_blocking_property isEmpty =
-    validateTrace $ runSimTrace $ do
+  :: StdGen -> Bool -> Bool
+tryTakeMVar_non_blocking_property stdGen isEmpty =
+    validateTrace $ runSimTrace stdGen $ do
       v <- if isEmpty
            then newEmptyMVar
            else newMVar ()
@@ -202,13 +208,15 @@ tryTakeMVar_non_blocking_property isEmpty =
                                            EventTxBlocked {} -> All False
                                            _                 -> All True)
 
-unit_tryTakeMVar_empty :: Assertion
-unit_tryTakeMVar_empty = assertBool "blocked on an empty MVar" $
-    tryTakeMVar_non_blocking_property False
+unit_tryTakeMVar_empty :: Int -> Property
+unit_tryTakeMVar_empty r =
+    counterexample "blocked on an empty MVar"
+  $ tryTakeMVar_non_blocking_property (mkStdGen r) False
 
-unit_tryTakeMVar_full :: Assertion
-unit_tryTakeMVar_full = assertBool "blocked on an empty MVar" $
-    tryTakeMVar_non_blocking_property True
+unit_tryTakeMVar_full :: Int -> Property
+unit_tryTakeMVar_full r =
+    counterexample "blocked on an empty MVar"
+  $ tryTakeMVar_non_blocking_property (mkStdGen r) True
 
 
 tryTakeMVar_return_value
@@ -222,15 +230,15 @@ tryTakeMVar_return_value isEmpty =
        a <- tryTakeMVar v
        return $ isNothing a == isEmpty
 
-unit_tryTakeMVar_return_empty_sim :: Assertion
-unit_tryTakeMVar_return_empty_sim =
-    assertBool "tryTakeMVar on an empty should return result" $
-    runSimOrThrow (tryTakeMVar_return_value True)
+unit_tryTakeMVar_return_empty_sim :: Int -> Property
+unit_tryTakeMVar_return_empty_sim r =
+    counterexample "tryTakeMVar on an empty should return result"
+  $ runSimOrThrow (mkStdGen r) (tryTakeMVar_return_value True)
 
-unit_tryTakeMVar_return_full_sim :: Assertion
-unit_tryTakeMVar_return_full_sim =
-    assertBool "tryTakeMVar on an full should return result" $
-    runSimOrThrow (tryTakeMVar_return_value False)
+unit_tryTakeMVar_return_full_sim :: Int -> Property
+unit_tryTakeMVar_return_full_sim r =
+    counterexample "tryTakeMVar on an full should return result"
+  $ runSimOrThrow (mkStdGen r) (tryTakeMVar_return_value False)
 
 --
 -- tryPutMVar
@@ -239,9 +247,9 @@ unit_tryTakeMVar_return_full_sim =
 -- | Check that `IOSim`'s `tryPutMVar` is non blocking.
 --
 tryPutMVar_non_blocking_property
-  :: Bool -> Bool
-tryPutMVar_non_blocking_property isEmpty =
-    validateTrace $ runSimTrace $ do
+  :: StdGen -> Bool -> Bool
+tryPutMVar_non_blocking_property stdGen isEmpty =
+    validateTrace $ runSimTrace stdGen $ do
       v <- if isEmpty
            then newEmptyMVar
            else newMVar ()
@@ -253,13 +261,15 @@ tryPutMVar_non_blocking_property isEmpty =
                                            EventTxBlocked {} -> All False
                                            _                 -> All True)
 
-unit_tryPutMVar_empty :: Assertion
-unit_tryPutMVar_empty = assertBool "blocked on an empty MVar" $
-    tryPutMVar_non_blocking_property False
+unit_tryPutMVar_empty :: Int -> Property
+unit_tryPutMVar_empty r =
+    counterexample "blocked on an empty MVar"
+  $ tryPutMVar_non_blocking_property (mkStdGen r) False
 
-unit_tryPutMVar_full :: Assertion
-unit_tryPutMVar_full = assertBool "blocked on an empty MVar" $
-    tryPutMVar_non_blocking_property True
+unit_tryPutMVar_full :: Int -> Property
+unit_tryPutMVar_full r =
+    counterexample "blocked on an empty MVar"
+  $ tryPutMVar_non_blocking_property (mkStdGen r) True
 
 
 tryPutMVar_return_value
@@ -275,15 +285,15 @@ tryPutMVar_return_value isEmpty = do
     a <- tryPutMVar v ()
     return $ a == isEmpty
 
-unit_tryPutMVar_return_empty_sim :: Assertion
-unit_tryPutMVar_return_empty_sim =
-    assertBool "tryPutMVar on an empty should return result" $
-    runSimOrThrow (tryPutMVar_return_value True)
+unit_tryPutMVar_return_empty_sim :: Int -> Property
+unit_tryPutMVar_return_empty_sim r =
+    counterexample "tryPutMVar on an empty should return result"
+  $ runSimOrThrow (mkStdGen r) (tryPutMVar_return_value True)
 
-unit_tryPutMVar_return_full_sim :: Assertion
-unit_tryPutMVar_return_full_sim =
-    assertBool "tryPutMVar on an full should return result" $
-    runSimOrThrow (tryPutMVar_return_value False)
+unit_tryPutMVar_return_full_sim :: Int -> Property
+unit_tryPutMVar_return_full_sim r =
+    counterexample "tryPutMVar on an full should return result"
+  $ runSimOrThrow (mkStdGen r) (tryPutMVar_return_value False)
 
 --
 -- isEmptyMVar
@@ -300,15 +310,15 @@ prop_isEmptyMVar isEmpty = do
          else newMVar ()
     (isEmpty ==) <$> isEmptyMVar v
 
-unit_isEmptyMVar_empty_sim :: Assertion
-unit_isEmptyMVar_empty_sim =
-    assertBool "empty mvar must be empty" $
-    runSimOrThrow (prop_isEmptyMVar True)
+unit_isEmptyMVar_empty_sim :: Int -> Property
+unit_isEmptyMVar_empty_sim r =
+    counterexample "empty mvar must be empty"
+  $ runSimOrThrow (mkStdGen r) (prop_isEmptyMVar True)
 
-unit_isEmptyMVar_full_sim :: Assertion
-unit_isEmptyMVar_full_sim =
-    assertBool "full mvar must not be empty" $
-    runSimOrThrow (prop_isEmptyMVar False)
+unit_isEmptyMVar_full_sim :: Int -> Property
+unit_isEmptyMVar_full_sim r =
+    counterexample "full mvar must not be empty"
+  $ runSimOrThrow (mkStdGen r) (prop_isEmptyMVar False)
 
 --
 -- Utils

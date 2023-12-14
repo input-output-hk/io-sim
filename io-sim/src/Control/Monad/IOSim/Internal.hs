@@ -76,12 +76,13 @@ import           Control.Monad.Class.MonadSTM hiding (STM)
 import           Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
 import           Control.Monad.Class.MonadThrow hiding (getMaskingState)
 import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
+import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..), DiffTime, diffTimeToMicrosecondsAsInt, microsecondsAsIntToDiffTime)
 
 import           Control.Monad.IOSim.InternalTypes
 import           Control.Monad.IOSim.Types hiding (SimEvent (SimPOREvent),
                      Trace (SimPORTrace))
 import           Control.Monad.IOSim.Types (SimEvent)
+import System.Random (StdGen, randomR, split)
 
 --
 -- Simulation interpreter
@@ -150,11 +151,12 @@ data SimState s a = SimState {
        -- | list of clocks
        clocks   :: !(Map ClockId UTCTime),
        nextVid  :: !TVarId,     -- ^ next unused 'TVarId'
-       nextTmid :: !TimeoutId   -- ^ next unused 'TimeoutId'
+       nextTmid :: !TimeoutId,   -- ^ next unused 'TimeoutId'
+       stdGen   :: !StdGen
      }
 
-initialState :: SimState s a
-initialState =
+initialState :: StdGen -> SimState s a
+initialState stdGen =
     SimState {
       runqueue = mempty,
       threads  = Map.empty,
@@ -162,7 +164,8 @@ initialState =
       timers   = PSQ.empty,
       clocks   = Map.singleton (ClockId []) epoch1970,
       nextVid  = TVarId 0,
-      nextTmid = TimeoutId 0
+      nextTmid = TimeoutId 0,
+      stdGen   = stdGen
     }
   where
     epoch1970 = UTCTime (fromGregorian 1970 1 1) 0
@@ -189,6 +192,42 @@ invariant Nothing SimState{runqueue,threads,clocks} =
 timeSinceEpoch :: Time -> NominalDiffTime
 timeSinceEpoch (Time t) = fromRational (toRational t)
 
+-- | This function receives a delay and adds jitter to it. The amount of
+-- jitter added is proportional to how large the delay is so to not greatly
+-- affect the indended behaviour of the function that calls it.
+--
+-- This function is used in order to introduce random delays between
+-- concurrent threads so that different thread schedulings might be found.
+--
+-- This approach is nice because, since time is perfect (due to infinite
+-- processing power of IOSim), IOSim will be able to introduce slight delays
+-- that might lead to threads being scheduled differently.
+--
+-- Note that this only enables IOSim to explore different thread schedules for
+-- concurrent threads blocked on 'threadDelay'. For threads blocked on STM
+-- IOSim employs a way to awake threads in a pseudo random way.
+--
+-- Also note that it is safe to add jitter to 'threadDelay' because we only
+-- have to guarantee that the thread is not woken up earlier than the delay
+-- specified.
+--
+jitterDelay :: StdGen -> DiffTime -> DiffTime
+jitterDelay stdGen d =
+  let -- Convert delay from DiffTime to picoseconds
+      delayInMicrosecondsAsInt = diffTimeToMicrosecondsAsInt d
+
+      -- Define the maximum jitter as a percentage of the delay
+      -- For example, 10% of the delay
+      maxJitter = delayInMicrosecondsAsInt `div` 10
+
+      -- Generate a random jitter value within the range
+      (jitterInMicrosecondsAsInt, _) = randomR (0, maxJitter) stdGen
+
+      -- Convert jitter back to DiffTime
+      jitter = microsecondsAsIntToDiffTime jitterInMicrosecondsAsInt
+
+   in -- Add jitter to the original delay
+      d + jitter
 
 -- | Schedule / run a thread.
 --
@@ -205,7 +244,8 @@ schedule !thread@Thread{
            timers,
            clocks,
            nextVid, nextTmid,
-           curTime  = time
+           curTime  = time,
+           stdGen
          } =
   invariant (Just thread) simstate $
   case action of
@@ -390,12 +430,15 @@ schedule !thread@Thread{
       !tvar <- execNewTVar nextVid
                           (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
-      let !expiry  = d `addTime` time
+      let !expiry  = jitterDelay stdGen d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
+          (_, !stdGen') = split stdGen
       trace <- schedule thread' simstate { timers   = timers'
                                          , nextVid  = succ nextVid
-                                         , nextTmid = succ nextTmid }
+                                         , nextTmid = succ nextTmid
+                                         , stdGen   = stdGen'
+                                         }
       return (SimTrace time tid tlbl
                 (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
 
@@ -409,11 +452,14 @@ schedule !thread@Thread{
               trace)
 
     ThreadDelay d k -> do
-      let !expiry  = d `addTime` time
+      let !expiry  = jitterDelay stdGen d `addTime` time
           !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           !thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
+          (_, !stdGen') = split stdGen
       !trace <- deschedule (Blocked BlockedOnDelay) thread' simstate { timers   = timers'
-                                                                     , nextTmid = succ nextTmid }
+                                                                     , nextTmid = succ nextTmid
+                                                                     , stdGen   = stdGen'
+                                                                     }
       return (SimTrace time tid tlbl (EventThreadDelay nextTmid expiry) trace)
 
     -- we treat negative timers as cancelled ones; for the record we put
@@ -432,13 +478,16 @@ schedule !thread@Thread{
       !tvar  <- execNewTVar nextVid
                            (Just $! "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
-      let !expiry  = d `addTime` time
+      let !expiry  = jitterDelay stdGen d `addTime` time
           !t       = Timeout tvar nextTmid
           !timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
           !thread' = thread { threadControl = ThreadControl (k t) ctl }
+          (_, !stdGen') = split stdGen
       trace <- schedule thread' simstate { timers   = timers'
                                          , nextVid  = succ nextVid
-                                         , nextTmid = succ nextTmid }
+                                         , nextTmid = succ nextTmid
+                                         , stdGen   = stdGen'
+                                         }
       return (SimTrace time tid tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
 
     CancelTimeout (Timeout tvar tmid) k -> do
@@ -861,9 +910,9 @@ forkTimeoutInterruptThreads timeoutExpired simState =
   where
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)] 
+    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)]
 
-    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired 
+    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
         fn :: SimState s a
            -> (IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)
@@ -997,8 +1046,8 @@ lookupThreadLabel tid threads = join (threadLabel <$> Map.lookup tid threads)
 -- computation with 'Control.Monad.IOSim.traceEvents'.  A slightly more
 -- convenient way is exposed by 'Control.Monad.IOSim.runSimTrace'.
 --
-runSimTraceST :: forall s a. IOSim s a -> ST s (SimTrace a)
-runSimTraceST mainAction = schedule mainThread initialState
+runSimTraceST :: forall s a. StdGen -> IOSim s a -> ST s (SimTrace a)
+runSimTraceST stdGen mainAction = schedule mainThread (initialState stdGen)
   where
     mainThread =
       Thread {
