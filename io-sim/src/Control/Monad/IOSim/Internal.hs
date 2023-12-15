@@ -849,14 +849,17 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
     timeoutSTMAction TimerTimeout{}           = return ()
 
 unblockThreads :: Bool -> [IOSimThreadId] -> SimState s a -> ([IOSimThreadId], SimState s a)
-unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads} =
+unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads, stdGen} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
     (unblocked, simstate {
-                  runqueue = runqueue <> Deque.fromList unblocked,
-                  threads  = threads'
+                  runqueue = Deque.fromList shuffledRunqueue,
+                  threads  = threads',
+                  stdGen   = stdGen'
                 })
   where
+    !(shuffledRunqueue, stdGen') = fisherYatesShuffle stdGen runqueue'
+    !runqueue' = Deque.toList $ runqueue <> Deque.fromList unblocked
     -- can only unblock if the thread exists and is blocked (not running)
     !unblocked = [ tid
                  | tid <- wakeup
@@ -872,6 +875,19 @@ unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads} =
                    (flip (Map.adjust (\t -> t { threadStatus = ThreadRunning })))
                    threads
                    unblocked
+
+    -- Fisher-Yates shuffle implementation
+    fisherYatesShuffle :: StdGen -> [a] -> ([a], StdGen)
+    fisherYatesShuffle gen [] = ([], gen)
+    fisherYatesShuffle gen l =
+        let (l', gen') = go (length l - 1) l gen
+        in (l', gen')
+      where
+        go 0 lst g = (lst, g)
+        go n lst g = let (k, newGen) = randomR (0, n) g
+                         (x:xs) = drop k lst
+                         swapped = take k lst ++ [lst !! n] ++ drop (k + 1) lst
+                     in go (n - 1) (take n swapped ++ [x] ++ drop n xs) newGen
 
 -- | This function receives a list of TimerTimeout values that represent threads
 -- for which the timeout expired and kills the running thread if needed.
