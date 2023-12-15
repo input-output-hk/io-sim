@@ -853,13 +853,17 @@ unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads, stdGen} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
     (unblocked, simstate {
-                  runqueue = Deque.fromList shuffledRunqueue,
+                  runqueue = Deque.fromList (shuffledRunqueue ++ rest),
                   threads  = threads',
-                  stdGen   = stdGen'
+                  stdGen   = stdGen''
                 })
   where
-    !(shuffledRunqueue, stdGen') = fisherYatesShuffle stdGen runqueue'
-    !runqueue' = Deque.toList $ runqueue <> Deque.fromList unblocked
+    !(shuffledRunqueue, stdGen'') = fisherYatesShuffle stdGen' toShuffle
+    !((toShuffle, rest), stdGen') =
+      let runqueueList = Deque.toList $ runqueue <> Deque.fromList unblocked
+          runqueueListLength = max 1 (length runqueueList)
+          (ix, newGen) = randomR (0, runqueueListLength `div` 2) stdGen
+       in (splitAt ix runqueueList, newGen)
     -- can only unblock if the thread exists and is blocked (not running)
     !unblocked = [ tid
                  | tid <- wakeup
