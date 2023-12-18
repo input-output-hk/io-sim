@@ -84,7 +84,6 @@ import           Control.Monad.IOSim.Types hiding (SimEvent (SimPOREvent),
                      Trace (SimPORTrace))
 import           Control.Monad.IOSim.Types (SimEvent)
 import           Data.Bifunctor (first)
-import           Data.Ord (comparing)
 import           System.Random (StdGen, randomR, split)
 
 --
@@ -856,42 +855,31 @@ unblockThreads !onlySTM !wakeup simstate@SimState {runqueue, threads, stdGen} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
     (unblocked, simstate {
-                  runqueue = runqueue <> Deque.fromList unblocked,
+                  runqueue = Deque.fromList shuffledRunqueue,
                   threads  = threads',
                   stdGen   = stdGen''
                 })
   where
     -- can only unblock if the thread exists and is blocked (not running)
-    !blockedOnOther = [ (tid, ix)
-                      | (tid, ix) <- zip wakeup [0 :: Int ..]
-                      , case Map.lookup tid threads of
-                         Just Thread { threadStatus = ThreadBlocked BlockedOnSTM }
-                           -> False
-                         Just Thread { threadStatus = ThreadBlocked _ }
-                           -> not onlySTM
-                         _ -> False
-                      ]
+    !unblocked = [ tid
+                 | tid <- wakeup
+                 , case Map.lookup tid threads of
+                    Just Thread { threadStatus = ThreadBlocked BlockedOnSTM }
+                      -> True
+                    Just Thread { threadStatus = ThreadBlocked _ }
+                      -> not onlySTM
+                    _ -> False
+                 ]
 
-    !blockedOnSTM = [ (tid, ix)
-                    | (tid, ix) <- zip wakeup [0 :: Int ..]
-                    , case Map.lookup tid threads of
-                       Just Thread { threadStatus = ThreadBlocked BlockedOnSTM }
-                         -> True
-                       _ -> False
-                    ]
-
-    mergeByIndex :: Ord a => [(b, a)] -> [(b, a)] -> [b]
-    mergeByIndex a b = map fst $ List.sortBy (comparing snd) (a ++ b)
+    !runQueueList = Deque.toList (runqueue <> Deque.fromList unblocked)
 
     -- Shuffle only 1/5th of the time
     (shouldShuffle, !stdGen') =
       first (== 0) $ randomR (0 :: Int, 5) stdGen
 
-    (!shuffledBlockedOnSTM, !stdGen'')
-      | shouldShuffle = fisherYatesShuffle stdGen' blockedOnSTM
-      | otherwise     = (blockedOnSTM, stdGen')
-
-    !unblocked = mergeByIndex blockedOnOther shuffledBlockedOnSTM
+    (!shuffledRunqueue, !stdGen'')
+      | shouldShuffle = shuffle runQueueList stdGen'
+      | otherwise     = (runQueueList, stdGen')
 
     -- and in which case we mark them as now running
     !threads'  = List.foldl'
@@ -899,18 +887,14 @@ unblockThreads !onlySTM !wakeup simstate@SimState {runqueue, threads, stdGen} =
                    threads
                    unblocked
 
-    -- Fisher-Yates shuffle implementation
-    fisherYatesShuffle :: StdGen -> [a] -> ([a], StdGen)
-    fisherYatesShuffle gen [] = ([], gen)
-    fisherYatesShuffle gen l =
-        let (l', gen') = go (length l - 1) l gen
-        in (l', gen')
+    shuffle :: [a] -> StdGen -> ([a], StdGen)
+    shuffle xs0 gen0 = go (length xs0) xs0 gen0
       where
-        go 0 lst g = (lst, g)
-        go n lst g = let (k, newGen) = randomR (0, n) g
-                         (x:xs)      = drop k lst
-                         swapped     = take k lst ++ [lst !! n] ++ drop (k + 1) lst
-                     in go (n - 1) (take n swapped ++ [x] ++ drop n xs) newGen
+        go 0 xs gen = (xs, gen)
+        go n xs gen = let (k, newGen) = randomR (0, n-1) gen
+                          (left, selected:right) = splitAt k xs
+                          (shuffled, finalGen) = go (n-1) (left ++ right) newGen
+                       in (selected:shuffled, finalGen)
 
 -- | This function receives a list of TimerTimeout values that represent threads
 -- for which the timeout expired and kills the running thread if needed.
