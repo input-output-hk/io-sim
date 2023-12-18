@@ -83,7 +83,6 @@ import           Control.Monad.IOSim.InternalTypes
 import           Control.Monad.IOSim.Types hiding (SimEvent (SimPOREvent),
                      Trace (SimPORTrace))
 import           Control.Monad.IOSim.Types (SimEvent)
-import           Data.Bifunctor (first)
 import           System.Random (StdGen, randomR, split)
 
 --
@@ -855,7 +854,7 @@ unblockThreads !onlySTM !wakeup simstate@SimState {runqueue, threads, stdGen} =
     -- To preserve our invariants (that threadBlocked is correct)
     -- we update the runqueue and threads together here
     (unblocked, simstate {
-                  runqueue = Deque.fromList shuffledRunqueue,
+                  runqueue = Deque.fromList shuffledUnblocked <> runqueue,
                   threads  = threads',
                   stdGen   = stdGen''
                 })
@@ -871,15 +870,7 @@ unblockThreads !onlySTM !wakeup simstate@SimState {runqueue, threads, stdGen} =
                     _ -> False
                  ]
 
-    !runQueueList = Deque.toList (runqueue <> Deque.fromList unblocked)
-
-    -- Shuffle only 1/5th of the time
-    (shouldShuffle, !stdGen') =
-      first (== 0) $ randomR (0 :: Int, 5) stdGen
-
-    (!shuffledRunqueue, !stdGen'')
-      | shouldShuffle = shuffle runQueueList stdGen'
-      | otherwise     = (runQueueList, stdGen')
+    (!shuffledUnblocked, !stdGen'') = shuffle unblocked stdGen
 
     -- and in which case we mark them as now running
     !threads'  = List.foldl'
