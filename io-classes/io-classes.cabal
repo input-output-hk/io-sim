@@ -8,7 +8,7 @@ description:
   'stm', 'exceptions' & 'time' packages.
 license:             Apache-2.0
 license-files:       LICENSE NOTICE
-copyright:           2019-2023 Input Output Global Inc (IOG)
+copyright:           2019-2024 Input Output Global Inc (IOG)
 author:              Alexander Vieth, Duncan Coutts, Marcin Szamotulski, Thomas Winant
 maintainer:          Duncan Coutts duncan@well-typed.com, Marcin Szamotulski coot@coot.me
 category:            Control
@@ -56,7 +56,6 @@ library
                        Control.Monad.Class.MonadAsync
                        Control.Monad.Class.MonadEventlog
                        Control.Monad.Class.MonadFork
-                       Control.Monad.Class.MonadMVar
                        Control.Monad.Class.MonadSay
                        Control.Monad.Class.MonadST
                        Control.Monad.Class.MonadSTM

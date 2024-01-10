@@ -12,6 +12,7 @@
 {-# LANGUAGE NumericUnderscores         #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 -- Needed for `SimEvent` type.
@@ -136,6 +137,7 @@ import           Control.Monad.IOSimPOR.Types
 
 import qualified System.IO.Error as IO.Error (userError)
 import Data.List (intercalate)
+import GHC.IO (mkUserError)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
 newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }
@@ -143,7 +145,7 @@ newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }
 runIOSim :: IOSim s a -> SimA s a
 runIOSim (IOSim k) = k Return
 
--- | 'IOSim' has the ability to story any 'Typeable' value in its trace which
+-- | 'IOSim' has the ability to store any 'Typeable' value in its trace which
 -- can then be recovered with `selectTraceEventsDynamic` or
 -- `selectTraceEventsDynamic'`.
 --
@@ -234,7 +236,9 @@ data StmA s a where
   LiftSTStm    :: StrictST.ST s a -> (a -> StmA s b) -> StmA s b
   FixStm       :: (x -> STM s x) -> (x -> StmA s r) -> StmA s r
 
--- Exported type
+-- | `IOSim`'s 'MonadSTM.STM' monad, as 'IOSim' it is parametrised by @s@, e.g.
+-- @STMSim s a@ is monadic expression of type @a@.
+--
 type STMSim = STM
 
 --
@@ -285,6 +289,11 @@ instance Fail.MonadFail (IOSim s) where
 instance MonadFix (IOSim s) where
     mfix f = IOSim $ oneShot $ \k -> Fix f k
 
+instance Alternative (IOSim s) where
+    empty = throwIO (mkUserError "mzero")
+    (<|>) !a b = a `catch` \(_ :: IOError) -> b
+
+instance MonadPlus (IOSim s)
 
 instance Functor (STM s) where
     {-# INLINE fmap #-}
@@ -630,8 +639,9 @@ instance MonadST (IOSim s) where
 
 -- | Lift an 'StrictST.ST' computation to 'IOSim'.
 --
--- Note: you can use 'MonadST' to lift 'StrictST.ST' computations, this is just
+-- Note: you can use 'MonadST' to lift 'StrictST.ST' computations, this is
 -- a more convenient function just for 'IOSim'.
+--
 liftST :: StrictST.ST s a -> IOSim s a
 liftST action = IOSim $ oneShot $ \k -> LiftST action k
 
@@ -816,7 +826,7 @@ data SimResult a
     -- ^ Return value of the main thread.
     | MainException !Time !(Labelled IOSimThreadId) SomeException ![Labelled IOSimThreadId]
     -- ^ Exception thrown by the main thread.
-    | Deadlock      !Time               ![Labelled IOSimThreadId]
+    | Deadlock      !Time ![Labelled IOSimThreadId]
     -- ^ Deadlock discovered in the simulation.  Deadlocks are discovered if
     -- simply the simulation cannot do any progress in a given time slot and
     -- there's no event which would advance the time.
@@ -824,6 +834,7 @@ data SimResult a
     -- ^ Only returned by /IOSimPOR/ when a step execution took longer than
     -- 'explorationStepTimelimit` was exceeded.
     | InternalError String
+    -- ^ An `IOSim` bug, please report to <https://github.com/input-output-hk/io-sim>
     deriving (Show, Functor)
 
 ppSimResult :: Show a
@@ -873,6 +884,12 @@ ppSimResult timeWidth tidWidth thLabelWidth r = case r of
 type SimTrace a = Trace.Trace (SimResult a) SimEvent
 
 -- | Pretty print simulation trace.
+--
+-- Note: this is not a streaming function, it will evaluate the whole trace
+-- before printing it.  If you need to print a very large trace, you might want
+-- to use
+--
+-- @'Trace.ppTrace' show ('ppSimEvent' 0 0 0)@
 --
 ppTrace :: Show a => SimTrace a -> String
 ppTrace tr = Trace.ppTrace
@@ -1047,8 +1064,6 @@ data SimEventType
 
   | EventTimerCreated         TimeoutId TVarId Time
   -- ^ a new 'Timeout' created (via `newTimeout`)
-  | EventTimerUpdated         TimeoutId        Time
-  -- ^ a 'Timeout' was updated (via `updateTimeout`)
   | EventTimerCancelled       TimeoutId
   -- ^ a 'Timeout' was cancelled (via `cancelTimeout`)
   | EventTimerFired           TimeoutId
@@ -1085,6 +1100,8 @@ data SimEventType
   | EventPerformAction StepId
   -- ^ /IOSimPOR/ event: perform action of the given step
   | EventReschedule           ScheduleControl
+  -- ^ /IOSimPOR/ event: reschedule a thread following the given
+  -- `ScheduleControl`
 
   | EventEffect VectorClock Effect
   -- ^ /IOSimPOR/ event: executed effect; Useful for debugging IOSimPOR or
@@ -1153,10 +1170,6 @@ ppSimEventType = \case
               show timer, " ",
               show tvarId, " ",
               show t ]
-  EventTimerUpdated timer t ->
-    concat [ "TimerUpdated ",
-             show timer, " ",
-             show t ]
   EventTimerCancelled timer -> "TimerCancelled " ++ show timer
   EventTimerFired timer -> "TimerFired " ++ show timer
   EventThreadStatus  tid tid' ->

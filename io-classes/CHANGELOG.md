@@ -4,6 +4,8 @@
 
 ### Breaking changes
 
+* Removed deprecated module `Control.Monad.Class.MonadVar`.
+
 ### Non-breaking changes
 
 ## 1.3.1.0

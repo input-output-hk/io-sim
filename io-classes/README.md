@@ -80,6 +80,37 @@ packages.
 * [MonadST]: provides a way to lift `ST`-computations.
 * [MonadSay]: dummy debugging interface
 
+## Differences from `base`, `async`, or `exceptions` packages
+
+### Major differences
+
+* `getMonotonicTime` returns `Time` (a newtype wrapper around `DiffTime`)
+* `Deadlock` exceptions are not thrown to the main thread (see
+  [ref][io-deadlock]), so they cannot be caught. This was a design decision,
+  which allows to catch all deadlocks which otherwise could be captured by
+  a `catch`.
+
+### Minor differences
+
+Some of the types have more general kind signatures, e.g.
+
+```
+type Async :: (Type -> Type) -> Type -> Type
+```
+
+The first type of kind `Type -> Type` describes the monad which could be
+instantiated to `IO`, `IOSim` or some other monad stacks built with monad
+transformers.  The same applies to many other types, e.g. `TVar`, `TMVar`.
+
+The following types although similar to the originals are not the same as the
+ones that come from `base`, `async`, or `exceptions` packages:
+
+* `Handler` (origin: `base`)
+* `MaskingState` (origin: `base`)
+* `Concurrently` (origin: `async`)
+* `ExceptionInLinkedThread` (origin: `async`): `io-class`es version does not
+  store `Async`
+* `ExitCase` (origin: `exceptions`)
 
 ## Debuging & Insepction
 
@@ -117,6 +148,7 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 [contributing]: https://www.github.com/input-output-hk/io-sim/tree/master/CONTRIBUTING.md
 [`nothunks`]: https://hackage.haskell.org/package/nothunks
 [labelThread-base]: https://hackage.haskell.org/package/base-4.17.0.0/docs/GHC-Conc-Sync.html#v:labelThread
+[io-deadlock]: https://hackage.haskell.org/package/base-4.19.0.0/docs/Control-Exception.html#t:Deadlock
 
 [MonadEventlog]: https://hackage.haskell.org/package/io-sim-classes/docs/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
 [Debug.Trace]: https://hackage.haskell.org/package/base/docs/Debug-Trace.html

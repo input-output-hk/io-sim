@@ -4,7 +4,7 @@ import           Control.Monad.Reader
 
 -- | A helper monad for /IOSimPOR/.
 class Monad m => MonadTest m where
-  -- | mark a thread for schedule exploration.  All threads that are forked by
+  -- | Mark a thread for schedule exploration.  All threads that are forked by
   -- it are also included in the exploration.
   --
   exploreRaces :: m ()

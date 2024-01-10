@@ -4,7 +4,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 
--- | Provides classes to handle delays and timeouts.
+-- | Provides classes to handle delays and timeouts which generalised
+-- <https://hackage.haskell.org/package/base base> API to both 'IO' and
+-- <https://hackage.haskell.org/package/io-sim IOSim>.
+--
 module Control.Monad.Class.MonadTimer
   ( MonadDelay (..)
   , MonadTimer (..)

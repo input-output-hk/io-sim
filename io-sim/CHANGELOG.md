@@ -4,7 +4,11 @@
 
 ### Breaking changes
 
+* Removed `EventTimerUpdated` constructor (not used anymore).
+
 ### Non-breaking changes
+
+* `Alternative` & `MonadPlus` instances for `IOSim`.
 
 ## 1.3.1.0
 
