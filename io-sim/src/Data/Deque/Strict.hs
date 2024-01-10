@@ -39,3 +39,6 @@ uncons = \case
 
 filter :: (a -> Bool) -> Deque a -> Deque a
 filter f (Deque head tail) = Deque (List.filter f head) (List.filter f tail)
+
+toList :: Deque a -> [a]
+toList = foldr (:) []

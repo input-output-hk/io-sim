@@ -50,6 +50,8 @@ import           Test.QuickCheck
 import           Test.Tasty hiding (after)
 import           Test.Tasty.QuickCheck
 
+import System.Random (mkStdGen)
+
 tests :: TestTree
 tests =
   testGroup "IOSim"
@@ -87,46 +89,46 @@ tests =
     [ testProperty "set (IO)"
     $ forall_masking_states unit_set_masking_state_IO
     , testProperty "set (IOSim)"
-    $ forall_masking_states unit_set_masking_state_ST
+    $ \r -> forall_masking_states (unit_set_masking_state_ST r)
 
     , testProperty "unmask (IO)"
     $ forall_masking_states $ \ms  ->
       forall_masking_states $ \ms' -> unit_unmask_IO ms ms'
     , testProperty "unmask (IOSim)"
-    $ forall_masking_states $ \ms  ->
-      forall_masking_states $ \ms' -> unit_unmask_ST ms ms'
+    $ \r -> forall_masking_states $ \ms  ->
+      forall_masking_states $ \ms' -> unit_unmask_ST r ms ms'
 
     , testProperty "fork (IO)"
     $ forall_masking_states unit_fork_masking_state_IO
     , testProperty "fork (IOSim)"
-    $ forall_masking_states unit_fork_masking_state_ST
+    $ \r -> forall_masking_states (unit_fork_masking_state_ST r)
 
     , testProperty "fork unmask (IO)"
     $ forall_masking_states $ \ms  ->
       forall_masking_states $ \ms' -> unit_fork_unmask_IO ms ms'
     , testProperty "fork unmask (IOSim)"
-    $ forall_masking_states $ \ms  ->
-      forall_masking_states $ \ms' -> unit_fork_unmask_ST ms ms'
+    $ \r -> forall_masking_states $ \ms  ->
+      forall_masking_states $ \ms' -> unit_fork_unmask_ST r ms ms'
 
     , testProperty "catch (IO)"
     $ forall_masking_states unit_catch_throwIO_masking_state_IO
     , testProperty "catch (IOSim)"
-    $ forall_masking_states unit_catch_throwIO_masking_state_ST
+    $ \r -> forall_masking_states (unit_catch_throwIO_masking_state_ST r)
 
     , testProperty "catch: throwTo (IO)"
     $ forall_masking_states unit_catch_throwTo_masking_state_IO
     , testProperty "catch: throwTo (IOSim)"
-    $ forall_masking_states unit_catch_throwTo_masking_state_ST
+    $ \r -> forall_masking_states (unit_catch_throwTo_masking_state_ST r)
 
     , testProperty "catch: throwTo async (IO)"
     $ forall_masking_states unit_catch_throwTo_masking_state_async_IO
     , testProperty "catch: throwTo async (IOSim)"
-    $ forall_masking_states unit_catch_throwTo_masking_state_async_ST
+    $ \r -> forall_masking_states (unit_catch_throwTo_masking_state_async_ST r)
 
     , testProperty "catch: throwTo async blocking (IO)"
     $ forall_masking_states unit_catch_throwTo_masking_state_async_mayblock_IO
     , testProperty "catch: throwTo async blocking (IOSim)"
-    $ forall_masking_states unit_catch_throwTo_masking_state_async_mayblock_ST
+    $ \r -> forall_masking_states (unit_catch_throwTo_masking_state_async_mayblock_ST r)
     ]
   , testProperty "evaluate unit test" unit_evaluate_0
   , testGroup "forkIO unit tests"
@@ -187,19 +189,19 @@ prop_stm_graph_io g =
   ioProperty $
     prop_stm_graph g
 
-prop_stm_graph_sim :: TestThreadGraph -> Bool
-prop_stm_graph_sim g =
-    case runSim (prop_stm_graph g) of
+prop_stm_graph_sim :: Int -> TestThreadGraph -> Bool
+prop_stm_graph_sim r g =
+    case runSim (mkStdGen r) (prop_stm_graph g) of
        Right () -> True
        _        -> False
     -- TODO: Note that we do not use runSimStrictShutdown here to check
     -- that all other threads finished, but perhaps we should and structure
     -- the graph tests so that's the case.
 
-prop_timers_ST :: TestMicro -> Property
-prop_timers_ST (TestMicro xs) =
+prop_timers_ST :: Int -> TestMicro -> Property
+prop_timers_ST r (TestMicro xs) =
   let ds = map (realToFrac :: Micro -> DiffTime) xs
-  in runSimOrThrow $ test_timers ds
+  in runSimOrThrow (mkStdGen r) $ test_timers ds
 
 prop_timers_IO :: [Positive Int] -> Property
 prop_timers_IO = ioProperty . test_timers
@@ -212,17 +214,17 @@ prop_timers_IO = ioProperty . test_timers
 -- Forking
 --
 
-prop_fork_order_ST :: Positive Int -> Property
-prop_fork_order_ST n = runSimOrThrow $ test_fork_order n
+prop_fork_order_ST :: Int -> Positive Int -> Property
+prop_fork_order_ST r n = runSimOrThrow (mkStdGen r) $ test_fork_order n
 
 prop_fork_order_IO :: Positive Int -> Property
 prop_fork_order_IO = ioProperty . test_fork_order
 
-prop_threadId_order_order_Sim :: Positive Int -> Property
-prop_threadId_order_order_Sim n = runSimOrThrow $ test_threadId_order n
+prop_threadId_order_order_Sim :: Int -> Positive Int -> Property
+prop_threadId_order_order_Sim r n = runSimOrThrow (mkStdGen r) $ test_threadId_order n
 
-prop_wakeup_order_ST :: Property
-prop_wakeup_order_ST = runSimOrThrow $ test_wakeup_order
+prop_wakeup_order_ST :: Int -> Property
+prop_wakeup_order_ST r = runSimOrThrow (mkStdGen r) $ test_wakeup_order
 
 --
 -- MonadFix properties
@@ -237,21 +239,22 @@ prop_mfix_purity_m (Positive n) =
     factorial :: (Int -> Int) -> Int -> Int
     factorial = \rec_ k -> if k <= 1 then 1 else k * rec_ (k - 1)
 
-prop_mfix_purity_IOSim :: Positive Int -> Bool
-prop_mfix_purity_IOSim a = runSimOrThrow $ prop_mfix_purity_m a
+prop_mfix_purity_IOSim :: Int -> Positive Int -> Bool
+prop_mfix_purity_IOSim r a = runSimOrThrow (mkStdGen r) $ prop_mfix_purity_m a
 
-prop_mfix_purity_STM:: Positive Int -> Bool
-prop_mfix_purity_STM a = runSimOrThrow $ atomically $ prop_mfix_purity_m a
+prop_mfix_purity_STM:: Int -> Positive Int -> Bool
+prop_mfix_purity_STM r a = runSimOrThrow (mkStdGen r) $ atomically $ prop_mfix_purity_m a
 
-prop_mfix_purity_2 :: [Positive Int] -> Bool
-prop_mfix_purity_2 as =
+prop_mfix_purity_2 :: Int -> [Positive Int] -> Bool
+prop_mfix_purity_2 r as =
     -- note: both 'IOSim' expressions are equivalent using 'Monad' and
     -- 'Applicative' laws only.
-      runSimOrThrow (join $  mfix (return . recDelay)
+      runSimOrThrow (mkStdGen r)
+                    (join $  mfix (return . recDelay)
                          <*> return as')
       == expected
     &&
-      runSimOrThrow (mfix (return . recDelay) >>= ($ as'))
+      runSimOrThrow (mkStdGen r) (mfix (return . recDelay) >>= ($ as'))
       == expected
   where
     as' :: [Int]
@@ -275,22 +278,23 @@ prop_mfix_purity_2 as =
 
 prop_mfix_left_shrinking_IOSim
     :: Int
+    -> Int
     -> NonNegative Int
     -> Positive Int
     -> Bool
-prop_mfix_left_shrinking_IOSim n (NonNegative d) (Positive i) =
+prop_mfix_left_shrinking_IOSim r n (NonNegative d) (Positive i) =
    let mn :: IOSim s Int
        mn = do say ""
                threadDelay (realToFrac d)
                return n
    in
         take i
-        (runSimOrThrow $
+        (runSimOrThrow (mkStdGen r) $
           mfix (\rec_ -> mn >>= \a -> do
                   threadDelay (realToFrac d) $> a : rec_))
       ==
         take i
-        (runSimOrThrow $
+        (runSimOrThrow (mkStdGen r) $
           mn >>= \a ->
             (mfix (\rec_ -> do
               threadDelay (realToFrac d) $> a : rec_)))
@@ -298,19 +302,20 @@ prop_mfix_left_shrinking_IOSim n (NonNegative d) (Positive i) =
 
 prop_mfix_left_shrinking_STM
     :: Int
+    -> Int
     -> Positive Int
     -> Bool
-prop_mfix_left_shrinking_STM n (Positive i) =
+prop_mfix_left_shrinking_STM r n (Positive i) =
    let mn :: STMSim s Int
        mn = do say ""
                return n
    in
         take i
-        (runSimOrThrow $ atomically $
+        (runSimOrThrow (mkStdGen r) $ atomically $
           mfix (\rec_ -> mn >>= \a -> return $ a : rec_))
       ==
         take i
-        (runSimOrThrow $ atomically $
+        (runSimOrThrow (mkStdGen r) $ atomically $
           mn >>= \a ->
             (mfix (\rec_ -> return $ a : rec_)))
 
@@ -319,11 +324,12 @@ prop_mfix_left_shrinking_STM n (Positive i) =
 -- | 'Example 8.2.1' in 'Value Recursion in Monadic Computations'
 -- <https://leventerkok.github.io/papers/erkok-thesis.pdf>
 --
-prop_mfix_lazy :: NonEmptyList Char
+prop_mfix_lazy :: Int
+               -> NonEmptyList Char
                -> Bool
-prop_mfix_lazy (NonEmpty env) =
+prop_mfix_lazy r (NonEmpty env) =
          take samples
-           (runSimOrThrow (withEnv (mfix . replicateHeadM)))
+           (runSimOrThrow (mkStdGen r) (withEnv (mfix . replicateHeadM)))
       == replicate samples (head env)
     where
       samples :: Int
@@ -368,10 +374,10 @@ prop_mfix_lazy (NonEmpty env) =
 -- | 'Example 8.2.3' in 'Value Recursion in Monadic Computations'
 -- <https://leventerkok.github.io/papers/erkok-thesis.pdf>
 --
-prop_mfix_recdata :: Property
-prop_mfix_recdata = ioProperty $ do
+prop_mfix_recdata :: Int -> Property
+prop_mfix_recdata r = ioProperty $ do
     expected <- experiment
-    let res = runSimOrThrow experiment
+    let res = runSimOrThrow (mkStdGen r) experiment
     return $
       take samples res
       ==
@@ -399,12 +405,12 @@ prop_mfix_recdata = ioProperty $ do
 unit_catch_0, unit_catch_1, unit_catch_2, unit_catch_3, unit_catch_4,
   unit_catch_5, unit_catch_6,
   unit_fork_1, unit_fork_2
-  :: Property
+  :: Int -> Property
 
 -- unhandled top level exception
-unit_catch_0 =
-      runSimTraceSay example === ["before"]
- .&&. case traceResult True (runSimTrace example) of
+unit_catch_0 r =
+      runSimTraceSay (mkStdGen r) example === ["before"]
+ .&&. case traceResult True (runSimTrace (mkStdGen r) example) of
         Left (FailureException e) -> property (maybe False (==DivideByZero) $ fromException e)
         _                         -> property False
 
@@ -416,8 +422,8 @@ unit_catch_0 =
     say "after"
 
 -- normal execution of a catch frame
-unit_catch_1 =
-    runSimTraceSay
+unit_catch_1 r =
+    runSimTraceSay (mkStdGen r)
       (do catch (say "inner") (\(_e :: IOError) -> say "handler")
           say "after"
       )
@@ -426,8 +432,8 @@ unit_catch_1 =
 
 
 -- catching an exception thrown in a catch frame
-unit_catch_2 =
-    runSimTraceSay
+unit_catch_2 r =
+    runSimTraceSay (mkStdGen r)
       (do catch (do say "inner1"
                     _ <- throwIO DivideByZero
                     say "inner2")
@@ -439,8 +445,8 @@ unit_catch_2 =
 
 
 -- not catching an exception of the wrong type
-unit_catch_3 =
-    runSimTraceSay
+unit_catch_3 r =
+    runSimTraceSay (mkStdGen r)
       (do catch (do say "inner"
                     throwIO DivideByZero)
                 (\(_e :: IOError) -> say "handler")
@@ -451,8 +457,8 @@ unit_catch_3 =
 
 
 -- catching an exception in an outer handler
-unit_catch_4 =
-    runSimTraceSay
+unit_catch_4 r =
+    runSimTraceSay (mkStdGen r)
       (do catch (catch (do say "inner"
                            throwIO DivideByZero)
                        (\(_e :: IOError) -> say "handler1"))
@@ -464,8 +470,8 @@ unit_catch_4 =
 
 
 -- catching an exception in the inner handler
-unit_catch_5 =
-    runSimTraceSay
+unit_catch_5 r =
+    runSimTraceSay (mkStdGen r)
       (do catch (catch (do say "inner"
                            throwIO DivideByZero)
                        (\(_e :: ArithException) -> say "handler1"))
@@ -477,8 +483,8 @@ unit_catch_5 =
 
 
 -- catching an exception in the inner handler, rethrowing and catching in outer
-unit_catch_6 =
-    runSimTraceSay
+unit_catch_6 r =
+    runSimTraceSay (mkStdGen r)
       (do catch (catch (do say "inner"
                            throwIO DivideByZero)
                        (\(e :: ArithException) -> do
@@ -492,17 +498,17 @@ unit_catch_6 =
 
 
 -- evaluate should catch pure errors
-unit_evaluate_0 :: Property
-unit_evaluate_0 =
+unit_evaluate_0 :: Int -> Property
+unit_evaluate_0 r =
     -- This property also fails if the @error@ is not caught by the sim monad
     -- and instead reaches the QuickCheck driver.
-    property $ isLeft $ runSim $ evaluate (error "boom" :: ())
+    property $ isLeft $ runSim (mkStdGen r) $ evaluate (error "boom" :: ())
 
 
 -- The sim terminates when the main thread terminates
-unit_fork_1 =
-      runSimTraceSay example === ["parent"]
- .&&. case traceResult True (runSimTrace example) of
+unit_fork_1 r =
+      runSimTraceSay (mkStdGen r) example === ["parent"]
+ .&&. case traceResult True (runSimTrace (mkStdGen r) example) of
         Left FailureSloppyShutdown{} -> property True
         _                            -> property False
   where
@@ -513,9 +519,9 @@ unit_fork_1 =
 
 -- Try works and we can pass exceptions back from threads.
 -- And terminating with an exception is reported properly.
-unit_fork_2 =
-      runSimTraceSay example === ["parent", "user error (oh noes!)"]
- .&&. case traceResult True (runSimTrace example) of
+unit_fork_2 r =
+      runSimTraceSay (mkStdGen r) example === ["parent", "user error (oh noes!)"]
+ .&&. case traceResult True (runSimTrace (mkStdGen r) example) of
         Left (FailureException e)
           | Just ioe <- fromException e
           , isUserError ioe
@@ -542,11 +548,11 @@ unit_async_1, unit_async_2, unit_async_3, unit_async_4, unit_async_5,
   unit_async_6, unit_async_7, unit_async_8, unit_async_9, unit_async_10,
   unit_async_11, unit_async_12, unit_async_13, unit_async_14, unit_async_15,
   unit_async_16
-  :: Property
+  :: Int -> Property
 
 
-unit_async_1 =
-    runSimTraceSay
+unit_async_1 r =
+    runSimTraceSay (mkStdGen r)
       (do mtid <- myThreadId
           say ("main " ++ show mtid)
           ctid <- forkIO $ do tid <- myThreadId
@@ -558,8 +564,8 @@ unit_async_1 =
    ["main ThreadId []", "parent ThreadId [1]", "child ThreadId [1]"]
 
 
-unit_async_2 =
-    runSimTraceSay
+unit_async_2 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- myThreadId
           say "before"
           throwTo tid DivideByZero
@@ -569,8 +575,8 @@ unit_async_2 =
    ["before"]
 
 
-unit_async_3 =
-    runSimTraceSay
+unit_async_3 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- myThreadId
           catch (do say "before"
                     throwTo tid DivideByZero
@@ -580,8 +586,8 @@ unit_async_3 =
    ["before", "handler"]
 
 
-unit_async_4 =
-    runSimTraceSay
+unit_async_4 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ say "child"
           threadDelay 1
           -- child has already terminated when we throw the async exception
@@ -591,8 +597,8 @@ unit_async_4 =
    ["child", "parent done"]
 
 
-unit_async_5 =
-    runSimTraceSay
+unit_async_5 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ do
                    say "child"
                    catch (atomically retry)
@@ -606,8 +612,8 @@ unit_async_5 =
    ["child", "handler", "child done", "parent done"]
 
 
-unit_async_6 =
-    runSimTraceSay
+unit_async_6 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ mask_ $
                    do
                      say "child"
@@ -626,8 +632,8 @@ unit_async_6 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_7 =
-    runSimTraceSay
+unit_async_7 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $
                    mask $ \restore -> do
                      say "child"
@@ -646,8 +652,8 @@ unit_async_7 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_8 =
-    runSimTraceSay
+unit_async_8 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ do
                    catch (do mask_ $ do
                                say "child"
@@ -666,8 +672,8 @@ unit_async_8 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_9 =
-    runSimTraceSay
+unit_async_9 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $
                    mask_ $ do
                      say "child"
@@ -682,8 +688,8 @@ unit_async_9 =
    ["child", "parent done"]
 
 
-unit_async_10 =
-    runSimTraceSay
+unit_async_10 r =
+    runSimTraceSay (mkStdGen r)
       (do tid1 <- forkIO $ do
                     mask_ $ do
                       threadDelay 1
@@ -710,8 +716,8 @@ unit_async_10 =
    ["child 1", "child 2", "child 1 running", "parent done"]
 
 
-unit_async_11 =
-    runSimTraceSay
+unit_async_11 r =
+    runSimTraceSay (mkStdGen r)
       (do tid1 <- forkIO $ do
                     mask_ $ do
                       threadDelay 1
@@ -742,8 +748,8 @@ unit_async_11 =
    ["child 1", "child 2", "child 1 running", "parent done"]
 
 
-unit_async_12 =
-    runSimTraceSay
+unit_async_12 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ do
                    uninterruptibleMask_ $ do
                      say "child"
@@ -763,8 +769,8 @@ unit_async_12 =
    ["child", "child masked", "child done", "parent done"]
 
 
-unit_async_13 =
-    case runSim
+unit_async_13 r =
+    case runSim (mkStdGen r)
            (uninterruptibleMask_ $ do
               tid <- forkIO $ atomically retry
               throwTo tid DivideByZero)
@@ -772,8 +778,8 @@ unit_async_13 =
           _                       -> property False
 
 
-unit_async_14 =
-    runSimTraceSay
+unit_async_14 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ do
                    uninterruptibleMask_ $ do
                      say "child"
@@ -793,8 +799,8 @@ unit_async_14 =
    ["child", "child masked", "child done", "parent done"]
 
 
-unit_async_15 =
-    runSimTraceSay
+unit_async_15 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $
                    uninterruptibleMask $ \restore -> do
                      say "child"
@@ -813,8 +819,8 @@ unit_async_15 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_16 =
-    runSimTraceSay
+unit_async_16 r =
+    runSimTraceSay (mkStdGen r)
       (do tid <- forkIO $ do
                    catch (do uninterruptibleMask_ $ do
                                say "child"
@@ -847,16 +853,16 @@ prop_stm_referenceIO t =
 -- | Compare the behaviour of the STM reference operational semantics with
 -- the behaviour of the IO simulator's STM implementation.
 --
-prop_stm_referenceSim :: SomeTerm -> Property
-prop_stm_referenceSim t =
-    runSimOrThrow (prop_stm_referenceM t)
+prop_stm_referenceSim :: Int -> SomeTerm -> Property
+prop_stm_referenceSim r t =
+    runSimOrThrow (mkStdGen r) (prop_stm_referenceM t)
 
 --
 -- MonadTimer
 --
 
-prop_timeout_no_deadlock_Sim :: Bool
-prop_timeout_no_deadlock_Sim = runSimOrThrow prop_timeout_no_deadlockM
+prop_timeout_no_deadlock_Sim :: Int -> Bool
+prop_timeout_no_deadlock_Sim r = runSimOrThrow (mkStdGen r) prop_timeout_no_deadlockM
 
 prop_timeout_no_deadlock_IO :: Property
 prop_timeout_no_deadlock_IO = ioProperty prop_timeout_no_deadlockM
@@ -992,26 +998,29 @@ experimentResult intendedTimeoutDuration
 
 
 prop_timeout
-    :: TimeoutDuration
+    :: Int
+    -> TimeoutDuration
     -> ActionDuration
     -> Property
-prop_timeout intendedTimeoutDuration intendedActionDuration = 
-    runSimOrThrow (withSanityCheck <$>
+prop_timeout r intendedTimeoutDuration intendedActionDuration =
+    runSimOrThrow (mkStdGen r)
+                  (withSanityCheck <$>
                     singleTimeoutExperiment
                       intendedTimeoutDuration
                       intendedActionDuration)
 
 
 prop_timeouts
-    :: [(TimeoutDuration, ActionDuration)]
+    :: Int
+    -> [(TimeoutDuration, ActionDuration)]
     -> Property
-prop_timeouts times =
+prop_timeouts r times =
     counterexample (ppTrace_ trace) $
     either (\e -> counterexample (show e) False) id $
     traceResult False trace
   where
     trace =
-      runSimTrace $
+      runSimTrace (mkStdGen r) $
         conjoin' <$>
         sequence
           [ fmap (counterexample ("failure on timeout test #" ++ show n))
@@ -1031,12 +1040,13 @@ prop_timeouts times =
                (numFailures <= maxFailures)
 
 
-prop_stacked_timeouts :: TimeoutDuration
+prop_stacked_timeouts :: Int
+                      -> TimeoutDuration
                       -> TimeoutDuration
                       -> ActionDuration
                       -> Property
-prop_stacked_timeouts timeout0 timeout1 actionDuration =
-    let trace = runSimTrace experiment in
+prop_stacked_timeouts r timeout0 timeout1 actionDuration =
+    let trace = runSimTrace (mkStdGen r) experiment in
     counterexample (ppTrace_ trace) $
     either (\e -> counterexample (show e) False) (=== predicted) (traceResult False trace)
   where
@@ -1059,9 +1069,9 @@ prop_stacked_timeouts timeout0 timeout1 actionDuration =
               = Just Nothing
 
 
-unit_timeouts_and_async_exceptions_1 :: Property
-unit_timeouts_and_async_exceptions_1 =
-    let trace = runSimTrace experiment in
+unit_timeouts_and_async_exceptions_1 :: Int -> Property
+unit_timeouts_and_async_exceptions_1 r =
+    let trace = runSimTrace (mkStdGen r) experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
       . traceResult False
@@ -1077,12 +1087,12 @@ unit_timeouts_and_async_exceptions_1 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
-unit_timeouts_and_async_exceptions_2 :: Property
-unit_timeouts_and_async_exceptions_2 =
-    let trace = runSimTrace experiment in
+unit_timeouts_and_async_exceptions_2 :: Int -> Property
+unit_timeouts_and_async_exceptions_2 r =
+    let trace = runSimTrace (mkStdGen r) experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
       . traceResult False
@@ -1098,12 +1108,12 @@ unit_timeouts_and_async_exceptions_2 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
-unit_timeouts_and_async_exceptions_3 :: Property
-unit_timeouts_and_async_exceptions_3 =
-    let trace = runSimTrace experiment in
+unit_timeouts_and_async_exceptions_3 :: Int -> Property
+unit_timeouts_and_async_exceptions_3 r =
+    let trace = runSimTrace (mkStdGen r) experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
       . traceResult False
@@ -1119,15 +1129,15 @@ unit_timeouts_and_async_exceptions_3 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 -- | Verify that a thread blocked on `threadDelay` is not unblocked by an STM
 -- transaction.
 --
-unit_threadDelay_and_stm :: Property
-unit_threadDelay_and_stm =
-    let trace = runSimTrace experiment in
+unit_threadDelay_and_stm :: Int -> Property
+unit_threadDelay_and_stm r =
+    let trace = runSimTrace (mkStdGen r) experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
       . traceResult False
@@ -1157,9 +1167,9 @@ unit_threadDelay_and_stm =
 -- | Verify that a thread blocked on `throwTo` is not unblocked by an STM
 -- transaction.
 --
-unit_throwTo_and_stm :: Property
-unit_throwTo_and_stm =
-    let trace = runSimTrace experiment in
+unit_throwTo_and_stm :: Int -> Property
+unit_throwTo_and_stm r =
+    let trace = runSimTrace (mkStdGen r) experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
       . traceResult False
@@ -1195,61 +1205,61 @@ unit_set_masking_state_IO :: MaskingState -> Property
 unit_set_masking_state_IO =
     ioProperty . prop_set_masking_state
 
-unit_set_masking_state_ST :: MaskingState -> Property
-unit_set_masking_state_ST ms =
-    runSimOrThrow (prop_set_masking_state ms)
+unit_set_masking_state_ST :: Int -> MaskingState -> Property
+unit_set_masking_state_ST r ms =
+    runSimOrThrow (mkStdGen r) (prop_set_masking_state ms)
 
 unit_unmask_IO :: MaskingState -> MaskingState -> Property
 unit_unmask_IO ms ms' = ioProperty $ prop_unmask ms ms'
 
-unit_unmask_ST :: MaskingState -> MaskingState -> Property
-unit_unmask_ST ms ms' = runSimOrThrow $ prop_unmask ms ms'
+unit_unmask_ST :: Int -> MaskingState -> MaskingState -> Property
+unit_unmask_ST r ms ms' = runSimOrThrow (mkStdGen r) $ prop_unmask ms ms'
 
 unit_fork_masking_state_IO :: MaskingState -> Property
 unit_fork_masking_state_IO =
     ioProperty . prop_fork_masking_state
 
-unit_fork_masking_state_ST :: MaskingState -> Property
-unit_fork_masking_state_ST ms =
-    runSimOrThrow (prop_fork_masking_state ms)
+unit_fork_masking_state_ST :: Int -> MaskingState -> Property
+unit_fork_masking_state_ST r ms =
+    runSimOrThrow (mkStdGen r) (prop_fork_masking_state ms)
 
 unit_fork_unmask_IO :: MaskingState -> MaskingState -> Property
 unit_fork_unmask_IO ms ms' = ioProperty $ prop_fork_unmask ms ms'
 
-unit_fork_unmask_ST :: MaskingState -> MaskingState -> Property
-unit_fork_unmask_ST ms ms' = runSimOrThrow $ prop_fork_unmask ms ms'
+unit_fork_unmask_ST :: Int -> MaskingState -> MaskingState -> Property
+unit_fork_unmask_ST r ms ms' = runSimOrThrow (mkStdGen r) $ prop_fork_unmask ms ms'
 
 unit_catch_throwIO_masking_state_IO :: MaskingState -> Property
 unit_catch_throwIO_masking_state_IO ms =
     ioProperty $ prop_catch_throwIO_masking_state ms
 
-unit_catch_throwIO_masking_state_ST :: MaskingState -> Property
-unit_catch_throwIO_masking_state_ST ms =
-    runSimOrThrow (prop_catch_throwIO_masking_state ms)
+unit_catch_throwIO_masking_state_ST :: Int -> MaskingState -> Property
+unit_catch_throwIO_masking_state_ST r ms =
+    runSimOrThrow (mkStdGen r) (prop_catch_throwIO_masking_state ms)
 
 unit_catch_throwTo_masking_state_IO :: MaskingState -> Property
 unit_catch_throwTo_masking_state_IO =
     ioProperty . prop_catch_throwTo_masking_state
 
-unit_catch_throwTo_masking_state_ST :: MaskingState -> Property
-unit_catch_throwTo_masking_state_ST ms =
-    runSimOrThrow $ prop_catch_throwTo_masking_state ms
+unit_catch_throwTo_masking_state_ST :: Int -> MaskingState -> Property
+unit_catch_throwTo_masking_state_ST r ms =
+    runSimOrThrow (mkStdGen r) $ prop_catch_throwTo_masking_state ms
 
 unit_catch_throwTo_masking_state_async_IO :: MaskingState -> Property
 unit_catch_throwTo_masking_state_async_IO =
     ioProperty . prop_catch_throwTo_masking_state_async
 
-unit_catch_throwTo_masking_state_async_ST :: MaskingState -> Property
-unit_catch_throwTo_masking_state_async_ST ms =
-    runSimOrThrow (prop_catch_throwTo_masking_state_async ms)
+unit_catch_throwTo_masking_state_async_ST :: Int -> MaskingState -> Property
+unit_catch_throwTo_masking_state_async_ST r ms =
+    runSimOrThrow (mkStdGen r) (prop_catch_throwTo_masking_state_async ms)
 
 unit_catch_throwTo_masking_state_async_mayblock_IO :: MaskingState -> Property
 unit_catch_throwTo_masking_state_async_mayblock_IO =
     ioProperty . prop_catch_throwTo_masking_state_async_mayblock
 
-unit_catch_throwTo_masking_state_async_mayblock_ST :: MaskingState -> Property
-unit_catch_throwTo_masking_state_async_mayblock_ST ms =
-    runSimOrThrow (prop_catch_throwTo_masking_state_async_mayblock ms)
+unit_catch_throwTo_masking_state_async_mayblock_ST :: Int -> MaskingState -> Property
+unit_catch_throwTo_masking_state_async_mayblock_ST r ms =
+    runSimOrThrow (mkStdGen r) (prop_catch_throwTo_masking_state_async_mayblock ms)
 
 --
 -- MonadTimerCancellable
@@ -1288,16 +1298,17 @@ instance Arbitrary DelayWithCancel where
       maxDelay = microsecondsAsIntToDiffTime maxBound
 
 prop_registerDelayCancellable
-    :: (forall s. DiffTime -> IOSim s (STM (IOSim s) TimeoutState, IOSim s ()))
-    -- ^ implementation 
+    :: Int
+    -> (forall s. DiffTime -> IOSim s (STM (IOSim s) TimeoutState, IOSim s ()))
+    -- ^ implementation
     -> DelayWithCancel
     -> Property
-prop_registerDelayCancellable registerDelayCancellableImpl
+prop_registerDelayCancellable rnd registerDelayCancellableImpl
                               (DelayWithCancel delay mbCancel) =
       -- 'within' covers the case where `registerDelayCancellable` would not
       -- make progress awaiting for the timeout (a live lock).
       within 50_000 $ -- 50ms
-      let trace = runSimTrace sim
+      let trace = runSimTrace (mkStdGen rnd) sim
       in case traceResult True trace of
         Left  err    -> counterexample (ppTrace trace)
                       . counterexample (show err)
@@ -1335,13 +1346,13 @@ prop_registerDelayCancellable registerDelayCancellableImpl
 -- `registerDelayCancellable`
 --
 prop_registerDelayCancellable_IOSim, prop_registerDelayCancellable_IO
-    :: DelayWithCancel -> Property
+    :: Int -> DelayWithCancel -> Property
 
-prop_registerDelayCancellable_IOSim =
-    prop_registerDelayCancellable registerDelayCancellable
+prop_registerDelayCancellable_IOSim r =
+    prop_registerDelayCancellable r registerDelayCancellable
 
-prop_registerDelayCancellable_IO =
-    prop_registerDelayCancellable  $
+prop_registerDelayCancellable_IO r =
+    prop_registerDelayCancellable r $
       defaultRegisterDelayCancellable
         (newTimeout . microsecondsAsIntToDiffTime)
         readTimeout

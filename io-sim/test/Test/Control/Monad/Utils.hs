@@ -22,6 +22,7 @@ import           Test.Control.Monad.STM
 
 import           Test.QuickCheck
 
+import System.Random (StdGen)
 --
 -- Read/Write graph
 --
@@ -501,8 +502,8 @@ forall_masking_states prop =
 -- Utils
 --
 
-runSimTraceSay :: (forall s. IOSim s a) -> [String]
-runSimTraceSay action = selectTraceSay (runSimTrace action)
+runSimTraceSay :: StdGen -> (forall s. IOSim s a) -> [String]
+runSimTraceSay stdGen action = selectTraceSay (runSimTrace stdGen action)
 
 selectTraceSay :: SimTrace a -> [String]
 selectTraceSay (SimTrace _ _ _ (EventSay msg) trace)      = msg : selectTraceSay trace
