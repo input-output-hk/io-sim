@@ -10,7 +10,7 @@ license:            Apache-2.0
 license-files:      LICENSE NOTICE
 author:             Duncan Coutts, Marcin Szamotulski
 maintainer:         Marcin Szamotulski coot@coot.me
-copyright:          2022-2023 Input Output Global Inc (IOG)
+copyright:          2022-2024 Input Output Global Inc (IOG)
 category:           Control
 build-type:         Simple
 extra-doc-files:    README.md CHANGELOG.md
