@@ -17,4 +17,4 @@ module Control.Concurrent.Class.MonadSTM.TSem
   , traceTSemIO
   ) where
 
-import           Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadSTM.Internal

@@ -49,44 +49,42 @@ module Control.Monad.IOSimPOR.Internal
   , ScheduleMod (..)
   ) where
 
-import           Prelude hiding (read)
+import Prelude hiding (read)
 
-import           Data.Dynamic
-import           Data.Foldable (foldlM, traverse_)
-import qualified Data.List as List
-import qualified Data.List.Trace as Trace
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import           Data.Maybe (mapMaybe)
-import           Data.Ord
-import           Data.OrdPSQ (OrdPSQ)
-import qualified Data.OrdPSQ as PSQ
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Time (UTCTime (..), fromGregorian)
+import Data.Dynamic
+import Data.Foldable (foldlM, traverse_)
+import Data.List qualified as List
+import Data.List.Trace qualified as Trace
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Maybe (mapMaybe)
+import Data.Ord
+import Data.OrdPSQ (OrdPSQ)
+import Data.OrdPSQ qualified as PSQ
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Time (UTCTime (..), fromGregorian)
 
-import           Control.Exception (NonTermination (..),
-                     assert, throw)
-import           Control.Monad (join, when)
-import           Control.Monad.ST.Lazy
-import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
-import           Data.STRef.Lazy
+import Control.Exception (NonTermination (..), assert, throw)
+import Control.Monad (join, when)
+import Control.Monad.ST.Lazy
+import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
+import Data.STRef.Lazy
 
-import           Control.Concurrent.Class.MonadSTM.TMVar
-import           Control.Concurrent.Class.MonadSTM.TVar hiding (TVar)
-import           Control.Monad.Class.MonadFork (killThread, myThreadId, throwTo)
-import           Control.Monad.Class.MonadSTM hiding (STM)
-import           Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
-import           Control.Monad.Class.MonadThrow as MonadThrow
-import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
+import Control.Concurrent.Class.MonadSTM.TMVar
+import Control.Concurrent.Class.MonadSTM.TVar hiding (TVar)
+import Control.Monad.Class.MonadFork (killThread, myThreadId, throwTo)
+import Control.Monad.Class.MonadSTM hiding (STM)
+import Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
+import Control.Monad.Class.MonadThrow as MonadThrow
+import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 
-import           Control.Monad.IOSim.InternalTypes
-import           Control.Monad.IOSim.Types hiding (SimEvent (SimEvent),
-                     Trace (SimTrace))
-import           Control.Monad.IOSim.Types (SimEvent)
-import           Control.Monad.IOSimPOR.Timeout (unsafeTimeout)
-import           Control.Monad.IOSimPOR.Types
+import Control.Monad.IOSim.InternalTypes
+import Control.Monad.IOSim.Types hiding (SimEvent (SimEvent), Trace (SimTrace))
+import Control.Monad.IOSim.Types (SimEvent)
+import Control.Monad.IOSimPOR.Timeout (unsafeTimeout)
+import Control.Monad.IOSimPOR.Types
 
 --
 -- Simulation interpreter
@@ -1729,10 +1727,10 @@ stepThread thread@Thread { threadId     = tid,
 updateRaces :: Thread s a -> SimState s a -> Races
 updateRaces thread@Thread { threadId = tid }
             SimState{ control, threads, races = races@Races { activeRaces } } =
-    let 
+    let
         newStep@Step{ stepEffect = newEffect } = currentStep thread
 
-        concurrent0 = 
+        concurrent0 =
           Map.keysSet (Map.filter (\t -> not (isThreadDone t)
                                       && threadId t `Set.notMember`
                                          effectForks newEffect

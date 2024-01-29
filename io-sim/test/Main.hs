@@ -1,10 +1,10 @@
 module Main (main) where
 
-import           Test.Tasty
+import Test.Tasty
 
-import qualified Test.Control.Concurrent.Class.MonadMVar (tests)
-import qualified Test.Control.Monad.IOSim (tests)
-import qualified Test.Control.Monad.IOSimPOR (tests)
+import Test.Control.Concurrent.Class.MonadMVar qualified (tests)
+import Test.Control.Monad.IOSim qualified (tests)
+import Test.Control.Monad.IOSimPOR qualified (tests)
 
 main :: IO ()
 main = defaultMain tests

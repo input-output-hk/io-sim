@@ -3,12 +3,12 @@
 
 module Test.MonadTimer (tests) where
 
-import           Control.Monad.Class.MonadTimer.SI
-import           GHC.Real
+import Control.Monad.Class.MonadTimer.SI
+import GHC.Real
 
-import           Test.QuickCheck
-import           Test.Tasty
-import           Test.Tasty.QuickCheck (testProperty)
+import Test.QuickCheck
+import Test.Tasty
+import Test.Tasty.QuickCheck (testProperty)
 
 tests :: TestTree
 tests =

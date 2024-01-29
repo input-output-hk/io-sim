@@ -25,14 +25,14 @@ module Control.Monad.Class.MonadThrow
   , catches
   ) where
 
-import           Control.Exception (Exception (..), MaskingState, SomeException)
-import qualified Control.Exception as IO
-import           Control.Monad (liftM)
+import Control.Exception (Exception (..), MaskingState, SomeException)
+import Control.Exception qualified as IO
+import Control.Monad (liftM)
 
-import           Control.Monad.Reader (ReaderT (..), runReaderT, lift)
+import Control.Monad.Reader (ReaderT (..), lift, runReaderT)
 
-import           Control.Monad.STM (STM)
-import qualified Control.Monad.STM as STM
+import Control.Monad.STM (STM)
+import Control.Monad.STM qualified as STM
 
 -- | Throwing exceptions, and resource handling in the presence of exceptions.
 --

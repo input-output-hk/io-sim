@@ -13,14 +13,14 @@ module Control.Monad.Class.MonadTimer
   , MonadTimer (..)
   ) where
 
-import qualified Control.Concurrent as IO
-import           Control.Concurrent.Class.MonadSTM
-import qualified Control.Concurrent.STM.TVar as STM
+import Control.Concurrent qualified as IO
+import Control.Concurrent.Class.MonadSTM
+import Control.Concurrent.STM.TVar qualified as STM
 
-import           Control.Monad.Reader (ReaderT (..))
-import           Control.Monad.Trans (lift)
+import Control.Monad.Reader (ReaderT (..))
+import Control.Monad.Trans (lift)
 
-import qualified System.Timeout as IO
+import System.Timeout qualified as IO
 
 -- | A typeclass to delay current thread.
 class Monad m => MonadDelay m where

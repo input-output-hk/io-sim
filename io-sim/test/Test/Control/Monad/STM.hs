@@ -21,19 +21,19 @@
 --
 module Test.Control.Monad.STM where
 
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import           Data.Maybe (fromMaybe, maybeToList)
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Type.Equality
-import           Prelude hiding (exp)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Maybe (fromMaybe, maybeToList)
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Type.Equality
+import Prelude hiding (exp)
 
-import           Control.Concurrent.Class.MonadSTM.TVar as STM
-import           Control.Monad.Class.MonadSTM as STM
-import           Control.Monad.Class.MonadThrow
+import Control.Concurrent.Class.MonadSTM.TVar as STM
+import Control.Monad.Class.MonadSTM as STM
+import Control.Monad.Class.MonadThrow
 
-import           Test.QuickCheck
+import Test.QuickCheck
 
 
 -- | The type level structure of types in our STM 'Term's. This is kept simple,

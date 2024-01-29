@@ -1,19 +1,19 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTSyntax                 #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE NumericUnderscores         #-}
-{-# LANGUAGE PatternSynonyms            #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE BangPatterns              #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE DeriveFunctor             #-}
+{-# LANGUAGE DeriveGeneric             #-}
+{-# LANGUAGE DerivingVia               #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE GADTSyntax                #-}
+{-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE NamedFieldPuns            #-}
+{-# LANGUAGE NumericUnderscores        #-}
+{-# LANGUAGE PatternSynonyms           #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 -- Needed for `SimEvent` type.
 {-# OPTIONS_GHC -Wno-partial-fields     #-}
@@ -74,70 +74,69 @@ module Control.Monad.IOSim.Types
   , execReadTVar
   ) where
 
-import           Control.Applicative
-import           Control.Exception (ErrorCall (..), asyncExceptionFromException,
-                     asyncExceptionToException)
-import           Control.Monad
-import           Control.Monad.Fix (MonadFix (..))
+import Control.Applicative
+import Control.Exception (ErrorCall (..), asyncExceptionFromException,
+           asyncExceptionToException)
+import Control.Monad
+import Control.Monad.Fix (MonadFix (..))
 
-import           Control.Concurrent.Class.MonadMVar
-import           Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
-import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar as StrictTVar
-import           Control.Monad.Class.MonadAsync hiding (Async)
-import qualified Control.Monad.Class.MonadAsync as MonadAsync
-import           Control.Monad.Class.MonadEventlog
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadST
-import           Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
-                     MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..),
-                     TArrayDefault, TChanDefault, TMVarDefault, TSemDefault,
-                     TraceValue, atomically, retry)
-import qualified Control.Monad.Class.MonadSTM.Internal as MonadSTM
-import           Control.Monad.Class.MonadSay
-import           Control.Monad.Class.MonadTest
-import           Control.Monad.Class.MonadThrow as MonadThrow hiding
-                     (getMaskingState)
-import qualified Control.Monad.Class.MonadThrow as MonadThrow
-import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTime.SI
-import           Control.Monad.Class.MonadTimer
-import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
-import qualified Control.Monad.Class.MonadTimer.SI as SI
-import           Control.Monad.ST.Lazy
-import qualified Control.Monad.ST.Strict as StrictST
-import           Control.Monad.ST.Unsafe (unsafeSTToIO)
+import Control.Concurrent.Class.MonadMVar
+import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
+import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
+import Control.Monad.Class.MonadAsync hiding (Async)
+import Control.Monad.Class.MonadAsync qualified as MonadAsync
+import Control.Monad.Class.MonadEventlog
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
+           MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..), TArrayDefault,
+           TChanDefault, TMVarDefault, TSemDefault, TraceValue, atomically,
+           retry)
+import Control.Monad.Class.MonadSTM.Internal qualified as MonadSTM
+import Control.Monad.Class.MonadTest
+import Control.Monad.Class.MonadThrow as MonadThrow hiding (getMaskingState)
+import Control.Monad.Class.MonadThrow qualified as MonadThrow
+import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTimer
+import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
+import Control.Monad.Class.MonadTimer.SI qualified as SI
+import Control.Monad.ST.Lazy
+import Control.Monad.ST.Strict qualified as StrictST
+import Control.Monad.ST.Unsafe (unsafeSTToIO)
 
-import qualified Control.Monad.Catch as Exceptions
-import qualified Control.Monad.Fail as Fail
+import Control.Monad.Catch qualified as Exceptions
+import Control.Monad.Fail qualified as Fail
 
-import           Data.Bifoldable
-import           Data.Bifunctor (bimap)
-import           Data.Dynamic (Dynamic, toDyn)
-import qualified Data.List.Trace as Trace
-import           Data.Map.Strict (Map)
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid (Endo (..))
-import           Data.STRef.Lazy
-import           Data.Semigroup (Max (..))
-import           Data.Time.Clock (diffTimeToPicoseconds)
-import           Data.Typeable
-import           Data.Word (Word64)
-import qualified Debug.Trace as Debug
-import           NoThunks.Class (NoThunks (..))
-import           Text.Printf
+import Data.Bifoldable
+import Data.Bifunctor (bimap)
+import Data.Dynamic (Dynamic, toDyn)
+import Data.List.Trace qualified as Trace
+import Data.Map.Strict (Map)
+import Data.Maybe (fromMaybe)
+import Data.Monoid (Endo (..))
+import Data.Semigroup (Max (..))
+import Data.STRef.Lazy
+import Data.Time.Clock (diffTimeToPicoseconds)
+import Data.Typeable
+import Data.Word (Word64)
+import Debug.Trace qualified as Debug
+import NoThunks.Class (NoThunks (..))
+import Text.Printf
 
-import           GHC.Exts (oneShot)
-import           GHC.Generics (Generic)
-import           Quiet (Quiet (..))
+import GHC.Exts (oneShot)
+import GHC.Generics (Generic)
+import Quiet (Quiet (..))
 
-import           Control.Monad.IOSim.CommonTypes
-import           Control.Monad.IOSim.STM
-import           Control.Monad.IOSimPOR.Types
+import Control.Monad.IOSim.CommonTypes
+import Control.Monad.IOSim.STM
+import Control.Monad.IOSimPOR.Types
 
 
-import qualified System.IO.Error as IO.Error (userError)
 import Data.List (intercalate)
 import GHC.IO (mkUserError)
+import System.IO.Error qualified as IO.Error (userError)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
 newtype IOSim s a = IOSim { unIOSim :: forall r. (a -> SimA s r) -> SimA s r }
@@ -871,7 +870,7 @@ ppSimResult timeWidth tidWidth thLabelWidth r = case r of
              tidWidth
              ""
              thLabelWidth
-             "" 
+             ""
              "Deadlock"
              ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
     Loop -> "<<io-sim-por: step execution exceded explorationStepTimelimit>>"

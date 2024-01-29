@@ -19,22 +19,22 @@ module Control.Monad.Class.MonadTimer.SI
   , TimeoutState (..)
     -- * Default implementations
   , defaultRegisterDelay
-  , defaultRegisterDelayCancellable  
+  , defaultRegisterDelayCancellable
   ) where
 
-import           Control.Concurrent.Class.MonadSTM
-import           Control.Exception (assert)
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadTime.SI
-import qualified Control.Monad.Class.MonadTimer as MonadTimer
-import           Control.Monad.Class.MonadTimer.NonStandard (TimeoutState (..))
-import qualified Control.Monad.Class.MonadTimer.NonStandard as NonStandard
+import Control.Concurrent.Class.MonadSTM
+import Control.Exception (assert)
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTimer qualified as MonadTimer
+import Control.Monad.Class.MonadTimer.NonStandard (TimeoutState (..))
+import Control.Monad.Class.MonadTimer.NonStandard qualified as NonStandard
 
-import           Control.Monad.Reader
+import Control.Monad.Reader
 
-import           Data.Bifunctor (bimap)
-import           Data.Functor (($>))
-import           Data.Time.Clock (diffTimeToPicoseconds)
+import Data.Bifunctor (bimap)
+import Data.Functor (($>))
+import Data.Time.Clock (diffTimeToPicoseconds)
 
 
 
@@ -248,7 +248,7 @@ instance MonadTimer IO where
       maxDelay = microsecondsAsIntToDiffTime maxBound
 
   registerDelayCancellable =
-    defaultRegisterDelayCancellable 
+    defaultRegisterDelayCancellable
       NonStandard.newTimeout
       NonStandard.readTimeout
       NonStandard.cancelTimeout

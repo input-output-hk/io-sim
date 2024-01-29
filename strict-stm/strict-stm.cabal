@@ -46,6 +46,7 @@ library
                        FlexibleContexts,
                        FlexibleInstances,
                        GADTs,
+                       ImportQualifiedPost,
                        NamedFieldPuns,
                        TypeOperators
   build-depends:       base        >= 4.9 && <4.20,

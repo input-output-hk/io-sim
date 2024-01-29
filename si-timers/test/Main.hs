@@ -1,8 +1,8 @@
 module Main (main) where
 
-import           Test.Tasty
+import Test.Tasty
 
-import qualified Test.MonadTimer
+import Test.MonadTimer qualified
 
 main :: IO ()
 main = defaultMain tests

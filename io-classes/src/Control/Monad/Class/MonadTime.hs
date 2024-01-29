@@ -14,13 +14,12 @@ module Control.Monad.Class.MonadTime
   , NominalDiffTime
   ) where
 
-import           Control.Monad.Reader
+import Control.Monad.Reader
 
-import           Data.Time.Clock (NominalDiffTime, UTCTime,
-                     addUTCTime, diffUTCTime)
-import qualified Data.Time.Clock as Time
-import           Data.Word (Word64)
-import qualified GHC.Clock as IO (getMonotonicTimeNSec)
+import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime)
+import Data.Time.Clock qualified as Time
+import Data.Word (Word64)
+import GHC.Clock qualified as IO (getMonotonicTimeNSec)
 
 
 class Monad m => MonadMonotonicTimeNSec m where

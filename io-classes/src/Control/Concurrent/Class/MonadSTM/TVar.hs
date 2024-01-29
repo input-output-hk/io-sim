@@ -23,4 +23,4 @@ module Control.Concurrent.Class.MonadSTM.TVar
   , traceTVarIO
   ) where
 
-import           Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadSTM.Internal

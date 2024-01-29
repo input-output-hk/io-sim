@@ -4,23 +4,23 @@
 
 module Test.Control.Monad.Utils where
 
-import           Data.Array
-import           Data.Fixed (Fixed (..), Micro)
-import           Data.Function (on)
-import           Data.Graph
-import           Data.List (sortBy)
+import Data.Array
+import Data.Fixed (Fixed (..), Micro)
+import Data.Function (on)
+import Data.Graph
+import Data.List (sortBy)
 
-import           Control.Monad
+import Control.Monad
 
-import           Control.Monad.Class.MonadFork
-import           Control.Concurrent.Class.MonadSTM.Strict
-import           Control.Monad.Class.MonadThrow
-import           Control.Monad.Class.MonadTimer.SI
-import           Control.Monad.IOSim
+import Control.Concurrent.Class.MonadSTM.Strict
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadThrow
+import Control.Monad.Class.MonadTimer.SI
+import Control.Monad.IOSim
 
-import           Test.Control.Monad.STM
+import Test.Control.Monad.STM
 
-import           Test.QuickCheck
+import Test.QuickCheck
 
 --
 -- Read/Write graph

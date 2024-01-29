@@ -25,4 +25,4 @@ module Control.Concurrent.Class.MonadSTM.TBQueue
   , traceTBQueueIO
   ) where
 
-import           Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadSTM.Internal

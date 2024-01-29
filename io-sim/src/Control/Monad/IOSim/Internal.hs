@@ -46,42 +46,42 @@ module Control.Monad.IOSim.Internal
   , execReadTVar
   ) where
 
-import           Prelude hiding (read)
+import Prelude hiding (read)
 
-import           Data.Dynamic
-import           Data.Foldable (foldlM, toList, traverse_)
-import qualified Data.List as List
-import qualified Data.List.Trace as Trace
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import           Data.Maybe (mapMaybe)
-import           Data.OrdPSQ (OrdPSQ)
-import qualified Data.OrdPSQ as PSQ
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Time (UTCTime (..), fromGregorian)
-import           Data.Deque.Strict (Deque)
-import qualified Data.Deque.Strict as Deque
+import Data.Deque.Strict (Deque)
+import Data.Deque.Strict qualified as Deque
+import Data.Dynamic
+import Data.Foldable (foldlM, toList, traverse_)
+import Data.List qualified as List
+import Data.List.Trace qualified as Trace
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Maybe (mapMaybe)
+import Data.OrdPSQ (OrdPSQ)
+import Data.OrdPSQ qualified as PSQ
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Time (UTCTime (..), fromGregorian)
 
-import           Control.Exception (NonTermination (..), assert, throw)
-import           Control.Monad (join, when)
-import           Control.Monad.ST.Lazy
-import           Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
-import           Data.STRef.Lazy
+import Control.Exception (NonTermination (..), assert, throw)
+import Control.Monad (join, when)
+import Control.Monad.ST.Lazy
+import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
+import Data.STRef.Lazy
 
-import           Control.Concurrent.Class.MonadSTM.TMVar
-import           Control.Concurrent.Class.MonadSTM.TVar hiding (TVar)
-import           Control.Monad.Class.MonadFork (killThread, myThreadId, throwTo)
-import           Control.Monad.Class.MonadSTM hiding (STM)
-import           Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
-import           Control.Monad.Class.MonadThrow hiding (getMaskingState)
-import           Control.Monad.Class.MonadTime
-import           Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
+import Control.Concurrent.Class.MonadSTM.TMVar
+import Control.Concurrent.Class.MonadSTM.TVar hiding (TVar)
+import Control.Monad.Class.MonadFork (killThread, myThreadId, throwTo)
+import Control.Monad.Class.MonadSTM hiding (STM)
+import Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
+import Control.Monad.Class.MonadThrow hiding (getMaskingState)
+import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 
-import           Control.Monad.IOSim.InternalTypes
-import           Control.Monad.IOSim.Types hiding (SimEvent (SimPOREvent),
-                     Trace (SimPORTrace))
-import           Control.Monad.IOSim.Types (SimEvent)
+import Control.Monad.IOSim.InternalTypes
+import Control.Monad.IOSim.Types hiding (SimEvent (SimPOREvent),
+           Trace (SimPORTrace))
+import Control.Monad.IOSim.Types (SimEvent)
 
 --
 -- Simulation interpreter
@@ -861,9 +861,9 @@ forkTimeoutInterruptThreads timeoutExpired simState =
   where
     -- we launch a thread responsible for throwing an AsyncCancelled exception
     -- to the thread which timeout expired
-    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)] 
+    throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)]
 
-    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired 
+    (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
       where
         fn :: SimState s a
            -> (IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)

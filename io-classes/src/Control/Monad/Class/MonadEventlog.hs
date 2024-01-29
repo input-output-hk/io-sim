@@ -1,10 +1,8 @@
-module Control.Monad.Class.MonadEventlog
-  ( MonadEventlog (..)
-  ) where
+module Control.Monad.Class.MonadEventlog (MonadEventlog (..)) where
 
-import           Control.Monad.Reader
+import Control.Monad.Reader
 
-import qualified Debug.Trace as IO (traceEventIO, traceMarkerIO)
+import Debug.Trace qualified as IO (traceEventIO, traceMarkerIO)
 
 class Monad m => MonadEventlog m where
 

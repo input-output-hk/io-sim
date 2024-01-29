@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
@@ -10,45 +10,44 @@
 
 module Test.Control.Monad.IOSimPOR (tests) where
 
-import           Data.Fixed (Micro)
-import           Data.Foldable (foldl', traverse_)
-import           Data.Functor (($>))
-import qualified Data.List as List
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.STRef.Lazy
+import Data.Fixed (Micro)
+import Data.Foldable (foldl', traverse_)
+import Data.Functor (($>))
+import Data.List qualified as List
+import Data.Map (Map)
+import Data.Map qualified as Map
+import Data.STRef.Lazy
 
-import           System.Exit
-import           System.IO.Error (ioeGetErrorString, isUserError)
+import System.Exit
+import System.IO.Error (ioeGetErrorString, isUserError)
 
-import           Control.Exception (ArithException (..), AsyncException)
-import           Control.Monad
-import           Control.Monad.Fix
-import           Control.Monad.ST.Lazy (ST, runST)
+import Control.Exception (ArithException (..), AsyncException)
+import Control.Monad
+import Control.Monad.Fix
+import Control.Monad.ST.Lazy (ST, runST)
 
-import           Control.Concurrent.Class.MonadSTM
-import           Control.Monad.Class.MonadAsync
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadSay
-import           Control.Monad.Class.MonadTest
-import           Control.Monad.Class.MonadThrow
-import           Control.Monad.Class.MonadTime.SI
-import           Control.Monad.Class.MonadTimer.SI
-import           Control.Monad.IOSim
+import Control.Concurrent.Class.MonadSTM
+import Control.Monad.Class.MonadAsync
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadTest
+import Control.Monad.Class.MonadThrow
+import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTimer.SI
+import Control.Monad.IOSim
 
-import           GHC.Generics
+import GHC.Generics
 
-import           Test.Control.Monad.IOSim (TimeoutDuration, ActionDuration,
-                   WithSanityCheck (..), ignoreSanityCheck,
-                   isSanityCheckIgnored, singleTimeoutExperiment,
-                   withSanityCheck)
-import           Test.Control.Monad.Utils
-import           Test.Control.Monad.STM
+import Test.Control.Monad.IOSim (ActionDuration, TimeoutDuration,
+           WithSanityCheck (..), ignoreSanityCheck, isSanityCheckIgnored,
+           singleTimeoutExperiment, withSanityCheck)
+import Test.Control.Monad.STM
+import Test.Control.Monad.Utils
 
-import           Test.QuickCheck
-import           Test.Tasty (TestTree, testGroup)
-import           Test.Tasty.QuickCheck
-import qualified Data.List.Trace as Trace
+import Data.List.Trace qualified as Trace
+import Test.QuickCheck
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.QuickCheck
 
 tests :: TestTree
 tests =
@@ -339,7 +338,7 @@ propSimulates cmp (Shrink2 (Tasks tasks)) =
       Left (FailureInternal msg)
                   -> counterexample msg False
       Left x      -> counterexample (ppTrace trace)
-                   $ counterexample (show x) True 
+                   $ counterexample (show x) True
 
 -- NOTE: This property needs to be executed sequentially, otherwise it fails
 -- undeterministically, which `exploreSimTraceST` does.
@@ -899,7 +898,7 @@ prop_timeout
     :: TimeoutDuration
     -> ActionDuration
     -> Property
-prop_timeout intendedTimeoutDuration intendedActionDuration = 
+prop_timeout intendedTimeoutDuration intendedActionDuration =
     exploreSimTrace id experiment $ \_ trace ->
         case traceResult False trace of
           Right a -> a
@@ -990,7 +989,7 @@ unit_timeouts_and_async_exceptions_1 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_2 :: Property
@@ -1012,7 +1011,7 @@ unit_timeouts_and_async_exceptions_2 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_3 :: Property
@@ -1034,7 +1033,7 @@ unit_timeouts_and_async_exceptions_3 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 --
 -- MonadMask properties

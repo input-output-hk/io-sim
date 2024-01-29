@@ -4,15 +4,14 @@
 -- before they are put inside the 'StrictMVar'.
 module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF (tests) where
 
-import           Control.Concurrent.Class.MonadMVar.Strict
-import           Control.Monad (void)
-import           Data.Typeable (Typeable)
-import           NoThunks.Class (OnlyCheckWhnf (OnlyCheckWhnf), unsafeNoThunks)
-import           Test.QuickCheck.Monadic (PropertyM, monadicIO, monitor, run)
-import           Test.Tasty (TestTree, testGroup)
-import           Test.Tasty.QuickCheck (Fun, applyFun, counterexample,
-                     testProperty)
-import           Test.Utils (monadicSim)
+import Control.Concurrent.Class.MonadMVar.Strict
+import Control.Monad (void)
+import Data.Typeable (Typeable)
+import NoThunks.Class (OnlyCheckWhnf (OnlyCheckWhnf), unsafeNoThunks)
+import Test.QuickCheck.Monadic (PropertyM, monadicIO, monitor, run)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.QuickCheck (Fun, applyFun, counterexample, testProperty)
+import Test.Utils (monadicSim)
 
 {-------------------------------------------------------------------------------
   Main test tree

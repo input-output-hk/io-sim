@@ -5,23 +5,23 @@
 
 module Test.Control.Concurrent.Class.MonadMVar where
 
-import           Control.Concurrent.Class.MonadMVar
-import           Control.Monad.Class.MonadAsync
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadTime.SI
-import           Control.Monad.Class.MonadTimer.SI
-import           Data.Bifoldable (bifoldMap)
-import           Data.Foldable (traverse_)
-import           Data.Functor (void, ($>))
-import           Data.Maybe (isNothing)
-import           Data.Monoid (All (..))
+import Control.Concurrent.Class.MonadMVar
+import Control.Monad.Class.MonadAsync
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTimer.SI
+import Data.Bifoldable (bifoldMap)
+import Data.Foldable (traverse_)
+import Data.Functor (void, ($>))
+import Data.Maybe (isNothing)
+import Data.Monoid (All (..))
 
-import           Control.Monad.IOSim
+import Control.Monad.IOSim
 
-import           Test.QuickCheck
-import           Test.Tasty
-import           Test.Tasty.HUnit
-import           Test.Tasty.QuickCheck (testProperty)
+import Test.QuickCheck
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck (testProperty)
 
 tests :: TestTree
 tests =

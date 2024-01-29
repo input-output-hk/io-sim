@@ -4,4 +4,4 @@
 --
 module Control.Concurrent.Class.MonadSTM.TArray (type TArray) where
 
-import           Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadSTM.Internal

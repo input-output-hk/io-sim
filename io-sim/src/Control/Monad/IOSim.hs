@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ExplicitNamespaces  #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -43,16 +43,7 @@ module Control.Monad.IOSim
   , unshareClock
     -- * Simulation trace
   , type SimTrace
-  , Trace (Cons,
-           Nil,
-           SimTrace,
-           SimPORTrace,
-           TraceDeadlock,
-           TraceLoop,
-           TraceMainReturn,
-           TraceMainException,
-           TraceRacesFound,
-           TraceInternalError)
+  , Trace (Cons, Nil, SimTrace, SimPORTrace, TraceDeadlock, TraceLoop, TraceMainReturn, TraceMainException, TraceRacesFound, TraceInternalError)
   , SimResult (..)
   , SimEvent (..)
   , SimEventType (..)
@@ -100,37 +91,37 @@ module Control.Monad.IOSim
   , awaitTimeout
   ) where
 
-import           Prelude
+import Prelude
 
-import           Data.Bifoldable
-import           Data.Bifunctor (first)
-import           Data.Dynamic (fromDynamic)
-import           Data.Functor (void)
-import           Data.List (intercalate)
-import           Data.Maybe (catMaybes)
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Typeable (Typeable)
+import Data.Bifoldable
+import Data.Bifunctor (first)
+import Data.Dynamic (fromDynamic)
+import Data.Functor (void)
+import Data.List (intercalate)
+import Data.Maybe (catMaybes)
+import Data.Set (Set)
+import Data.Set qualified as Set
+import Data.Typeable (Typeable)
 
-import           Data.List.Trace (Trace (..))
-import qualified Data.List.Trace as Trace
+import Data.List.Trace (Trace (..))
+import Data.List.Trace qualified as Trace
 
-import           Control.Exception (throw)
+import Control.Exception (throw)
 
-import           Control.Monad.ST.Lazy
-import           Data.STRef.Lazy
+import Control.Monad.ST.Lazy
+import Data.STRef.Lazy
 
-import           Control.Monad.Class.MonadThrow as MonadThrow
+import Control.Monad.Class.MonadThrow as MonadThrow
 
-import           Control.Monad.IOSim.Internal (runSimTraceST)
-import           Control.Monad.IOSim.Types
-import qualified Control.Monad.IOSimPOR.Internal as IOSimPOR (controlSimTraceST)
-import           Control.Monad.IOSimPOR.QuickCheckUtils
+import Control.Monad.IOSim.Internal (runSimTraceST)
+import Control.Monad.IOSim.Types
+import Control.Monad.IOSimPOR.Internal qualified as IOSimPOR (controlSimTraceST)
+import Control.Monad.IOSimPOR.QuickCheckUtils
 
-import           Test.QuickCheck
+import Test.QuickCheck
 
-import           System.IO.Unsafe
-import qualified Debug.Trace as Debug
+import Debug.Trace qualified as Debug
+import System.IO.Unsafe
 
 
 -- | Select events according to the predicate function.  It throws an error if
@@ -402,7 +393,7 @@ instance Exception Failure where
              , "please report the issue at\n"
              , "https://github.com/input-output-hk/io-sim/issues"
              ]
-    
+
 
 -- | 'IOSim' is a pure monad.
 --

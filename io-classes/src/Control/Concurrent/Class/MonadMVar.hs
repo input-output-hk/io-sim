@@ -8,13 +8,13 @@ module Control.Concurrent.Class.MonadMVar
   , MonadInspectMVar (..)
   ) where
 
-import qualified Control.Concurrent.MVar as IO
-import           Control.Monad.Class.MonadThrow
+import Control.Concurrent.MVar qualified as IO
+import Control.Monad.Class.MonadThrow
 
-import           Control.Monad.Reader (ReaderT (..))
-import           Control.Monad.Trans (lift)
+import Control.Monad.Reader (ReaderT (..))
+import Control.Monad.Trans (lift)
 
-import           Data.Kind (Type)
+import Data.Kind (Type)
 
 
 class Monad m => MonadMVar m where

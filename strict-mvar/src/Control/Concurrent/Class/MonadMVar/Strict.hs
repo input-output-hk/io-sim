@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE TypeFamilies  #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | This module corresponds to "Control.Concurrent.MVar" in the @base@ package.
@@ -30,8 +30,8 @@ module Control.Concurrent.Class.MonadMVar.Strict
   , MonadMVar
   ) where
 
-import           Control.Concurrent.Class.MonadMVar (MonadMVar)
-import qualified Control.Concurrent.Class.MonadMVar as Lazy
+import Control.Concurrent.Class.MonadMVar (MonadMVar)
+import Control.Concurrent.Class.MonadMVar qualified as Lazy
 
 --
 -- StrictMVar

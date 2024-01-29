@@ -11,18 +11,17 @@
 --
 module Control.Monad.IOSim.STM where
 
-import           Control.Exception (SomeAsyncException (..))
+import Control.Exception (SomeAsyncException (..))
 
-import           Control.Concurrent.Class.MonadSTM.TVar
-import           Control.Monad.Class.MonadSTM (MonadInspectSTM (..),
-                     MonadLabelledSTM, MonadSTM (..), MonadTraceSTM,
-                     TraceValue (..))
-import           Control.Monad.Class.MonadThrow
+import Control.Concurrent.Class.MonadSTM.TVar
+import Control.Monad.Class.MonadSTM (MonadInspectSTM (..), MonadLabelledSTM,
+           MonadSTM (..), MonadTraceSTM, TraceValue (..))
+import Control.Monad.Class.MonadThrow
 
-import           Numeric.Natural (Natural)
+import Numeric.Natural (Natural)
 
-import           Data.Deque.Strict (Deque)
-import qualified Data.Deque.Strict as Deque
+import Data.Deque.Strict (Deque)
+import Data.Deque.Strict qualified as Deque
 
 --
 -- Default TQueue implementation in terms of a 'TVar' (used by sim)

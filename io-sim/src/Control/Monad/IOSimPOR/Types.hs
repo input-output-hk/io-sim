@@ -24,11 +24,11 @@ module Control.Monad.IOSimPOR.Types
   , noRaces
   ) where
 
-import qualified Data.List as List
-import           Data.Set (Set)
-import qualified Data.Set as Set
+import Data.List qualified as List
+import Data.Set (Set)
+import Data.Set qualified as Set
 
-import           Control.Monad.IOSim.CommonTypes
+import Control.Monad.IOSim.CommonTypes
 
 --
 -- Effects

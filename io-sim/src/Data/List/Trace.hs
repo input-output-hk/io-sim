@@ -12,15 +12,15 @@ module Data.List.Trace
   , length
   ) where
 
-import           Prelude hiding (filter, head, length, tail)
+import Prelude hiding (filter, head, length, tail)
 
-import           Control.Applicative (Alternative (..))
-import           Control.Monad (MonadPlus (..))
-import           Control.Monad.Fix (MonadFix (..), fix)
-import           Data.Bifoldable
-import           Data.Bifunctor
-import           Data.Bitraversable
-import           Data.Functor.Classes
+import Control.Applicative (Alternative (..))
+import Control.Monad (MonadPlus (..))
+import Control.Monad.Fix (MonadFix (..), fix)
+import Data.Bifoldable
+import Data.Bifunctor
+import Data.Bitraversable
+import Data.Functor.Classes
 
 -- | A 'cons' list with polymorphic 'nil'.
 --

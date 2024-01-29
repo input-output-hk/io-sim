@@ -5,10 +5,10 @@ module Test.Utils
   , monadicSim
   ) where
 
-import           Control.Monad.IOSim (IOSim, runSimOrThrow)
-import           Test.QuickCheck (Gen, Property, Testable (..))
-import           Test.QuickCheck.Gen.Unsafe (Capture (..), capture)
-import           Test.QuickCheck.Monadic (PropertyM, monadic')
+import Control.Monad.IOSim (IOSim, runSimOrThrow)
+import Test.QuickCheck (Gen, Property, Testable (..))
+import Test.QuickCheck.Gen.Unsafe (Capture (..), capture)
+import Test.QuickCheck.Monadic (PropertyM, monadic')
 
 {-------------------------------------------------------------------------------
   Property runners (copied from "Ouroboros.Network.Testing.QuickCheck")

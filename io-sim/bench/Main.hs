@@ -1,21 +1,20 @@
-{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Main (main) where
 
-import           Control.Concurrent.Class.MonadSTM
-import           Control.Monad (forever, replicateM)
-import           Control.Monad.Class.MonadAsync
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadSay
-import           Control.Monad.Class.MonadTimer
-import           Control.Monad.IOSim
+import Control.Concurrent.Class.MonadSTM
+import Control.Monad (forever, replicateM)
+import Control.Monad.Class.MonadAsync
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadTimer
+import Control.Monad.IOSim
 
-import           Criterion
-import           Criterion.Main
+import Criterion
+import Criterion.Main
 
-import           Control.Exception (AsyncException (..))
-import           Data.Foldable (traverse_)
+import Control.Exception (AsyncException (..))
+import Data.Foldable (traverse_)
 
 
 --

@@ -32,19 +32,19 @@ module Control.Monad.IOSim.CommonTypes
   , ppList
   ) where
 
-import           Control.DeepSeq (NFData (..))
-import           Control.Monad.Class.MonadSTM (TraceValue)
-import           Control.Monad.ST.Lazy
+import Control.DeepSeq (NFData (..))
+import Control.Monad.Class.MonadSTM (TraceValue)
+import Control.Monad.ST.Lazy
 
-import           NoThunks.Class
+import NoThunks.Class
 
-import           Data.List (intercalate, intersperse)
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.STRef.Lazy
-import           Data.Set (Set)
-import           GHC.Generics
-import           Quiet
+import Data.List (intercalate, intersperse)
+import Data.Map (Map)
+import Data.Map qualified as Map
+import Data.Set (Set)
+import Data.STRef.Lazy
+import GHC.Generics
+import Quiet
 
 
 -- | A thread id.

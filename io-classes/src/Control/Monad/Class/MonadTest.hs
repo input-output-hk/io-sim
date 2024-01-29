@@ -1,6 +1,6 @@
 module Control.Monad.Class.MonadTest (MonadTest (..)) where
 
-import           Control.Monad.Reader
+import Control.Monad.Reader
 
 -- | A helper monad for /IOSimPOR/.
 class Monad m => MonadTest m where
