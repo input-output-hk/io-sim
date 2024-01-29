@@ -1,6 +1,7 @@
-{-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE BangPatterns   #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies   #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module corresponds to `Control.Concurrent.STM.TVar` in "stm" package
 --
