@@ -1,6 +1,6 @@
 {-# LANGUAGE ExplicitNamespaces #-}
 
--- | This module corresponds to `Control.Concurrnet.STM.TVar` in "stm" package
+-- | This module corresponds to `Control.Concurrent.STM.TQueue` in "stm" package
 --
 module Control.Concurrent.Class.MonadSTM.TQueue
   ( -- * MonadSTM

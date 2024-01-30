@@ -176,6 +176,8 @@ tests =
     , testProperty "registerDelayCancellable (IO impl)"
         prop_registerDelayCancellable_IO
     ]
+  , testGroup "MonadSTM"
+    [ testProperty "flushTQueue empties the queue" prop_flushTQueue ]
   ]
 
 --
@@ -1347,6 +1349,19 @@ prop_registerDelayCancellable_IO =
         readTimeout
         cancelTimeout
         awaitTimeout
+
+prop_flushTQueue :: Property
+prop_flushTQueue =
+  ioProperty emptyQueueAfterFlush
+  .&&. runSimOrThrow emptyQueueAfterFlush
+
+emptyQueueAfterFlush :: MonadSTM m => m Bool
+emptyQueueAfterFlush = do
+  q <- newTQueueIO
+  atomically $ do
+    writeTQueue q (1 :: Int)
+    _ <- flushTQueue q
+    isEmptyTQueue q
 
 --
 -- Utils
