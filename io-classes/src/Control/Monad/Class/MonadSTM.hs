@@ -1,15 +1,15 @@
 -- | This module corresponds to "Control.Monad.STM" in "stm" package
 --
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 -- undecidable instances needed for 'WrappedSTM' instances of 'MonadThrow' and
 -- 'MonadCatch' type classes.
-{-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE UndecidableInstances  #-}
 module Control.Monad.Class.MonadSTM
   ( MonadSTM (STM, atomically, retry, orElse, check)
   , throwSTM
@@ -22,7 +22,7 @@ module Control.Monad.Class.MonadSTM
   , MonadInspectSTM (..)
   ) where
 
-import           Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadSTM.Internal
 
 -- $non-standard-extensions
 --

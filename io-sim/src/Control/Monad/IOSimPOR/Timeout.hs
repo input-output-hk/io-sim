@@ -9,14 +9,13 @@ module Control.Monad.IOSimPOR.Timeout
 -- enabled, +RTS -T -RTS). Thus this can be used more reliably to
 -- limit computation time.
 
-import           Control.Concurrent
-import           Control.Exception (Exception (..), asyncExceptionFromException,
-                     asyncExceptionToException, bracket, handleJust,
-                     uninterruptibleMask_)
-import           Control.Monad
-import           Data.Unique (Unique, newUnique)
-import           GHC.Stats
-import           System.IO.Unsafe
+import Control.Concurrent
+import Control.Exception (Exception (..), asyncExceptionFromException,
+           asyncExceptionToException, bracket, handleJust, uninterruptibleMask_)
+import Control.Monad
+import Data.Unique (Unique, newUnique)
+import GHC.Stats
+import System.IO.Unsafe
 
 
 -- An internal type that is thrown as a dynamic exception to

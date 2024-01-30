@@ -1,9 +1,9 @@
 {-# LANGUAGE RankNTypes #-}
 module Control.Monad.Class.MonadST (MonadST (..)) where
 
-import           Control.Monad.Reader
+import Control.Monad.Reader
 
-import           Control.Monad.ST (ST, stToIO)
+import Control.Monad.ST (ST, stToIO)
 
 
 -- | This class is for abstracting over 'stToIO' which allows running 'ST'

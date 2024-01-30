@@ -26,8 +26,8 @@ module Control.Concurrent.Class.MonadSTM.Strict.TChan
   ) where
 
 
-import qualified Control.Concurrent.Class.MonadSTM.TChan as Lazy
-import           Control.Monad.Class.MonadSTM
+import Control.Concurrent.Class.MonadSTM.TChan qualified as Lazy
+import Control.Monad.Class.MonadSTM
 
 
 type LazyTChan   m = Lazy.TChan m

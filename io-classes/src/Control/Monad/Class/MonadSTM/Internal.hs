@@ -99,35 +99,35 @@ module Control.Monad.Class.MonadSTM.Internal
   , labelTChanDefault
   ) where
 
-import           Prelude hiding (read)
+import Prelude hiding (read)
 
-import qualified Control.Concurrent.STM.TArray as STM
-import qualified Control.Concurrent.STM.TBQueue as STM
-import qualified Control.Concurrent.STM.TChan as STM
-import qualified Control.Concurrent.STM.TMVar as STM
-import qualified Control.Concurrent.STM.TQueue as STM
-import qualified Control.Concurrent.STM.TSem as STM
-import qualified Control.Concurrent.STM.TVar as STM
-import           Control.Monad (unless, when)
-import qualified Control.Monad.STM as STM
+import Control.Concurrent.STM.TArray qualified as STM
+import Control.Concurrent.STM.TBQueue qualified as STM
+import Control.Concurrent.STM.TChan qualified as STM
+import Control.Concurrent.STM.TMVar qualified as STM
+import Control.Concurrent.STM.TQueue qualified as STM
+import Control.Concurrent.STM.TSem qualified as STM
+import Control.Concurrent.STM.TVar qualified as STM
+import Control.Monad (unless, when)
+import Control.Monad.STM qualified as STM
 
-import           Control.Monad.Reader (ReaderT (..))
-import           Control.Monad.Trans (lift)
+import Control.Monad.Reader (ReaderT (..))
+import Control.Monad.Trans (lift)
 
-import qualified Control.Monad.Class.MonadThrow as MonadThrow
+import Control.Monad.Class.MonadThrow qualified as MonadThrow
 
-import           Control.Exception
-import           Data.Array (Array, bounds)
-import qualified Data.Array as Array
-import           Data.Array.Base (IArray (numElements), MArray (..),
-                     arrEleBottom, listArray, unsafeAt)
-import           Data.Foldable (traverse_)
-import           Data.Ix (Ix, rangeSize)
-import           Data.Kind (Type)
-import           Data.Proxy (Proxy (..))
-import           Data.Typeable (Typeable)
-import           GHC.Stack
-import           Numeric.Natural (Natural)
+import Control.Exception
+import Data.Array (Array, bounds)
+import Data.Array qualified as Array
+import Data.Array.Base (IArray (numElements), MArray (..), arrEleBottom,
+           listArray, unsafeAt)
+import Data.Foldable (traverse_)
+import Data.Ix (Ix, rangeSize)
+import Data.Kind (Type)
+import Data.Proxy (Proxy (..))
+import Data.Typeable (Typeable)
+import GHC.Stack
+import Numeric.Natural (Natural)
 
 
 -- $default-implementations
@@ -436,7 +436,7 @@ class MonadInspectSTM m
   -- This is supported by 'IOSim' (and 'IOSimPOR'); 'IO' has a trivial instance.
   --
   -- The simplest example is:
-  -- 
+  --
   -- >
   -- > traceTVar (Proxy @m) tvar (\_ -> TraceString . show)
   -- >

@@ -4,9 +4,9 @@
 
 module Control.Monad.IOSimPOR.QuickCheckUtils where
 
-import           Control.Monad.ST.Lazy
-import           Test.QuickCheck.Gen
-import           Test.QuickCheck.Property
+import Control.Monad.ST.Lazy
+import Test.QuickCheck.Gen
+import Test.QuickCheck.Property
 
 -- We also need a version of conjoin that is sequential, but does not
 -- label its result as an IO property unless one of its arguments

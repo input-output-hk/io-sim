@@ -31,30 +31,30 @@ module Control.Monad.Class.MonadAsync
   , Concurrently (..)
   ) where
 
-import           Prelude hiding (read)
+import Prelude hiding (read)
 
 #if MIN_VERSION_base(4,18,0)
-import           Control.Applicative (Alternative (..))
+import Control.Applicative (Alternative (..))
 #else
-import           Control.Applicative (Alternative (..), liftA2)
+import Control.Applicative (Alternative (..), liftA2)
 #endif
-import           Control.Monad (forever)
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadSTM
-import           Control.Monad.Class.MonadThrow
-import           Control.Monad.Class.MonadTimer
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadSTM
+import Control.Monad.Class.MonadThrow
+import Control.Monad.Class.MonadTimer
 
-import           Control.Monad.Reader (ReaderT (..))
-import           Control.Monad.Trans (lift)
+import Control.Monad.Reader (ReaderT (..))
+import Control.Monad.Trans (lift)
 
-import           Control.Concurrent.Async (AsyncCancelled (..))
-import qualified Control.Concurrent.Async as Async
-import qualified Control.Exception as E
+import Control.Concurrent.Async (AsyncCancelled (..))
+import Control.Concurrent.Async qualified as Async
+import Control.Exception qualified as E
 
-import           Data.Bifunctor (first)
-import           Data.Foldable (fold)
-import           Data.Functor (void)
-import           Data.Kind (Type)
+import Data.Bifunctor (first)
+import Data.Foldable (fold)
+import Data.Functor (void)
+import Data.Kind (Type)
 
 class ( MonadSTM m
       , MonadThread m

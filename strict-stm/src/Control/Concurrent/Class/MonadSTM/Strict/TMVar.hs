@@ -33,8 +33,8 @@ module Control.Concurrent.Class.MonadSTM.Strict.TMVar
   ) where
 
 
-import qualified Control.Concurrent.Class.MonadSTM.TMVar as Lazy
-import           Control.Monad.Class.MonadSTM hiding (traceTMVar, traceTMVarIO)
+import Control.Concurrent.Class.MonadSTM.TMVar qualified as Lazy
+import Control.Monad.Class.MonadSTM hiding (traceTMVar, traceTMVarIO)
 
 
 type LazyTMVar   m = Lazy.TMVar m

@@ -27,6 +27,7 @@ library
 
   exposed-modules:     Control.Concurrent.Class.MonadMVar.Strict
   default-language:    Haskell2010
+  default-extensions:  ImportQualifiedPost
   build-depends:       base        >= 4.9 && <4.20,
                        io-classes ^>= 1.3,
   ghc-options:         -Wall
@@ -45,6 +46,7 @@ test-suite test
   other-modules:       Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
                        Test.Utils
   default-language:    Haskell2010
+  default-extensions:  ImportQualifiedPost
   build-depends:       base >=4.9 && <4.20,
                        io-sim,
                        nothunks,

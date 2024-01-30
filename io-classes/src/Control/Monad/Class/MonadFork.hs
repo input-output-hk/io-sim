@@ -13,11 +13,12 @@ module Control.Monad.Class.MonadFork
   , MonadFork (..)
   ) where
 
-import qualified Control.Concurrent as IO
-import           Control.Exception (AsyncException (ThreadKilled), Exception, SomeException)
-import           Control.Monad.Reader (ReaderT (..), lift)
-import           Data.Kind (Type)
-import qualified GHC.Conc.Sync as IO (labelThread)
+import Control.Concurrent qualified as IO
+import Control.Exception (AsyncException (ThreadKilled), Exception,
+           SomeException)
+import Control.Monad.Reader (ReaderT (..), lift)
+import Data.Kind (Type)
+import GHC.Conc.Sync qualified as IO (labelThread)
 
 
 class (Monad m, Eq   (ThreadId m),

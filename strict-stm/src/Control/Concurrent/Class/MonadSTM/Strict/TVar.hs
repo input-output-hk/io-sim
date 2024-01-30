@@ -1,6 +1,7 @@
-{-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE BangPatterns   #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies   #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module corresponds to `Control.Concurrent.STM.TVar` in "stm" package
 --
@@ -28,8 +29,8 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar
   , traceTVarIO
   ) where
 
-import qualified Control.Concurrent.Class.MonadSTM.TVar as Lazy
-import           Control.Monad.Class.MonadSTM hiding (traceTVar, traceTVarIO)
+import Control.Concurrent.Class.MonadSTM.TVar qualified as Lazy
+import Control.Monad.Class.MonadSTM hiding (traceTVar, traceTVarIO)
 
 type LazyTVar m = Lazy.TVar m
 

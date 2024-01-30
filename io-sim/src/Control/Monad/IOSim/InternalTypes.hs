@@ -11,13 +11,14 @@ module Control.Monad.IOSim.InternalTypes
   , unsafeUnregisterTimeout
   ) where
 
-import           Control.Exception (Exception)
-import           Control.Concurrent.Class.MonadSTM
-import           Control.Monad.Class.MonadThrow (MaskingState (..))
+import Control.Concurrent.Class.MonadSTM
+import Control.Exception (Exception)
+import Control.Monad.Class.MonadThrow (MaskingState (..))
 
-import           Control.Monad.IOSim.Types (IOSim (..), SimA (..), IOSimThreadId, TimeoutId)
+import Control.Monad.IOSim.Types (IOSim (..), IOSimThreadId, SimA (..),
+           TimeoutId)
 
-import           GHC.Exts (oneShot)
+import GHC.Exts (oneShot)
 
 -- We hide the type @b@ here, so it's useful to bundle these two parts together,
 -- rather than having Thread have an existential type, which makes record

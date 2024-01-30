@@ -33,10 +33,10 @@ module Control.Concurrent.Class.MonadSTM.Strict.TBQueue
   ) where
 
 
-import qualified Control.Concurrent.Class.MonadSTM.TBQueue as Lazy
-import           Control.Monad.Class.MonadSTM hiding (traceTBQueue, traceTBQueueIO)
+import Control.Concurrent.Class.MonadSTM.TBQueue qualified as Lazy
+import Control.Monad.Class.MonadSTM hiding (traceTBQueue, traceTBQueueIO)
 
-import           Numeric.Natural (Natural)
+import Numeric.Natural (Natural)
 
 
 type LazyTBQueue m = Lazy.TBQueue m

@@ -1,7 +1,7 @@
 module Control.Monad.Class.MonadSay where
 
-import           Control.Monad.Reader
-import qualified Data.ByteString.Char8 as BSC
+import Control.Monad.Reader
+import Data.ByteString.Char8 qualified as BSC
 
 class Monad m => MonadSay m where
   say :: String -> m ()

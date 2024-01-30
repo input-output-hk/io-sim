@@ -22,33 +22,33 @@ module Test.Control.Monad.IOSim
   , singleTimeoutExperiment
   ) where
 
-import           Data.Either (isLeft)
-import           Data.Fixed (Micro)
-import           Data.Foldable (foldl')
-import           Data.Functor (($>))
-import           Data.Time.Clock (picosecondsToDiffTime)
+import Data.Either (isLeft)
+import Data.Fixed (Micro)
+import Data.Foldable (foldl')
+import Data.Functor (($>))
+import Data.Time.Clock (picosecondsToDiffTime)
 
-import           Control.Exception (ArithException (..), AsyncException)
-import           Control.Monad
-import           Control.Monad.Fix
-import           System.IO.Error (ioeGetErrorString, isUserError)
+import Control.Exception (ArithException (..), AsyncException)
+import Control.Monad
+import Control.Monad.Fix
+import System.IO.Error (ioeGetErrorString, isUserError)
 
-import           Control.Concurrent.Class.MonadSTM.Strict
-import qualified Control.Concurrent.Class.MonadSTM.TVar as LazySTM
-import           Control.Monad.Class.MonadAsync
-import           Control.Monad.Class.MonadFork
-import           Control.Monad.Class.MonadSay
-import           Control.Monad.Class.MonadThrow
-import           Control.Monad.Class.MonadTime.SI
-import           Control.Monad.Class.MonadTimer.SI
-import           Control.Monad.IOSim
+import Control.Concurrent.Class.MonadSTM.Strict
+import Control.Concurrent.Class.MonadSTM.TVar qualified as LazySTM
+import Control.Monad.Class.MonadAsync
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadThrow
+import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTimer.SI
+import Control.Monad.IOSim
 
-import           Test.Control.Monad.Utils
-import           Test.Control.Monad.STM
+import Test.Control.Monad.STM
+import Test.Control.Monad.Utils
 
-import           Test.QuickCheck
-import           Test.Tasty hiding (after)
-import           Test.Tasty.QuickCheck
+import Test.QuickCheck
+import Test.Tasty hiding (after)
+import Test.Tasty.QuickCheck
 
 tests :: TestTree
 tests =
@@ -995,7 +995,7 @@ prop_timeout
     :: TimeoutDuration
     -> ActionDuration
     -> Property
-prop_timeout intendedTimeoutDuration intendedActionDuration = 
+prop_timeout intendedTimeoutDuration intendedActionDuration =
     runSimOrThrow (withSanityCheck <$>
                     singleTimeoutExperiment
                       intendedTimeoutDuration
@@ -1077,7 +1077,7 @@ unit_timeouts_and_async_exceptions_1 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_2 :: Property
@@ -1098,7 +1098,7 @@ unit_timeouts_and_async_exceptions_2 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 unit_timeouts_and_async_exceptions_3 :: Property
@@ -1119,7 +1119,7 @@ unit_timeouts_and_async_exceptions_3 =
       threadDelay (delay / 2)
       killThread tid
       threadDelay 1
-      return $ property True 
+      return $ property True
 
 
 -- | Verify that a thread blocked on `threadDelay` is not unblocked by an STM
@@ -1289,7 +1289,7 @@ instance Arbitrary DelayWithCancel where
 
 prop_registerDelayCancellable
     :: (forall s. DiffTime -> IOSim s (STM (IOSim s) TimeoutState, IOSim s ()))
-    -- ^ implementation 
+    -- ^ implementation
     -> DelayWithCancel
     -> Property
 prop_registerDelayCancellable registerDelayCancellableImpl

@@ -44,6 +44,7 @@ library
                        Control.Monad.Class.MonadTimer.SI
   other-modules:       Control.Monad.Class.MonadTimer.NonStandard
   default-language:    Haskell2010
+  default-extensions:  ImportQualifiedPost
   other-extensions:    BangPatterns,
                        CPP,
                        ConstraintKinds,
@@ -73,6 +74,7 @@ test-suite test
   main-is:             Main.hs
   other-modules:       Test.MonadTimer
   default-language:    Haskell2010
+  default-extensions:  ImportQualifiedPost
   build-depends:       base,
 
                        QuickCheck,

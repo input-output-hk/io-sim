@@ -36,17 +36,17 @@ module Control.Monad.Class.MonadTimer.NonStandard
   , AwaitTimeout
   ) where
 
-import qualified Control.Concurrent.STM as STM
+import Control.Concurrent.STM qualified as STM
 #ifndef GHC_TIMERS_API
-import           Control.Monad (when)
+import Control.Monad (when)
 #endif
-import           Control.Monad.Class.MonadSTM
+import Control.Monad.Class.MonadSTM
 
 #ifdef GHC_TIMERS_API
-import qualified GHC.Event as GHC (TimeoutKey, getSystemTimerManager,
-                     registerTimeout, unregisterTimeout)
+import GHC.Event qualified as GHC (TimeoutKey, getSystemTimerManager,
+           registerTimeout, unregisterTimeout)
 #else
-import qualified GHC.Conc.IO as GHC (registerDelay)
+import GHC.Conc.IO qualified as GHC (registerDelay)
 #endif
 
 
@@ -93,7 +93,7 @@ type NewTimeout m timeout = Int -> m timeout
 -- You should consider the cancelled state if you plan to use 'cancelTimeout'.
 --
 readTimeout :: ReadTimeout IO Timeout
-type ReadTimeout m timeout = timeout -> STM m TimeoutState 
+type ReadTimeout m timeout = timeout -> STM m TimeoutState
 
 
 -- | Cancel a timeout (unless it has already fired), putting it into the

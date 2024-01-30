@@ -16,9 +16,9 @@ module Control.Concurrent.Class.MonadSTM.Strict.TArray
   ) where
 
 
-import qualified Control.Concurrent.Class.MonadSTM.TArray as Lazy
+import Control.Concurrent.Class.MonadSTM.TArray qualified as Lazy
 
-import           Data.Array.Base (MArray (..))
+import Data.Array.Base (MArray (..))
 
 
 type LazyTArray  m = Lazy.TArray m
