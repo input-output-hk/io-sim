@@ -95,7 +95,10 @@ tryPeekTQueueDefault (TQueue queue) = do
       []   -> Nothing
 
 flushTQueueDefault :: MonadSTM m => TQueueDefault m a -> STM m [a]
-flushTQueueDefault (TQueue queue) = uncurry (++) <$> readTVar queue
+flushTQueueDefault (TQueue queue) = do
+  xs <- uncurry (++) <$> readTVar queue
+  writeTVar queue ([], [])
+  pure xs
 
 unGetTQueueDefault :: MonadSTM m => TQueueDefault m a -> a -> STM m ()
 unGetTQueueDefault (TQueue queue) a = do

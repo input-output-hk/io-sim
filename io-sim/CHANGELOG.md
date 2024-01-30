@@ -9,6 +9,7 @@
 ### Non-breaking changes
 
 * `Alternative` & `MonadPlus` instances for `IOSim`.
+* Fixed `flushTQueue` implemetation.
 
 ## 1.3.1.0
 
