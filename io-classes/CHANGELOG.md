@@ -8,6 +8,8 @@
 
 ### Non-breaking changes
 
+* Fixed some module haddock typos.
+
 ## 1.3.1.0
 
 ### Non-breaking changes

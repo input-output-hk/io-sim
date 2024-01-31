@@ -48,7 +48,7 @@ module Control.Monad.Class.MonadSTM.Internal
   , isEmptyTMVarDefault
   , labelTMVarDefault
   , traceTMVarDefault
-    -- ** Default 'TBQueue' implementation
+    -- ** Default 'TQueue' implementation
   , TQueueDefault (..)
   , newTQueueDefault
   , writeTQueueDefault

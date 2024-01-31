@@ -176,6 +176,12 @@ tests =
     , testProperty "registerDelayCancellable (IO impl)"
         prop_registerDelayCancellable_IO
     ]
+  , testGroup "MonadSTM"
+    [ testGroup "flushTQueue"
+      [ testProperty "empties the queue" prop_flushTQueueEmpties
+      , testProperty "maintains FIFO order" prop_flushTQueueOrder
+      ]
+    ]
   ]
 
 --
@@ -1347,6 +1353,33 @@ prop_registerDelayCancellable_IO =
         readTimeout
         cancelTimeout
         awaitTimeout
+
+-- | Test that 'flushTQueue' empties the queue.
+prop_flushTQueueEmpties :: Property
+prop_flushTQueueEmpties =
+  ioProperty emptyQueueAfterFlush
+  .&&. runSimOrThrow emptyQueueAfterFlush
+
+emptyQueueAfterFlush :: MonadSTM m => m Bool
+emptyQueueAfterFlush = do
+  q <- newTQueueIO
+  atomically $ do
+    writeTQueue q (1 :: Int)
+    _ <- flushTQueue q
+    isEmptyTQueue q
+
+-- | Test that 'flushTQueue' returns values in FIFO order.
+prop_flushTQueueOrder :: [Int] -> Property
+prop_flushTQueueOrder entries =
+  ioProperty (writeAndFlushQueue entries >>= \actual -> pure $ actual === entries)
+  .&&. runSimOrThrow (writeAndFlushQueue entries) === entries
+
+writeAndFlushQueue :: MonadSTM m => [Int] -> m [Int]
+writeAndFlushQueue entries =
+  atomically $ do
+    q <- newTQueue
+    forM_ entries $ writeTQueue q
+    flushTQueue q
 
 --
 -- Utils
