@@ -6,16 +6,18 @@
 
 ### Non-breaking changes
 
+* Prevent underflows in `threadDelay` (issue #129)
+
 ## 1.3.0.0
 
-- `io-sim-1.3.0.0`.
+* `io-sim-1.3.0.0`.
 * Support `ghc-9.8`.
 
 ## 1.2.0.0
 
 ## Non breaking changes
 
-- Added NFData & NoThunks instances for `Time`
+* Added NFData & NoThunks instances for `Time`
 
 ## 1.1.0.0
 

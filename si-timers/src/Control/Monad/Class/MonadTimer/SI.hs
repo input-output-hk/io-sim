@@ -42,11 +42,16 @@ import Data.Time.Clock (diffTimeToPicoseconds)
 --
 -- Note that on 32bit systems it can only represent `2^31-1` seconds, which is
 -- only ~35 minutes.
+--
+-- It doesn't prevent under- or overflows; when assertions are on it will thrown
+-- an assertion exception.
+--
 diffTimeToMicrosecondsAsInt :: DiffTime -> Int
 diffTimeToMicrosecondsAsInt d =
     let usec :: Integer
         usec = diffTimeToPicoseconds d `div` 1_000_000 in
-    assert (usec <= fromIntegral (maxBound :: Int)) $
+    assert (usec <= fromIntegral (maxBound :: Int)
+         && usec >= fromIntegral (minBound :: Int)) $
     fromIntegral usec
 
 
@@ -60,15 +65,21 @@ class ( MonadTimer.MonadDelay m
       ) => MonadDelay m where
   threadDelay :: DiffTime -> m ()
 
--- | Thread delay.  When the delay is smaller than what `Int` can represent it
--- will use the `Control.Monad.Class.MonadTimer.threadDelay` (e.g. for the `IO`
--- monad it will use `Control.Concurrent.threadDelay`); otherwise it will
--- recursively call `Control.Monad.Class.MonadTimer.threadDelay`.
+-- | Thread delay. This implementation will not over- or underflow.
+--
+-- For delay larger than what `Int` can represent (see
+-- `diffTimeToMicrosecondsAsInt`), it will recursively call
+-- `Control.Monad.Class.MonadTimer.threadDelay`.
+--
+-- For delays smaller than `minBound :: Int` seconds, `minBound :: Int` will be
+-- used instead.
 --
 instance MonadDelay IO where
   threadDelay :: forall m.
                  MonadDelay m
               => DiffTime -> m ()
+  threadDelay d | d <= 0        = return ()
+
   threadDelay d | d <= maxDelay =
       MonadTimer.threadDelay (diffTimeToMicrosecondsAsInt d)
     where
