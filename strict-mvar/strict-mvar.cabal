@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                strict-mvar
-version:             1.3.0.0
+version:             1.4.0.0
 synopsis:            Strict MVars for IO and IOSim
 description:
   Strict @MVar@ interface compatible with
@@ -29,7 +29,7 @@ library
   default-language:    Haskell2010
   default-extensions:  ImportQualifiedPost
   build-depends:       base        >= 4.9 && <4.20,
-                       io-classes ^>= 1.3,
+                       io-classes ^>= 1.4
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
                        -Wcompat

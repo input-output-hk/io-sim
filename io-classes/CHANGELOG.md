@@ -1,6 +1,6 @@
 # Revsion history of io-classes
 
-## next release
+## 1.4.0.0
 
 ### Breaking changes
 

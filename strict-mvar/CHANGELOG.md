@@ -1,10 +1,8 @@
 # Revsion history of strict-mvar
 
-## next release
+## 1.4.0.0
 
-### Breaking changes
-
-### Non-breaking changes
+* `io-sim-1.4.0.0`.
 
 ## 1.3.0.0
 
