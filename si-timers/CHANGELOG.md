@@ -1,8 +1,6 @@
 # Changelog
 
-## next release
-
-### Breaking changes
+## 1.4.0.0
 
 ### Non-breaking changes
 

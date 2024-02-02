@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                si-timers
-version:             1.3.0.0
+version:             1.4.0.0
 synopsis:            timers using SI units (seconds)
 description:
   Timers using SI units (seconds) which are safe on 32-bit platforms and
@@ -60,7 +60,7 @@ library
                        stm,
                        time              >=1.9.1 && <1.13,
 
-                       io-classes       ^>=1.3
+                       io-classes       ^>=1.4
   if flag(asserts)
      ghc-options:      -fno-ignore-asserts
 
