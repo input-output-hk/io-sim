@@ -1,10 +1,11 @@
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE ExplicitNamespaces  #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE ExplicitNamespaces    #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -20,6 +21,10 @@ module Control.Monad.IOSim
   , Failure (..)
   , runSimTrace
   , runSimTraceST
+    -- *** QuickCheck Monadic combinators
+  , monadicIOSim_
+  , monadicIOSim
+  , runIOSimGen
     -- ** Explore races using /IOSimPOR/
     -- $iosimpor
   , exploreSimTrace
@@ -119,6 +124,8 @@ import Control.Monad.IOSimPOR.Internal qualified as IOSimPOR (controlSimTraceST)
 import Control.Monad.IOSimPOR.QuickCheckUtils
 
 import Test.QuickCheck
+import Test.QuickCheck.Gen.Unsafe (Capture (..), capture)
+import Test.QuickCheck.Monadic (PropertyM, monadic')
 
 import Debug.Trace qualified as Debug
 import System.IO.Unsafe
@@ -751,3 +758,75 @@ compareTracesST (Just passing) trace = do
                 Nothing -> error "compareTraceST: invariant violation"
         wakeup _ _ SimTrace {} = error "compareTracesST: invariant violation"
         wakeup _ _ fail = return fail
+
+--
+-- QuickCheck monadic combinators
+--
+
+
+
+-- | Like <monadicST https://hackage.haskell.org/package/QuickCheck-2.14.3/docs/Test-QuickCheck-Monadic.html#v:monadicST>.
+--
+-- Note: it calls `traceResult` in non-strict mode, e.g. leaked threads do not
+-- cause failures.
+--
+-- @since 1.4.1.0
+--
+monadicIOSim_ :: Testable a
+              => (forall s. PropertyM (IOSim s) a)
+              -> Property
+monadicIOSim_ sim =
+    monadicIOSim
+      (\e -> case traceResult False e of
+          Left e  -> counterexample (show e) False
+          Right p -> p)
+      id
+      sim
+
+-- | A more general version of `monadicIOSim_`, which:
+--
+-- * allows to run in monad stacks build on top of `IOSim`;
+-- * gives more control how to attach debugging information to failed
+--   tests.
+--
+-- Note, to use this combinator your monad needs to be defined as:
+--
+-- > newtype M s a = M s { runM :: ReaderT State (IOSim s) a }
+--
+-- It's important that `M s` is a monad.  For such a monad one you'll need provide
+-- a natural transformation:
+-- @
+--   -- the state could also be created as an `IOSim` computation.
+--   nat :: forall s a. State -> M s a -> 'IOSim' s a
+--   nat state m = runStateT (runM m) state
+-- @
+--
+-- @since 1.4.1.0
+--
+monadicIOSim :: (Testable a, forall s. Monad (m s))
+             => (SimTrace Property -> Property)
+             -- ^ Allows to trace `SimTrace` in counterexamples.  The simplest
+             -- use case is to pass:
+             --
+             -- > either (\e -> counterexample (show e) False) id . traceResult False
+             --
+             -- as `monadicIOSim_` does.
+             --
+             -> (forall s a. m s a -> IOSim s a)
+             -- ^ natural transformation from `m` to @IOSim` s@
+             -> (forall s. PropertyM (m s) a)
+             -> Property
+monadicIOSim f tr sim = property (runIOSimGen f (tr <$> monadic' sim))
+
+-- | Like <runSTGen
+-- https://hackage.haskell.org/package/QuickCheck-2.14.3/docs/Test-QuickCheck-Monadic.html#v:runSTGen>.
+--
+-- @since 1.4.1.0
+--
+runIOSimGen :: (SimTrace a -> Property)
+            -> (forall s. Gen (IOSim s a))
+            -> Gen Property
+runIOSimGen f sim = do
+    Capture eval <- capture
+    let trace = runSimTrace (eval sim)
+    return (f trace)

@@ -1,5 +1,11 @@
 # Revsion history of io-sim
 
+## next version (1.4.1.0)
+
+### Non-breaking changes
+
+* QuickCheck monadic combinators: `monadicIOSim`, `monadicIOSim_` and `runIOSimGen`.
+
 ## 1.4.0.0
 
 ### Breaking changes
