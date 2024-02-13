@@ -1,5 +1,13 @@
 # Revsion history of io-classes
 
+## next version (1.4.1.0)
+
+### Non-breaking changes
+
+* New dependency on `primitive` package
+* New `stToIO` in `MonadST`, which is simpler to use than the existing
+  `withLiftST`, and depends on the `primitive` package's `PrimState`.
+
 ## 1.4.0.0
 
 ### Breaking changes
