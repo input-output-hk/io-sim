@@ -2,6 +2,8 @@
 
 ## next version (1.4.1.0)
 
+* Prevent STM waking up threads blocked on `threadDelay`.
+
 ### Non-breaking changes
 
 * QuickCheck monadic combinators: `monadicIOSim`, `monadicIOSim_` and `runIOSimGen`.

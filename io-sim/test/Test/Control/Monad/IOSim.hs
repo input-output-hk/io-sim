@@ -68,6 +68,7 @@ tests =
     , testProperty "async exceptions 2"     unit_timeouts_and_async_exceptions_2
     , testProperty "async exceptions 3"     unit_timeouts_and_async_exceptions_3
     , testProperty "threadDelay and STM"    unit_threadDelay_and_stm
+    , testProperty "{register,thread}Delay" unit_registerDelay_threadDelay
     , testProperty "throwTo and STM"        unit_throwTo_and_stm
     ]
   , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
@@ -1159,6 +1160,34 @@ unit_threadDelay_and_stm =
 
       return (t1 `diffTime` t0 === delay)
 
+unit_registerDelay_threadDelay :: Property
+unit_registerDelay_threadDelay =
+    let trace = runSimTrace experiment in
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    experiment :: IOSim s Property
+    experiment = do
+      v0 <- registerDelay 2
+      v1 <- newTVarIO False
+
+      _ <- forkIO $ do
+        threadDelay 1
+        atomically $ writeTVar v1 True
+
+      atomically $ do
+        b0 <- LazySTM.readTVar v0
+        b1 <- readTVar v1
+        check $ b0 || b1
+
+      let delay = 2
+      t0 <- getMonotonicTime
+      threadDelay delay
+      t1 <- getMonotonicTime
+
+      return (t1 `diffTime` t0 === delay)
 
 -- | Verify that a thread blocked on `throwTo` is not unblocked by an STM
 -- transaction.
