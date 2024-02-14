@@ -747,8 +747,10 @@ reschedule !simstate@SimState{ threads, timers, curTime = time } =
 
             -- Check all fired threadDelays
         let wakeupThreadDelay = [ (tid, tmid) | TimerThreadDelay tid tmid <- fired ]
-            wakeup            = fst `fmap` wakeupThreadDelay ++ wakeupSTM
-            (_, !simstate')   = unblockThreads False wakeup simstate
+            !simstate'        =
+                snd . unblockThreads False (fst `fmap` wakeupThreadDelay)
+              . snd . unblockThreads True  wakeupSTM
+              $ simstate
 
             -- For each 'timeout' action where the timeout has fired, start a
             -- new thread to execute throwTo to interrupt the action.
