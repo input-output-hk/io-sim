@@ -81,6 +81,7 @@ library
                        containers,
                        deepseq,
                        nothunks,
+                       primitive         >=0.7 && <0.10,
                        psqueues          >=0.2 && <0.3,
                        strict-stm       ^>=1.4,
                        si-timers        ^>=1.4,

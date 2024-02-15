@@ -102,6 +102,7 @@ import Control.Monad.Class.MonadTime.SI
 import Control.Monad.Class.MonadTimer
 import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 import Control.Monad.Class.MonadTimer.SI qualified as SI
+import Control.Monad.Primitive qualified as Prim
 import Control.Monad.ST.Lazy
 import Control.Monad.ST.Strict qualified as StrictST
 import Control.Monad.ST.Unsafe (unsafeSTToIO)
@@ -633,7 +634,17 @@ instance MonadAsync (IOSim s) where
   asyncWithUnmask k = async (k unblock)
   asyncOnWithUnmask _ k = async (k unblock)
 
+-- | This provides access to (almost) everything from the
+-- @primitive@ package, but don't try to use the @MVar@s as that will not
+-- work as expected.
+--
+-- @since 1.4.1.0
+instance Prim.PrimMonad (IOSim s) where
+  type PrimState (IOSim s) = s
+  primitive st = IOSim $ oneShot $ \k -> LiftST (Prim.primitive st) k
+
 instance MonadST (IOSim s) where
+  stToIO f = IOSim $ oneShot $ \k -> LiftST f k
   withLiftST f = f liftST
 
 -- | Lift an 'StrictST.ST' computation to 'IOSim'.

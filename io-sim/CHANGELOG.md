@@ -5,6 +5,9 @@
 ### Non-breaking changes
 
 * QuickCheck monadic combinators: `monadicIOSim`, `monadicIOSim_` and `runIOSimGen`.
+* New dependency on `primitive`
+* Provides an instance for `PrimMonad`, giving access to most functionality
+  from the `primitive` package.
 
 ## 1.4.0.0
 
