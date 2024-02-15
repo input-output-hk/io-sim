@@ -70,6 +70,7 @@ tests =
       , testProperty "timeout"                prop_timeout
       , testProperty "timeouts"               prop_timeouts
       , testProperty "stacked timeouts"       prop_stacked_timeouts
+      , testProperty "{register,thread}Delay" unit_registerDelay_threadDelay
       ]
     , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
     , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
@@ -969,6 +970,35 @@ prop_stacked_timeouts timeout0 timeout1 actionDuration =
 
               | otherwise -- i.e. timeout0 >= timeout1
               = Just Nothing
+
+unit_registerDelay_threadDelay :: Property
+unit_registerDelay_threadDelay =
+    exploreSimTrace id experiment $ \_ trace ->
+        counterexample (ppTrace_ trace)
+      . either (\e -> counterexample (show e) False) id
+      . traceResult False
+      $ trace
+  where
+    experiment :: IOSim s Property
+    experiment = do
+      v0 <- registerDelay 2
+      v1 <- newTVarIO False
+
+      _ <- forkIO $ do
+        threadDelay 1
+        atomically $ writeTVar v1 True
+
+      atomically $ do
+        b0 <- readTVar v0
+        b1 <- readTVar v1
+        check $ b0 || b1
+
+      let delay = 2
+      t0 <- getMonotonicTime
+      threadDelay delay
+      t1 <- getMonotonicTime
+
+      return (t1 `diffTime` t0 === delay)
 
 unit_timeouts_and_async_exceptions_1 :: Property
 unit_timeouts_and_async_exceptions_1 =

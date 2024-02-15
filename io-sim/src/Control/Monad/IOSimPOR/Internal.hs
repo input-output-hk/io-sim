@@ -1033,9 +1033,11 @@ reschedule simstate@SimState{ threads, timers, curTime = time, races } =
         mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
 
         let wakeupThreadDelay = [ (tid, tmid) | TimerThreadDelay tid tmid <- fired ]
-            wakeup            = fst `fmap` wakeupThreadDelay ++ wakeupSTM
             -- TODO: the vector clock below cannot be right, can it?
-            (_, !simstate')   = unblockThreads False bottomVClock wakeup simstate
+            !simstate'        =
+                snd . unblockThreads False bottomVClock (fst `fmap` wakeupThreadDelay)
+              . snd . unblockThreads True  bottomVClock wakeupSTM
+              $ simstate
 
             -- For each 'timeout' action where the timeout has fired, start a
             -- new thread to execute throwTo to interrupt the action.
