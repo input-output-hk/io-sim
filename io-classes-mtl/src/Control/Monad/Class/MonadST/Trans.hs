@@ -15,25 +15,33 @@ import           Control.Monad.Class.MonadST
 
 
 instance MonadST m => MonadST (ContT r m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
 instance MonadST m => MonadST (ExceptT e m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
 instance (Monoid w, MonadST m) => MonadST (Lazy.RWST r w s m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
 instance (Monoid w, MonadST m) => MonadST (Strict.RWST r w s m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
 instance MonadST m => MonadST (Lazy.StateT s m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
 instance MonadST m => MonadST (Strict.StateT s m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
 
 instance (Monoid w, MonadST m) => MonadST (Lazy.WriterT w m) where
-   withLiftST f = withLiftST $ \g -> f (lift . g) 
+  stToIO = lift . stToIO
+  withLiftST f = withLiftST $ \g -> f (lift . g) 
 
 instance (Monoid w, MonadST m) => MonadST (Strict.WriterT w m) where
+  stToIO = lift . stToIO
   withLiftST f = withLiftST $ \g -> f (lift . g)
