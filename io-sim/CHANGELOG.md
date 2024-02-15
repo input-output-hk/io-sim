@@ -1,15 +1,14 @@
 # Revsion history of io-sim
 
-## next version (1.4.1.0)
-
-* Prevent STM waking up threads blocked on `threadDelay`.
+## 1.4.1.0
 
 ### Non-breaking changes
 
-* QuickCheck monadic combinators: `monadicIOSim`, `monadicIOSim_` and `runIOSimGen`.
+* QuickCheck monadic combinators: `monadicIOSim`, `monadicIOSim_` and `runIOSimGen` (#140).
 * New dependency on `primitive`
 * Provides an instance for `PrimMonad`, giving access to most functionality
-  from the `primitive` package.
+  from the `primitive` package (#141).
+* Prevented STM waking up threads blocked on `threadDelay` (#142).
 
 ## 1.4.0.0
 

@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               io-classes-mtl
-version:            0.1.0.3
+version:            0.1.1.0
 synopsis:           Experimental MTL instances for io-classes
 description:
     MTL instances for
@@ -44,7 +44,7 @@ library
                       array,
                       mtl,
 
-                      io-classes  >=1.0 && <1.5,
+                      io-classes ^>=1.4.1.0,
                       si-timers,
 
 
