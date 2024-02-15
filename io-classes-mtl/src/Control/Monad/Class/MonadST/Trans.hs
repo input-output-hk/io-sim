@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 module Control.Monad.Class.MonadST.Trans () where
 
 import           Control.Monad.Cont (ContT)
