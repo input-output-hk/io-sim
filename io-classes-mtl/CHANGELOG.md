@@ -1,10 +1,8 @@
 # Revision history for io-classes-mtl
 
-## next release
+## 0.1.1.0
 
-### Breaking changes
-
-### Non-breaking changes
+* Support `io-classes-1.4.1.0`
 
 ## 0.1.0.2
 
@@ -16,6 +14,6 @@
 
 * Support `ghc-9.6`.
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 0.1.0.0
 
 * First version. Released on an unsuspecting world.
