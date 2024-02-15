@@ -46,8 +46,8 @@ jobs:
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
         echo "weeknum=$(/bin/date -u "+%W")" >> $GITHUB_OUTPUT
 
-    - uses: actions/cache@v4
-      name: "Cache cabal store"
+    - uses: actions/cache/restore@v4
+      name: "Restore cabal store"
       with:
         path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.setup-haskell.outputs.cabal-store }}
         key: cache-dependencies-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
@@ -67,6 +67,13 @@ jobs:
     - name: Build dependencies
       run: |
         cabal build --only-dependencies all
+
+    - uses: actions/cache/save@v4
+      name: "Save cabal store"
+      with:
+        path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.setup-haskell.outputs.cabal-store }}
+        key: cache-dependencies-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+        enableCrossOsArchive: true
 
     - name: Build projects [build]
       run: cabal build all
