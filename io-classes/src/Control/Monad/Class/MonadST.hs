@@ -6,7 +6,7 @@ module Control.Monad.Class.MonadST (MonadST (..)) where
 import Control.Monad.Reader
 
 import Control.Monad.Primitive
-import Control.Monad.ST as ST (ST, stToIO)
+import Control.Monad.ST (ST)
 
 
 -- | This class is for abstracting over 'stToIO' which allows running 'ST'
@@ -36,18 +36,18 @@ import Control.Monad.ST as ST (ST, stToIO)
 -- allows us to instantiate it with @RealWorld@ in the @IO@ case, and the local
 -- @s@ in a case where we are embedding into another @ST@ action.
 --
-class Monad m => MonadST m where
+class PrimMonad m => MonadST m where
   -- | @since 1.4.1.0
   stToIO :: ST (PrimState m) a -> m a
 
   -- | Deprecated. Use 'stToIO' instead.
   withLiftST :: (forall s. (forall a. ST s a -> m a) -> b) -> b
+  withLiftST = \k -> k stToIO
 
 {-# DEPRECATED withLiftST "Use the simpler 'stToIO' instead." #-}
 
 instance MonadST IO where
   stToIO = stToPrim
-  withLiftST = \f -> f ST.stToIO
 
 instance MonadST (ST s) where
   stToIO = stToPrim

@@ -1,5 +1,12 @@
 # Revsion history of io-classes
 
+## next release
+
+### Breaking changes
+
+* `MonadST` depends on `PrimMonad`.
+* Provide a default implementation of `withLiftST`.
+
 ## 1.4.1.0
 
 ### Non-breaking changes

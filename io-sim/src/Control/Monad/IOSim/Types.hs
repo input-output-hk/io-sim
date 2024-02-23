@@ -644,8 +644,7 @@ instance Prim.PrimMonad (IOSim s) where
   primitive st = IOSim $ oneShot $ \k -> LiftST (Prim.primitive st) k
 
 instance MonadST (IOSim s) where
-  stToIO f = IOSim $ oneShot $ \k -> LiftST f k
-  withLiftST f = f liftST
+  stToIO = liftST
 
 -- | Lift an 'StrictST.ST' computation to 'IOSim'.
 --
