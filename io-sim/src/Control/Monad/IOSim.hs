@@ -165,11 +165,11 @@ selectTraceRaces = go
 -- unsafe, of course, since that function may return different results
 -- at different times.
 
-detachTraceRacesST :: forall a s. SimTrace a -> ST s (ST s [ScheduleControl], SimTrace a)
+detachTraceRacesST :: forall a s. SimTrace a -> ST s (() -> ST s [ScheduleControl], SimTrace a)
 detachTraceRacesST trace0 = do
   races <- newSTRef []
-  let readRaces :: ST s [ScheduleControl]
-      readRaces = concat . reverse <$> readSTRef races
+  let readRaces :: () -> ST s [ScheduleControl]
+      readRaces () = concat . reverse <$> readSTRef races
 
       saveRaces :: [ScheduleControl] -> ST s ()
       saveRaces rs = modifySTRef races (rs:)
@@ -344,7 +344,7 @@ instance Exception Failure where
              , ">>"
              ]
     displayException (FailureEvaluation err) = "evaluation error:" ++ displayException  err
-    
+
 
 -- | 'IOSim' is a pure monad.
 --
@@ -517,7 +517,7 @@ exploreSimTrace optsf mainAction k =
               -- filter out cached ones *after* selecting the children of this
               -- node.
              races <- catMaybes
-                  <$> (readRaces >>= traverse (cachedST cacheRef) . take limit)
+                  <$> (readRaces () >>= traverse (cachedST cacheRef) . take limit)
              let branching = length races
              -- tabulate "Races explored" (map show races) $
              tabulate "Branching factor" [bucket branching]
