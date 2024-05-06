@@ -50,6 +50,8 @@ import Test.Tasty.QuickCheck
 import System.IO.Unsafe
 
 import Data.IORef
+import Data.Time (secondsToDiffTime)
+import Data.Void (Void)
 import GHC.Conc (pseq)
 
 tests :: TestTree
@@ -75,6 +77,7 @@ tests =
       , testProperty "stacked timeouts"       prop_stacked_timeouts
       , testProperty "{register,thread}Delay" unit_registerDelay_threadDelay
       ]
+    , testProperty "infinite simulation"      prop_explore_endless_simulation
     , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
     , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
     , testGroup "throw/catch unit tests"
@@ -436,6 +439,41 @@ traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
       return x
     traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
 
+-- | Checks that IOSimPOR is capable of analysing an infinite simulation
+-- lazily.
+--
+-- If the test fails with "outer timeout" error it means that 'exploreSimTrace'
+-- is not lazy and there's something wrong with IOSimPOR implementation and
+-- the trace is being forced way too soon. If, on the other hand, this property
+-- fails with "inner timeout" error, it means that 'exploreSimTrace' is somewhat
+-- lazy, however the trace is not being lazily generated.
+--
+--
+prop_explore_endless_simulation :: Positive (Small Integer) -> Property
+prop_explore_endless_simulation (Positive (Small finalTime)) =
+    counterexample "outer timeout"
+  $ label (show (secondsToDiffTime finalTime))
+  $ within 15000000 -- 15 seconds
+  $ exploreSimTrace
+      id sim $ \_ trace -> do
+        let l = takeWhile (\(t, _, _, _) -> t < Time (secondsToDiffTime finalTime))
+              . traceEvents
+              $ trace
+         in ioProperty $ do
+           r <- timeout 10 $ evaluate (foldl' (flip seq) True l)
+           case r of
+             Nothing -> return $ counterexample "inner timeout" False
+             Just _  -> return (property True)
+  where
+    thread :: forall s. IOSim s Void
+    thread = do
+      threadDelay 1
+      thread
+
+    sim :: forall s. IOSim s Void
+    sim = do
+      exploreRaces
+      withAsync thread wait
 
 --
 -- IOSim reused properties
