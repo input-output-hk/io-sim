@@ -1,4 +1,16 @@
-# Revsion history of io-sim
+# Revision history of io-sim
+
+## new version
+
+### Breaking changes
+
+- Generalised the type of `traceSelectTraceEvents` & co.
+
+### Non-breaking changes
+
+- Reverted commit 4534b6eae64072a87bd81584f479a123681358a3 which uses
+  `unsafePerformIO` instead of ST, to regain lazyness on infinite simulations.
+- Added a test to check for lazyness on infinite simulations
 
 ## 1.4.1.0
 
