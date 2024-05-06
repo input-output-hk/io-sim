@@ -1,15 +1,11 @@
-{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE ExplicitNamespaces    #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
+{-# LANGUAGE QuantifiedConstraints #-}
 module Control.Monad.IOSim
   ( -- * Simulation monad
     IOSim
@@ -28,9 +24,7 @@ module Control.Monad.IOSim
     -- ** Explore races using /IOSimPOR/
     -- $iosimpor
   , exploreSimTrace
-  , exploreSimTraceST
   , controlSimTrace
-  , controlSimTraceST
   , ScheduleMod (..)
   , ScheduleControl (..)
     -- *** Exploration options
@@ -99,11 +93,8 @@ module Control.Monad.IOSim
 import Prelude
 
 import Data.Bifoldable
-import Data.Bifunctor (first)
 import Data.Dynamic (fromDynamic)
-import Data.Functor (void)
 import Data.List (intercalate)
-import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Typeable (Typeable)
@@ -114,7 +105,6 @@ import Data.List.Trace qualified as Trace
 import Control.Exception (throw)
 
 import Control.Monad.ST.Lazy
-import Data.STRef.Lazy
 
 import Control.Monad.Class.MonadThrow as MonadThrow
 
@@ -127,8 +117,12 @@ import Test.QuickCheck
 import Test.QuickCheck.Gen.Unsafe (Capture (..), capture)
 import Test.QuickCheck.Monadic (PropertyM, monadic')
 
-import Debug.Trace qualified as Debug
 import System.IO.Unsafe
+
+import Data.Bifunctor (first)
+import Data.Functor (void)
+import Data.IORef
+import Debug.Trace qualified as Debug
 
 
 -- | Select events according to the predicate function.  It throws an error if
@@ -187,38 +181,23 @@ selectTraceRaces = go
 -- unsafe, of course, since that function may return different results
 -- at different times.
 
--- | Detach discovered races.  This is written in `ST` monad to support
--- simulations which do not terminate, in which case we will only detach races
--- up to the point we evaluated the simulation.
---
-detachTraceRacesST :: forall a s. SimTrace a -> ST s (ST s [ScheduleControl], SimTrace a)
-detachTraceRacesST trace0 = do
-  races <- newSTRef []
-  let readRaces :: ST s [ScheduleControl]
-      readRaces = concat . reverse <$> readSTRef races
+detachTraceRaces :: forall a. SimTrace a -> (() -> [ScheduleControl], SimTrace a)
+detachTraceRaces trace = unsafePerformIO $ do
+  races <- newIORef []
+  let readRaces :: () -> [ScheduleControl]
+      readRaces () = concat . reverse . unsafePerformIO $ readIORef races
 
-      saveRaces :: [ScheduleControl] -> ST s ()
-      saveRaces rs = modifySTRef races (rs:)
+      saveRaces :: [ScheduleControl] -> x -> x
+      saveRaces rs t = unsafePerformIO $ modifyIORef races (rs:)
+                                      >> return t
 
-      go :: SimTrace a -> ST s (SimTrace a)
-      go (SimTrace a b c d trace)      = SimTrace a b c d <$> go trace
-      go (SimPORTrace _ _ _ _ EventRaces {} trace)
-                                       = go trace
-      go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e <$> go trace
-      go (TraceRacesFound rs trace)    = saveRaces rs >> go trace
-      go t                             = return t
+      go :: SimTrace a -> SimTrace a
+      go (SimTrace a b c d trace)      = SimTrace a b c d $ go trace
+      go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e $ go trace
+      go (TraceRacesFound rs trace)    = saveRaces rs $ go trace
+      go t                             = t
 
-  trace <- go trace0
-  return (readRaces, trace)
-
-
--- | Like `detachTraceRacesST`, but it doesn't expose discovered races.
---
-detachTraceRaces :: forall a. SimTrace a -> SimTrace a
-detachTraceRaces = Trace.filter (\a -> case a of
-                                         SimPOREvent { seType = EventRaces {} } -> False
-                                         SimRacesFound {} -> False
-                                         _                -> True)
+  return (readRaces, go trace)
 
 -- | Select all the traced values matching the expected type.  It relies on the
 -- sim's dynamic trace facility.
@@ -531,76 +510,57 @@ exploreSimTrace
   -- ^ a callback which receives the previous trace (e.g. before reverting
   -- a race condition) and current trace
   -> Property
-exploreSimTrace optsf main k =
-    runST (exploreSimTraceST optsf main (\a b -> pure (k a b)))
-
-
--- | An 'ST' version of 'exploreSimTrace'. The callback also receives
--- 'ScheduleControl'.  This is mostly useful for testing /IOSimPOR/ itself.
---
-exploreSimTraceST
-  :: forall s a test. Testable test
-  => (ExplorationOptions -> ExplorationOptions)
-  -> (forall s. IOSim s a)
-  -> (Maybe (SimTrace a) -> SimTrace a -> ST s test)
-  -> ST s Property
-exploreSimTraceST optsf main k =
-    case explorationReplay opts of
-      Just control -> do
-        trace <- controlSimTraceST (explorationStepTimelimit opts) control main
-        counterexample ("Schedule control: " ++ show control)
-          <$> k Nothing trace
-      Nothing -> do
-        cacheRef <- createCacheST
-        prop <- go cacheRef (explorationScheduleBound opts)
-                            (explorationBranching opts)
-                            ControlDefault Nothing
-        !size <- cacheSizeST cacheRef
-        return $ tabulate "Modified schedules explored" [bucket size] prop
+exploreSimTrace optsf mainAction k =
+  case explorationReplay opts of
+    Nothing ->
+      explore (explorationScheduleBound opts) (explorationBranching opts) ControlDefault Nothing .&&.
+      let size = cacheSize() in size `seq`
+      tabulate "Modified schedules explored" [bucket size] True
+    Just control ->
+      replaySimTrace opts mainAction control (k Nothing)
   where
     opts = optsf stdExplorationOptions
 
-    go :: STRef s (Set ScheduleControl)
-       -> Int -- schedule bound
-       -> Int -- branching factor
-       -> ScheduleControl
-       -> Maybe (SimTrace a)
-       -> ST s Property
-    go cacheRef n m control passingTrace = do
-      traceWithRaces <- IOSimPOR.controlSimTraceST (explorationStepTimelimit opts) control main
-      (readRaces, trace0) <- detachTraceRacesST traceWithRaces
-      (readSleeperST, trace) <- compareTracesST passingTrace trace0
-      () <- traceDebugLog (explorationDebugLevel opts) traceWithRaces
-      conjoinNoCatchST
-        [ do sleeper <- readSleeperST
-             prop <- k passingTrace trace
-             return $ counterexample ("Schedule control: " ++ show control)
-                    $ counterexample
-                       (case sleeper of
-                         Nothing -> "No thread delayed"
-                         Just ((t,tid,lab),racing) ->
-                           showThread (tid,lab) ++
-                           " delayed at time "++
-                           show t ++
-                           "\n  until after:\n" ++
-                           unlines (map (("    "++).showThread) $ Set.toList racing)
-                        )
-                      prop
-        , do let limit = (n+m-1) `div` m
-              -- To ensure the set of schedules explored is deterministic, we
-              -- filter out cached ones *after* selecting the children of this
-              -- node.
-             races <- catMaybes
-                  <$> (readRaces >>= traverse (cachedST cacheRef) . take limit)
-             let branching = length races
-             -- tabulate "Races explored" (map show races) $
-             tabulate "Branching factor" [bucket branching]
-                .  tabulate "Race reversals per schedule" [bucket (raceReversals control)]
-                .  conjoin
-               <$> sequence
-                     [ go cacheRef n' ((m-1) `max` 1) r (Just trace0)
-                     | (r,n') <- zip races (divide (n-branching) branching) ]
-        ]
+    explore :: Int -- schedule bound
+            -> Int -- branching factor
+            -> ScheduleControl -> Maybe (SimTrace a) -> Property
+    explore n m control passingTrace =
+
+      -- ALERT!!! Impure code: readRaces must be called *after* we have
+      -- finished with trace.
+      let (readRaces, trace0) = detachTraceRaces
+                              $ traceDebugLog (explorationDebugLevel opts)
+                              $ controlSimTrace
+                                  (explorationStepTimelimit opts) control mainAction
+          (sleeper,trace) = compareTraces passingTrace trace0
+      in ( counterexample ("Schedule control: " ++ show control)
+         $ counterexample
+            (case sleeper of
+              Nothing -> "No thread delayed"
+              Just ((t,tid,lab),racing) ->
+                showThread (tid,lab) ++
+                " delayed at time "++
+                show t ++
+                "\n  until after:\n" ++
+                unlines (map (("    "++).showThread) $ Set.toList racing)
+             )
+         $ k passingTrace trace
+         )
+      .&&| let limit     = (n+m-1) `div` m
+               -- To ensure the set of schedules explored is deterministic, we
+               -- filter out cached ones *after* selecting the children of this
+               -- node.
+               races     = filter (not . cached) . take limit $ readRaces ()
+               branching = length races
+           in -- tabulate "Races explored" (map show races) $
+              tabulate "Branching factor" [bucket branching] $
+              tabulate "Race reversals per schedule" [bucket (raceReversals control)] $
+              conjoinPar
+                [ --Debug.trace "New schedule:" $
+                  --Debug.trace ("  "++show r) $
+                  --counterexample ("Schedule control: " ++ show r) $
+                  explore n' ((m-1) `max` 1) r (Just trace0)
+                | (r,n') <- zip races (divide (n-branching) branching) ]
 
     bucket :: Int -> String
     bucket n | n<10      = show n
@@ -619,42 +579,69 @@ exploreSimTraceST optsf main k =
       ppIOSimThreadId tid ++ (case lab of Nothing -> ""
                                           Just l  -> " ("++l++")")
 
+    -- cache of explored schedules
+    cache :: IORef (Set ScheduleControl)
+    cache = unsafePerformIO cacheIO
+
     -- insert a schedule into the cache
-    cachedST :: STRef s (Set ScheduleControl) -> ScheduleControl -> ST s (Maybe ScheduleControl)
-    cachedST cacheRef a = do
-      set <- readSTRef cacheRef
-      writeSTRef cacheRef (Set.insert a set)
-      return $ if Set.member a set
-               then Nothing
-               else Just a
+    cached :: ScheduleControl -> Bool
+    cached = unsafePerformIO . cachedIO
+
+    -- compute cache size; it's a function to make sure that `GHC` does not
+    -- inline it (and share the same thunk).
+    cacheSize :: () -> Int
+    cacheSize = unsafePerformIO . cacheSizeIO
 
     --
-    -- Caching in ST monad
+    -- Caching in IO monad
     --
 
     -- It is possible for the same control to be generated several times.
     -- To avoid exploring them twice, we keep a cache of explored schedules.
-    createCacheST :: ST s (STRef s (Set ScheduleControl))
-    createCacheST = newSTRef $
+    cacheIO :: IO (IORef (Set ScheduleControl))
+    cacheIO = newIORef $
               -- we use opts here just to be sure the reference cannot be
               -- lifted out of exploreSimTrace
               if explorationScheduleBound opts >=0
                 then Set.empty
                 else error "exploreSimTrace: negative schedule bound"
 
-    cacheSizeST :: STRef s (Set ScheduleControl) -> ST s Int
-    cacheSizeST = fmap Set.size . readSTRef
+    cachedIO :: ScheduleControl -> IO Bool
+    cachedIO m = atomicModifyIORef' cache $ \set ->
+      (Set.insert m set, Set.member m set)
+
+    cacheSizeIO :: () -> IO Int
+    cacheSizeIO () = Set.size <$> readIORef cache
 
 
 -- |  Trace `SimTrace` to `stderr`.
 --
-traceDebugLog :: Int -> SimTrace a -> ST s ()
-traceDebugLog logLevel _trace | logLevel <= 0 = pure ()
-traceDebugLog 1 trace = Debug.traceM $ "Simulation trace with discovered schedules:\n"
-                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (ignoreRaces $ void `first` trace)
-traceDebugLog _ trace = Debug.traceM $ "Simulation trace with discovered schedules:\n"
-                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (void `first` trace)
+-- An internal function.
+--
+traceDebugLog :: Int -> SimTrace a -> SimTrace a
+traceDebugLog logLevel trace | logLevel <= 0 = trace
+traceDebugLog 1 trace = Debug.trace ("Simulation trace with discovered schedules:\n"
+                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (ignoreRaces $ void `first` trace))
+                                    trace
 
+traceDebugLog _ trace = Debug.trace ("Simulation trace with discovered schedules:\n"
+                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (void `first` trace))
+                                    trace
+
+replaySimTrace :: forall a test. (Testable test)
+               => ExplorationOptions
+               -- ^ race exploration options
+               -> (forall s. IOSim s a)
+               -> ScheduleControl
+               -- ^ a schedule control to reproduce
+               -> (SimTrace a -> test)
+               -- ^ a callback which receives the simulation trace. The trace
+               -- will not contain any race events
+               -> Property
+replaySimTrace opts mainAction control k =
+  let (_,trace) = detachTraceRaces $
+                  controlSimTrace (explorationStepTimelimit opts) control mainAction
+  in property (k trace)
 
 -- | Run a simulation using a given schedule.  This is useful to reproduce
 -- failing cases without exploring the races.
@@ -671,12 +658,7 @@ controlSimTrace :: forall a.
                 -- ^ a simulation to run
                 -> SimTrace a
 controlSimTrace limit control main =
-    runST (controlSimTraceST limit control main)
-
-controlSimTraceST :: Maybe Int -> ScheduleControl -> IOSim s a -> ST s (SimTrace a)
-controlSimTraceST limit control main =
-  detachTraceRaces <$> IOSimPOR.controlSimTraceST limit control main
-
+    runST (IOSimPOR.controlSimTraceST limit control main)
 
 --
 -- Utils
@@ -702,62 +684,41 @@ raceReversals ControlFollow{}     = error "Impossible: raceReversals ControlFoll
 -- this far, then we collect its identity only if it is reached using
 -- `unsafePerformIO`.
 
--- TODO: return StepId
-compareTracesST :: forall a b s.
-                   Maybe (SimTrace a) -- ^ passing
-                -> SimTrace b         -- ^ failing
-                -> ST s ( ST s (Maybe ( (Time, IOSimThreadId, Maybe ThreadLabel)
-                                      , Set.Set (IOSimThreadId, Maybe ThreadLabel)
-                                      ))
-                        , SimTrace b
-                        )
-compareTracesST Nothing trace = return (return Nothing, trace)
-compareTracesST (Just passing) trace = do
-  sleeper <- newSTRef Nothing
-  trace' <- go sleeper passing trace
-  return ( readSTRef sleeper
-         , trace'
-         )
-  where
-        go :: STRef s (Maybe ( (Time, IOSimThreadId, Maybe ThreadLabel)
-                             , Set.Set (IOSimThreadId, Maybe ThreadLabel)
-                             ))
-           -> SimTrace a -- ^ passing
-           -> SimTrace b -- ^ failing
-           -> ST s (SimTrace b)
-        go sleeper (SimPORTrace tpass tidpass _ _ _ pass')
+compareTraces :: Maybe (SimTrace a1)
+              -> SimTrace a2
+              -> (Maybe ((Time, IOSimThreadId, Maybe ThreadLabel),
+                         Set.Set (IOSimThreadId, Maybe ThreadLabel)),
+                  SimTrace a2)
+compareTraces Nothing trace = (Nothing, trace)
+compareTraces (Just passing) trace = unsafePerformIO $ do
+  sleeper <- newIORef Nothing
+  return (unsafePerformIO $ readIORef sleeper,
+          go sleeper passing trace)
+  where go sleeper (SimPORTrace tpass tidpass _ _ _ pass')
                    (SimPORTrace tfail tidfail tstepfail tlfail evfail fail')
           | (tpass,tidpass) == (tfail,tidfail) =
               SimPORTrace tfail tidfail tstepfail tlfail evfail
-                <$> go sleeper pass' fail'
-        go sleeper (SimPORTrace tpass tidpass tsteppass tlpass _ _) fail = do
-          writeSTRef sleeper $ Just ((tpass, tidpass, tlpass),Set.empty)
-          SimPORTrace tpass tidpass tsteppass tlpass EventThreadSleep
-            <$> wakeup sleeper tidpass fail
-        go _ SimTrace {} _ = error "compareTracesST: invariant violation"
-        go _ _ SimTrace {} = error "compareTracesST: invariant violation"
-        go _ _ fail = return fail
+                $ go sleeper pass' fail'
+        go sleeper (SimPORTrace tpass tidpass tsteppass tlpass _ _) fail =
+          unsafePerformIO $ do
+            writeIORef sleeper $ Just ((tpass, tidpass, tlpass),Set.empty)
+            return $ SimPORTrace tpass tidpass tsteppass tlpass EventThreadSleep
+                   $ wakeup sleeper tidpass fail
+        go _ SimTrace {} _ = error "compareTraces: invariant violation"
+        go _ _ SimTrace {} = error "compareTraces: invariant violation"
+        go _ _ fail = fail
 
-        wakeup :: STRef s (Maybe ( (Time, IOSimThreadId, Maybe ThreadLabel)
-                                 , Set.Set (IOSimThreadId, Maybe ThreadLabel)
-                                 ))
-               -> IOSimThreadId
-               -> SimTrace b
-               -> ST s (SimTrace b)
         wakeup sleeper tidpass
                fail@(SimPORTrace tfail tidfail tstepfail tlfail evfail fail')
           | tidpass == tidfail =
-              return $ SimPORTrace tfail tidfail tstepfail tlfail EventThreadWake fail
-          | otherwise = do
-              ms <- readSTRef sleeper
-              case ms of
-                Just (slp, racing) -> do
-                  writeSTRef sleeper $ Just (slp,Set.insert (tidfail,tlfail) racing)
-                  SimPORTrace tfail tidfail tstepfail tlfail evfail
-                    <$> wakeup sleeper tidpass fail'
-                Nothing -> error "compareTraceST: invariant violation"
-        wakeup _ _ SimTrace {} = error "compareTracesST: invariant violation"
-        wakeup _ _ fail = return fail
+              SimPORTrace tfail tidfail tstepfail tlfail EventThreadWake fail
+          | otherwise = unsafePerformIO $ do
+              Just (slp,racing) <- readIORef sleeper
+              writeIORef sleeper $ Just (slp,Set.insert (tidfail,tlfail) racing)
+              return $ SimPORTrace tfail tidfail tstepfail tlfail evfail
+                     $ wakeup sleeper tidpass fail'
+        wakeup _ _ SimTrace {} = error "compareTraces: invariant violation"
+        wakeup _ _ fail = fail
 
 --
 -- QuickCheck monadic combinators

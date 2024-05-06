@@ -16,7 +16,6 @@ import Data.Functor (($>))
 import Data.List qualified as List
 import Data.Map (Map)
 import Data.Map qualified as Map
-import Data.STRef.Lazy
 
 import System.Exit
 import System.IO.Error (ioeGetErrorString, isUserError)
@@ -24,7 +23,6 @@ import System.IO.Error (ioeGetErrorString, isUserError)
 import Control.Exception (ArithException (..), AsyncException)
 import Control.Monad
 import Control.Monad.Fix
-import Control.Monad.ST.Lazy (ST, runST)
 
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadAsync
@@ -48,6 +46,11 @@ import Data.List.Trace qualified as Trace
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
+
+import System.IO.Unsafe
+
+import Data.IORef
+import GHC.Conc (pseq)
 
 tests :: TestTree
 tests =
@@ -344,18 +347,17 @@ propSimulates cmp (Shrink2 (Tasks tasks)) =
 -- NOTE: This property needs to be executed sequentially, otherwise it fails
 -- undeterministically, which `exploreSimTraceST` does.
 --
-propExploration :: Compare -> (Shrink2 Tasks) -> Property
+propExploration :: Compare -> Shrink2 Tasks -> Property
 propExploration cmp (Shrink2 ts@(Tasks tasks)) =
-  any (not . null . (\(Task steps)->steps)) tasks ==>
-    runST $
-    -- traceNoDuplicates $ \addTrace->
-    exploreSimTraceST (\a -> a { explorationDebugLevel = 0 })
-                      (say (show ts) >> runTasks cmp tasks)
-                    $ \_ trace -> do
-    -- addTrace trace
+  not (all (null . (\(Task steps)->steps)) tasks) ==>
+    traceNoDuplicates $ \addTrace->
+    exploreSimTrace (\a -> a { explorationDebugLevel = 0 })
+                    (say (show ts) >> runTasks cmp tasks)
+                    $ \_ trace ->
+    addTrace trace
     -- TODO: for now @coot is leaving `Trace.ppTrace`, but once we change all
     -- assertions into `FailureInternal`, we can use `ppTrace` instead
-    return $ counterexample (Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
+    counterexample (Trace.ppTrace show (ppSimEvent 0 0 0) trace) $
              case traceResult False trace of
                Right (m,a) -> property (m >= a)
                Left (FailureInternal msg)
@@ -410,30 +412,29 @@ unit_issue113_nonDep =
 -- Test manually, and supply a small value of n.
 propPermutations :: Int -> Property
 propPermutations n =
-  runST $
   traceNoDuplicates $ \addTrace ->
-  exploreSimTraceST (withScheduleBound 10000) (doit n) $ \_ trace -> do
-    addTrace trace
+  exploreSimTrace (withScheduleBound 10000) (doit n) $ \_ trace ->
+    addTrace trace $
     let Right result = traceResult False trace
-    return $ tabulate "Result" [show $ result] $ True
+     in tabulate "Result" [show result] True
 
 doit :: Int -> IOSim s [Int]
 doit n = do
-  r <- atomically $ newTVar []
+  r <- newTVarIO []
   exploreRaces
   mapM_ (\i -> forkIO $ atomically $ modifyTVar r (++[i])) [1..n]
   threadDelay 1
-  atomically $ readTVar r
+  readTVarIO r
 
 
-traceNoDuplicates :: forall s a prop. (Show a, Testable prop)
-                  => ((a -> ST s ()) -> ST s prop)
-                  -> ST s Property
-traceNoDuplicates k = do
-  v <- newSTRef Map.empty :: ST s (STRef s (Map String Int))
-  prop <- k (\a -> modifySTRef v (Map.insertWith (+) (show a) 1))
-  m <- readSTRef v
-  return $ prop .&&. counterexample (show (Map.keys $ Map.filter (> 1) m)) (maximum m === 1)
+traceNoDuplicates :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
+traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
+  where
+    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
+    addTrace t x = unsafePerformIO $ do
+      atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
+      return x
+    traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
 
 
 --
@@ -446,11 +447,10 @@ traceNoDuplicates k = do
 
 prop_stm_graph_sim :: TestThreadGraph -> Property
 prop_stm_graph_sim g =
-  runST $
   traceNoDuplicates $ \addTrace ->
-    exploreSimTraceST id (prop_stm_graph g) $ \_ trace -> do
+    exploreSimTrace id (prop_stm_graph g) $ \_ trace -> do
       addTrace trace
-      return $ counterexample (Trace.ppTrace show show trace) $
+      $ counterexample (Trace.ppTrace show show trace) $
         case traceResult False trace of
           Right () -> property True
           Left e   -> counterexample (show e) False
@@ -498,7 +498,7 @@ prop_mfix_purity (Positive n) =
        Left e  -> counterexample (show e) False
   where
     factorial :: (Int -> Int) -> Int -> Int
-    factorial = \rec_ k -> if k <= 1 then 1 else k * rec_ (k - 1)
+    factorial rec_ k = if k <= 1 then 1 else k * rec_ (k - 1)
 
 prop_mfix_purity_2 :: [Positive Int] -> Property
 prop_mfix_purity_2 as =

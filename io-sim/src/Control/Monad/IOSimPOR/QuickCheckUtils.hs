@@ -4,19 +4,32 @@
 
 module Control.Monad.IOSimPOR.QuickCheckUtils where
 
-import Control.Monad.ST.Lazy
+import Control.Parallel
 import Test.QuickCheck.Gen
 import Test.QuickCheck.Property
+
+-- Take the conjunction of several properties, in parallel This is a
+-- modification of code from Test.QuickCheck.Property, to run non-IO
+-- properties in parallel. It also takes care NOT to label its result
+-- as an IO property (using IORose), unless one of its arguments is
+-- itself an IO property. This is needed to permit parallel testing.
+conjoinPar :: TestableNoCatch prop => [prop] -> Property
+conjoinPar = conjoinSpeculate speculate
+  where
+  -- speculation tries to evaluate each Rose tree in parallel, to WHNF
+  -- This will not perform any IO, but should evaluate non-IO properties
+  -- completely.
+  speculate [] = []
+  speculate (rose:roses) = roses' `par` rose' `pseq` (rose':roses')
+    where rose' = case rose of
+                    MkRose result _ -> (case ok result of { Nothing -> (); Just !_ -> (); })
+                                `pseq` rose
+                    IORose _        -> rose
+          roses' = speculate roses
 
 -- We also need a version of conjoin that is sequential, but does not
 -- label its result as an IO property unless one of its arguments
 -- is. Consequently it does not catch exceptions in its arguments.
-
-conjoinNoCatchST :: TestableNoCatch prop => [ST s prop] -> ST s Property
-conjoinNoCatchST sts = do
-    ps <- sequence sts
-    return $ conjoinNoCatch ps
-
 conjoinNoCatch :: TestableNoCatch prop => [prop] -> Property
 conjoinNoCatch = conjoinSpeculate id
 
@@ -84,7 +97,7 @@ instance TestableNoCatch Result where
   propertyNoCatch = MkProperty . return . MkProp . return
 
 instance TestableNoCatch Prop where
-  propertyNoCatch = MkProperty . return
+  propertyNoCatch p = MkProperty . return $ p
 
 instance TestableNoCatch prop => TestableNoCatch (Gen prop) where
   propertyNoCatch mp = MkProperty $ do p <- mp; unProperty (againNoCatch $ propertyNoCatch p)
