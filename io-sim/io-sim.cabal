@@ -88,6 +88,7 @@ library
                        time              >=1.9.1 && <1.13,
                        quiet,
                        QuickCheck,
+                       parallel
 
 
   if flag(asserts)
