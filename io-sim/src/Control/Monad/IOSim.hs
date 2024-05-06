@@ -100,7 +100,6 @@ import Data.Set qualified as Set
 import Data.Typeable (Typeable)
 
 import Data.List.Trace (Trace (..))
-import Data.List.Trace qualified as Trace
 
 import Control.Exception (throw)
 
@@ -119,7 +118,6 @@ import Test.QuickCheck.Monadic (PropertyM, monadic')
 
 import System.IO.Unsafe
 
-import Data.Bifunctor (first)
 import Data.Functor (void)
 import Data.IORef
 import Debug.Trace qualified as Debug
@@ -181,8 +179,8 @@ selectTraceRaces = go
 -- unsafe, of course, since that function may return different results
 -- at different times.
 
-detachTraceRaces :: forall a. SimTrace a -> (() -> [ScheduleControl], SimTrace a)
-detachTraceRaces trace = unsafePerformIO $ do
+detachTraceRaces :: forall a. Int -> SimTrace a -> (() -> [ScheduleControl], SimTrace a)
+detachTraceRaces debugLevel trace = unsafePerformIO $ do
   races <- newIORef []
   let readRaces :: () -> [ScheduleControl]
       readRaces () = concat . reverse . unsafePerformIO $ readIORef races
@@ -192,10 +190,16 @@ detachTraceRaces trace = unsafePerformIO $ do
                                       >> return t
 
       go :: SimTrace a -> SimTrace a
-      go (SimTrace a b c d trace)      = SimTrace a b c d $ go trace
-      go (SimPORTrace a b c d e trace) = SimPORTrace a b c d e $ go trace
-      go (TraceRacesFound rs trace)    = saveRaces rs $ go trace
-      go t                             = t
+      go (SimTrace a b c d trace)      = traceDebugLog debugLevel (Left (SimEvent a b c d))
+                                       $ SimTrace a b c d $ go trace
+      go (SimPORTrace a b c d e trace) = traceDebugLog debugLevel (Left (SimPOREvent a b c d e))
+                                       $ SimPORTrace a b c d e $ go trace
+      go (TraceRacesFound rs trace)    = traceDebugLog debugLevel (Left (SimRacesFound rs))
+                                       $ saveRaces rs $ go trace
+      go (Cons a as)                   = traceDebugLog debugLevel (Left a)
+                                       $ Cons a (go as)
+      go (Nil a)                       = traceDebugLog debugLevel (Right a)
+                                       $ Nil a
 
   return (readRaces, go trace)
 
@@ -528,8 +532,7 @@ exploreSimTrace optsf mainAction k =
 
       -- ALERT!!! Impure code: readRaces must be called *after* we have
       -- finished with trace.
-      let (readRaces, trace0) = detachTraceRaces
-                              $ traceDebugLog (explorationDebugLevel opts)
+      let (readRaces, trace0) = detachTraceRaces (explorationDebugLevel opts)
                               $ controlSimTrace
                                   (explorationStepTimelimit opts) control mainAction
           (sleeper,trace) = compareTraces passingTrace trace0
@@ -618,15 +621,15 @@ exploreSimTrace optsf mainAction k =
 --
 -- An internal function.
 --
-traceDebugLog :: Int -> SimTrace a -> SimTrace a
-traceDebugLog logLevel trace | logLevel <= 0 = trace
-traceDebugLog 1 trace = Debug.trace ("Simulation trace with discovered schedules:\n"
-                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (ignoreRaces $ void `first` trace))
-                                    trace
-
-traceDebugLog _ trace = Debug.trace ("Simulation trace with discovered schedules:\n"
-                                    ++ Trace.ppTrace (ppSimResult 0 0 0) (ppSimEvent 0 0 0) (void `first` trace))
-                                    trace
+traceDebugLog :: Int -> Either SimEvent (SimResult a) -> SimTrace a -> SimTrace a
+traceDebugLog logLevel _event trace | logLevel <= 0 = trace
+-- Discard races if log level is 1
+traceDebugLog 1 (Left SimPOREvent { seType = EventRaces {} }) trace = trace
+traceDebugLog 1 (Left event) trace  = Debug.trace (ppSimEvent 0 0 0 event) trace
+traceDebugLog 1 (Right event) trace = Debug.trace (ppSimResult 0 0 0 (void event)) trace
+-- Otherwise, show races
+traceDebugLog _ (Left event) trace  = Debug.trace (ppSimEvent 0 0 0 event) trace
+traceDebugLog _ (Right event) trace = Debug.trace (ppSimResult 0 0 0 (void event)) trace
 
 replaySimTrace :: forall a test. (Testable test)
                => ExplorationOptions
@@ -639,7 +642,7 @@ replaySimTrace :: forall a test. (Testable test)
                -- will not contain any race events
                -> Property
 replaySimTrace opts mainAction control k =
-  let (_,trace) = detachTraceRaces $
+  let (_,trace) = detachTraceRaces (explorationDebugLevel opts) $
                   controlSimTrace (explorationStepTimelimit opts) control mainAction
   in property (k trace)
 
@@ -663,11 +666,6 @@ controlSimTrace limit control main =
 --
 -- Utils
 --
-
-ignoreRaces :: SimTrace a -> SimTrace a
-ignoreRaces = Trace.filter (\a -> case a of
-                                    SimPOREvent { seType = EventRaces {} } -> False
-                                    _ -> True)
 
 raceReversals :: ScheduleControl -> Int
 raceReversals ControlDefault      = 0
