@@ -10,9 +10,13 @@ module Data.List.Trace
   , tail
   , filter
   , length
+  , take
+  , takeWhile
+  , drop
+  , dropWhile
   ) where
 
-import Prelude hiding (filter, head, length, tail)
+import Prelude hiding (filter, head, length, tail, take, takeWhile, drop, dropWhile)
 
 import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus (..))
@@ -64,6 +68,32 @@ fromList a = foldr Cons (Nil a)
 ppTrace :: (a -> String) -> (b -> String) -> Trace a b -> String
 ppTrace sa  sb (Cons b bs) = sb b ++ "\n" ++ ppTrace sa sb bs
 ppTrace sa _sb (Nil a)     = sa a
+
+-- | Take the first n elements of a Trace, converting each to ().
+take :: Int -> Trace a b -> Trace (Maybe a) b
+take n _ | n <= 0 = Nil Nothing
+take _ (Nil a)    = Nil (Just a)
+take n (Cons b o) = Cons b (take (n - 1) o)
+
+-- | Take elements from the Trace while the predicate holds, converting each to ().
+takeWhile :: (b -> Bool) -> Trace a b -> Trace (Maybe a) b
+takeWhile _ (Nil a)          = Nil (Just a)
+takeWhile p (Cons b o)
+  | p b                       = Cons b (takeWhile p o)
+  | otherwise                 = Nil Nothing
+
+-- | Drop the first n elements of a Trace.
+drop :: Int -> Trace a b -> Trace a b
+drop n o | n <= 0 = o
+drop _ (Nil a)    = Nil a
+drop n (Cons _ o) = drop (n - 1) o
+
+-- | Drop elements from the Trace while the predicate holds.
+dropWhile :: (b -> Bool) -> Trace a b -> Trace a b
+dropWhile _ o@Nil {}        = o
+dropWhile p o@(Cons b o')
+  | p b                     = dropWhile p o'
+  | otherwise               = o
 
 instance Bifunctor Trace where
     bimap f g (Cons b bs) = Cons (g b) (bimap f g bs)
