@@ -78,10 +78,10 @@ take n (Cons b o) = Cons b (take (n - 1) o)
 
 -- | Take elements from the Trace while the predicate holds, converting each to ().
 takeWhile :: (b -> Bool) -> Trace a b -> Trace (Maybe a) b
-takeWhile _ (Nil a)          = Nil (Just a)
+takeWhile _ (Nil a)    = Nil (Just a)
 takeWhile p (Cons b o)
-  | p b                       = Cons b (takeWhile p o)
-  | otherwise                 = Nil Nothing
+  | p b                = Cons b (takeWhile p o)
+  | otherwise          = Nil Nothing
 
 -- | Drop the first n elements of a Trace.
 drop :: Int -> Trace a b -> Trace a b
