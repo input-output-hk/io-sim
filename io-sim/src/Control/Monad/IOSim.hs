@@ -296,8 +296,8 @@ printTraceEventsSay = mapM_ print . selectTraceEventsSay
 --
 traceSelectTraceEvents
     :: (Time -> SimEventType -> Maybe b)
-    -> SimTrace a
-    -> Trace (SimResult a) b
+    -> Trace a SimEvent
+    -> Trace a b
 traceSelectTraceEvents fn = bifoldr ( \ v _acc -> Nil v )
                                     ( \ eventCtx acc
                                      -> case eventCtx of
@@ -316,7 +316,8 @@ traceSelectTraceEvents fn = bifoldr ( \ v _acc -> Nil v )
 -- | Select dynamic events.  It is a /total function/.
 --
 traceSelectTraceEventsDynamic :: forall a b. Typeable b
-                              => SimTrace a -> Trace (SimResult a) b
+                              => Trace a SimEvent
+                              -> Trace a b
 traceSelectTraceEventsDynamic = traceSelectTraceEvents fn
   where
     fn :: Time -> SimEventType -> Maybe b
@@ -326,7 +327,7 @@ traceSelectTraceEventsDynamic = traceSelectTraceEvents fn
 
 -- | Select say events.  It is a /total function/.
 --
-traceSelectTraceEventsSay :: forall a.  SimTrace a -> Trace (SimResult a) String
+traceSelectTraceEventsSay :: forall a. Trace a SimEvent -> Trace a String
 traceSelectTraceEventsSay = traceSelectTraceEvents fn
   where
     fn :: Time -> SimEventType -> Maybe String
