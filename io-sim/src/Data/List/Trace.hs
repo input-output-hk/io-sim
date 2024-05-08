@@ -16,7 +16,8 @@ module Data.List.Trace
   , dropWhile
   ) where
 
-import Prelude hiding (filter, head, length, tail, take, takeWhile, drop, dropWhile)
+import Prelude hiding (drop, dropWhile, filter, head, length, tail, take,
+           takeWhile)
 
 import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus (..))
