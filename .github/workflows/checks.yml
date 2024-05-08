@@ -15,7 +15,8 @@ jobs:
 
     steps:
     - name: Install dependencies
-      run: sudo apt install -y fd-find
+      run: |
+        sudo apt install -y fd-find
 
     - uses: actions/checkout@v3
 
