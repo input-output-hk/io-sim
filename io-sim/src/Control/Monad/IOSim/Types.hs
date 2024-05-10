@@ -516,6 +516,7 @@ instance MonadSTM (IOSim s) where
   readTMVar         = MonadSTM.readTMVarDefault
   tryReadTMVar      = MonadSTM.tryReadTMVarDefault
   swapTMVar         = MonadSTM.swapTMVarDefault
+  writeTMVar        = MonadSTM.writeTMVarDefault
   isEmptyTMVar      = MonadSTM.isEmptyTMVarDefault
 
   newTQueue         = newTQueueDefault

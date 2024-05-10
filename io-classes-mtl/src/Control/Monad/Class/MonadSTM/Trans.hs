@@ -106,6 +106,7 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     readTMVar      = ContTSTM .  readTMVar
     tryReadTMVar   = ContTSTM .  tryReadTMVar
     swapTMVar      = ContTSTM .: swapTMVar
+    writeTMVar     = ContTSTM .: writeTMVar
     isEmptyTMVar   = ContTSTM .  isEmptyTMVar
 
     type TQueue (ContT r m) = TQueue m
@@ -183,6 +184,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.WriterT w m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (Lazy.WriterT w m) = TQueue m
@@ -260,6 +262,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Strict.WriterT w m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (Strict.WriterT w m) = TQueue m
@@ -337,6 +340,7 @@ instance MonadSTM m => MonadSTM (Lazy.StateT s m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (Lazy.StateT s m) = TQueue m
@@ -414,6 +418,7 @@ instance MonadSTM m => MonadSTM (Strict.StateT s m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (Strict.StateT s m) = TQueue m
@@ -491,6 +496,7 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (ExceptT e m) = TQueue m
@@ -568,6 +574,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.RWST r w s m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (Lazy.RWST r w s m) = TQueue m
@@ -645,6 +652,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Strict.RWST r w s m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (Strict.RWST r w s m) = TQueue m

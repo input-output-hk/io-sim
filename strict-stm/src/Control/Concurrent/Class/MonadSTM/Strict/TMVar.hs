@@ -23,6 +23,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TMVar
   , readTMVar
   , tryReadTMVar
   , swapTMVar
+  , writeTMVar
   , isEmptyTMVar
     -- * MonadLabelledSTM
   , labelTMVar
@@ -100,6 +101,9 @@ tryReadTMVar (StrictTMVar tmvar) = Lazy.tryReadTMVar tmvar
 
 swapTMVar :: MonadSTM m => StrictTMVar m a -> a -> STM m a
 swapTMVar (StrictTMVar tmvar) !a = Lazy.swapTMVar tmvar a
+
+writeTMVar :: MonadSTM m => StrictTMVar m a -> a -> STM m ()
+writeTMVar (StrictTMVar tmvar) !a = Lazy.writeTMVar tmvar a
 
 isEmptyTMVar :: MonadSTM m => StrictTMVar m a -> STM m Bool
 isEmptyTMVar (StrictTMVar tmvar) = Lazy.isEmptyTMVar tmvar
