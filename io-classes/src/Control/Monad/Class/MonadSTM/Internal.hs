@@ -45,6 +45,7 @@ module Control.Monad.Class.MonadSTM.Internal
   , readTMVarDefault
   , tryReadTMVarDefault
   , swapTMVarDefault
+  , writeTMVarDefault
   , isEmptyTMVarDefault
   , labelTMVarDefault
   , traceTMVarDefault
@@ -189,6 +190,7 @@ class (Monad m, Monad (STM m)) => MonadSTM m where
   readTMVar       :: TMVar m a      -> STM m a
   tryReadTMVar    :: TMVar m a      -> STM m (Maybe a)
   swapTMVar       :: TMVar m a -> a -> STM m a
+  writeTMVar      :: TMVar m a -> a -> STM m ()
   isEmptyTMVar    :: TMVar m a      -> STM m Bool
 
   type TQueue m  :: Type -> Type
@@ -569,6 +571,7 @@ instance MonadSTM IO where
   readTMVar      = STM.readTMVar
   tryReadTMVar   = STM.tryReadTMVar
   swapTMVar      = STM.swapTMVar
+  writeTMVar     = STM.writeTMVar
   isEmptyTMVar   = STM.isEmptyTMVar
   newTQueue      = STM.newTQueue
   readTQueue     = STM.readTQueue
@@ -739,6 +742,9 @@ swapTMVarDefault (TMVar t) new = do
   case m of
     Nothing  -> retry
     Just old -> do writeTVar t (Just new); return old
+
+writeTMVarDefault :: MonadSTM m => TMVarDefault m a -> a -> STM m ()
+writeTMVarDefault (TMVar t) new = writeTVar t (Just new)
 
 isEmptyTMVarDefault :: MonadSTM m => TMVarDefault m a -> STM m Bool
 isEmptyTMVarDefault (TMVar t) = do
@@ -1188,6 +1194,7 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     readTMVar      = lift .  readTMVar
     tryReadTMVar   = lift .  tryReadTMVar
     swapTMVar      = lift .: swapTMVar
+    writeTMVar     = lift .: writeTMVar
     isEmptyTMVar   = lift .  isEmptyTMVar
 
     type TQueue (ReaderT r m) = TQueue m

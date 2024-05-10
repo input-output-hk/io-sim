@@ -16,6 +16,7 @@ module Control.Concurrent.Class.MonadSTM.TMVar
   , readTMVar
   , tryReadTMVar
   , swapTMVar
+  , writeTMVar
   , isEmptyTMVar
     -- * MonadLabelledSTM
   , labelTMVar
