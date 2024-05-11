@@ -2,6 +2,10 @@
 
 ## next release
 
+### Non breaking change
+
+* Add `writeTMVar` to `MonadSTM`.
+
 ### Breaking changes
 
 * `MonadST` depends on `PrimMonad`.
