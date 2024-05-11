@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE DerivingStrategies         #-}
@@ -571,7 +572,11 @@ instance MonadSTM IO where
   readTMVar      = STM.readTMVar
   tryReadTMVar   = STM.tryReadTMVar
   swapTMVar      = STM.swapTMVar
+#if MIN_VERSION_stm(2, 5, 1)
   writeTMVar     = STM.writeTMVar
+#else
+  writeTMVar     = writeTMVar'
+#endif
   isEmptyTMVar   = STM.isEmptyTMVar
   newTQueue      = STM.newTQueue
   readTQueue     = STM.readTQueue
@@ -1245,3 +1250,10 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
 (f .: g) x y = f (g x y)
+
+-- TODO: writeTMVar was introduced in stm-2.5.1. But io-sim supports stm older than that
+-- Therefore this can be removed once we don't need backwards compatibility with stm.
+#if !MIN_VERSION_stm(2,5,1)
+writeTMVar' :: STM.TMVar a -> a -> STM.STM ()
+writeTMVar' t new = STM.tryTakeTMVar t >> STM.putTMVar t new
+#endif
