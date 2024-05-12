@@ -101,6 +101,8 @@ library
                        primitive >= 0.7 && <0.11,
                        stm   >=2.5 && <2.6,
                        time  >=1.9.1 && <1.13
+  if impl(ghc >= 9.10)
+    build-depends:     ghc-internal
 
   if flag(asserts)
     ghc-options: -fno-ignore-asserts
