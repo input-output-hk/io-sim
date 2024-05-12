@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                       #-}
 {-# LANGUAGE DefaultSignatures         #-}
 {-# LANGUAGE DeriveFunctor             #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -34,18 +35,30 @@ import Control.Monad.Reader (ReaderT (..), lift, runReaderT)
 import Control.Monad.STM (STM)
 import Control.Monad.STM qualified as STM
 
+#if __GLASGOW_HASKELL__ >= 910
+import GHC.Internal.Exception.Context (ExceptionAnnotation)
+#endif
+
 -- | Throwing exceptions, and resource handling in the presence of exceptions.
 --
 -- Does not include the ability to respond to exceptions.
 --
 class Monad m => MonadThrow m where
 
+#if __GLASGOW_HASKELL__ >= 910
+  {-# MINIMAL throwIO, annotateIO #-}
+#else
   {-# MINIMAL throwIO #-}
+#endif
+
   throwIO :: Exception e => e -> m a
 
   bracket  :: m a -> (a -> m b) -> (a -> m c) -> m c
   bracket_ :: m a -> m b -> m c -> m c
   finally  :: m a -> m b -> m a
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO :: forall e a. ExceptionAnnotation e => e -> m a -> m a
+#endif
 
   default bracket :: MonadCatch m => m a -> (a -> m b) -> (a -> m c) -> m c
 
@@ -206,11 +219,14 @@ class MonadThrow m => MonadEvaluate m where
 
 instance MonadThrow IO where
 
-  throwIO  = IO.throwIO
+  throwIO    = IO.throwIO
 
-  bracket  = IO.bracket
-  bracket_ = IO.bracket_
-  finally  = IO.finally
+  bracket    = IO.bracket
+  bracket_   = IO.bracket_
+  finally    = IO.finally
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO = IO.annotateIO
+#endif
 
 
 instance MonadCatch IO where
@@ -249,6 +265,9 @@ instance MonadEvaluate IO where
 
 instance MonadThrow STM where
   throwIO = STM.throwSTM
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann io = io `catch` \e -> throwIO (IO.addExceptionContext ann e)
+#endif
 
 instance MonadCatch STM where
   catch  = STM.catchSTM
@@ -273,6 +292,10 @@ instance MonadThrow m => MonadThrow (ReaderT r m) where
       (      runReaderT acquire     env)
       (\a -> runReaderT (release a) env)
       (\a -> runReaderT (use a)     env)
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann io = ReaderT $ \env ->
+    annotateIO ann (runReaderT io env)
+#endif
 
 instance MonadCatch m => MonadCatch (ReaderT r m) where
   catch act handler = ReaderT $ \env ->

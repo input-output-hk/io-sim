@@ -68,6 +68,9 @@ instance ( MonadSTM m
          , MonadThrow.MonadCatch (STM m)
          ) => MonadThrow.MonadThrow (ContTSTM r m) where
   throwIO = ContTSTM . MonadThrow.throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (ContTSTM stm) = ContTSTM (MonadThrow.annotateIO ann stm)
+#endif
 
 instance ( MonadSTM m
          , MonadThrow.MonadThrow (STM m)

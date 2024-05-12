@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP             #-}
 {-# LANGUAGE RankNTypes      #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Control.Monad.Class.MonadThrow.Trans () where
@@ -21,6 +22,10 @@ import           Control.Monad.Class.MonadThrow
 
 instance MonadCatch m => MonadThrow (ExceptT e m) where
   throwIO = lift . throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (ExceptT io) = ExceptT (annotateIO ann io)
+#endif
+
 
 instance MonadCatch m => MonadCatch (ExceptT e m) where
   catch (ExceptT m) f = ExceptT $ catch m (runExceptT . f)
@@ -63,6 +68,10 @@ instance MonadMask m => MonadMask (ExceptT e m) where
 instance (Monoid w, MonadCatch m) => MonadThrow (Lazy.WriterT w m) where
   throwIO = lift . throwIO
 
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (Lazy.WriterT io) = Lazy.WriterT (annotateIO ann io)
+#endif
+
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadCatch (Lazy.WriterT w m) where
   catch (Lazy.WriterT m) f = Lazy.WriterT $ catch m (Lazy.runWriterT . f)
@@ -102,6 +111,9 @@ instance (Monoid w, MonadMask m) => MonadMask (Lazy.WriterT w m) where
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadThrow (Strict.WriterT w m) where
   throwIO = lift . throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (Strict.WriterT io) = Strict.WriterT (annotateIO ann io)
+#endif
 
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadCatch (Strict.WriterT w m) where
@@ -143,6 +155,9 @@ instance (Monoid w, MonadMask m) => MonadMask (Strict.WriterT w m) where
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadThrow (Lazy.RWST r w s m) where
   throwIO = lift . throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (Lazy.RWST io) = Lazy.RWST (\r s -> annotateIO ann (io r s))
+#endif
 
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadCatch (Lazy.RWST r w s m) where
@@ -186,6 +201,9 @@ instance (Monoid w, MonadMask m) => MonadMask (Lazy.RWST r w s m) where
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadThrow (Strict.RWST r w s m) where
   throwIO = lift . throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (Strict.RWST io) = Strict.RWST (\r s -> annotateIO ann (io r s))
+#endif
 
 -- | @since 1.0.0.0
 instance (Monoid w, MonadCatch m) => MonadCatch (Strict.RWST r w s m) where
@@ -229,6 +247,9 @@ instance (Monoid w, MonadMask m) => MonadMask (Strict.RWST r w s m) where
 -- | @since 1.0.0.0
 instance MonadCatch m => MonadThrow (Lazy.StateT s m) where
   throwIO = lift . throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (Lazy.StateT io) = Lazy.StateT (\s -> annotateIO ann (io s))
+#endif
 
 -- | @since 1.0.0.0
 instance MonadCatch m => MonadCatch (Lazy.StateT s m) where
@@ -270,6 +291,9 @@ instance MonadMask m => MonadMask (Lazy.StateT s m) where
 -- | @since 1.0.0.0
 instance MonadCatch m => MonadThrow (Strict.StateT s m) where
   throwIO = lift . throwIO
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann (Strict.StateT io) = Strict.StateT (\s -> annotateIO ann (io s))
+#endif
 
 -- | @since 1.0.0.0
 instance MonadCatch m => MonadCatch (Strict.StateT s m) where

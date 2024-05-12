@@ -16,7 +16,7 @@
 {-# LANGUAGE TypeFamilies              #-}
 
 -- Needed for `SimEvent` type.
-{-# OPTIONS_GHC -Wno-partial-fields     #-}
+{-# OPTIONS_GHC -Wno-partial-fields    #-}
 
 module Control.Monad.IOSim.Types
   ( IOSim (..)
@@ -75,8 +75,8 @@ module Control.Monad.IOSim.Types
   ) where
 
 import Control.Applicative
-import Control.Exception (ErrorCall (..), asyncExceptionFromException,
-           asyncExceptionToException)
+import Control.Exception (ErrorCall (..))
+import Control.Exception qualified as IO
 import Control.Monad
 import Control.Monad.Fix (MonadFix (..))
 
@@ -340,6 +340,9 @@ instance MonadSay (IOSim s) where
 
 instance MonadThrow (IOSim s) where
   throwIO e = IOSim $ oneShot $ \_ -> Throw (toException e)
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann io = io `catch` \e -> throwIO (IO.addExceptionContext ann e)
+#endif
 
 instance MonadEvaluate (IOSim s) where
   evaluate a = IOSim $ oneShot $ \k -> Evaluate a k
@@ -354,6 +357,9 @@ instance Exceptions.MonadThrow (IOSim s) where
 
 instance MonadThrow (STM s) where
   throwIO e = STM $ oneShot $ \_ -> ThrowStm (toException e)
+#if __GLASGOW_HASKELL__ >= 910
+  annotateIO ann io = io `catch` \e -> throwIO (IO.addExceptionContext ann e)
+#endif
 
   -- Since these involve re-throwing the exception and we don't provide
   -- CatchSTM at all, then we can get away with trivial versions:
@@ -742,8 +748,8 @@ instance Show TimeoutException where
     show (TimeoutException tmid) = "<<timeout " ++ show tmid ++ " >>"
 
 instance Exception TimeoutException where
-  toException   = asyncExceptionToException
-  fromException = asyncExceptionFromException
+  toException   = IO.asyncExceptionToException
+  fromException = IO.asyncExceptionFromException
 
 -- | Wrapper for Eventlog events so they can be retrieved from the trace with
 -- 'selectTraceEventsDynamic'.
