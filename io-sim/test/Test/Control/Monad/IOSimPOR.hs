@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE LambdaCase            #-}
@@ -11,7 +12,11 @@
 module Test.Control.Monad.IOSimPOR (tests) where
 
 import Data.Fixed (Micro)
+#if __GLASGOW_HASKELL__ >= 910
+import Data.Foldable (traverse_)
+#else
 import Data.Foldable (foldl', traverse_)
+#endif
 import Data.Functor (($>))
 import Data.List qualified as List
 import Data.Map (Map)

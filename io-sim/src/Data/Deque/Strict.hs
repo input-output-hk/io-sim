@@ -1,10 +1,15 @@
+{-# LANGUAGE CPP        #-}
 {-# LANGUAGE LambdaCase #-}
 
 -- | A minimal implementation of a strict deque.
 --
 module Data.Deque.Strict where
 
+#if __GLASGOW_HASKELL__ >= 910
+import Data.Foldable (foldr')
+#else
 import Data.Foldable (foldl', foldr')
+#endif
 import Data.List qualified as List
 import Prelude hiding (head, init, tail)
 
