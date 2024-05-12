@@ -7,6 +7,10 @@
 * `MonadST` depends on `PrimMonad`.
 * Provide a default implementation of `withLiftST`.
 
+### Non-breaking changes
+
+* Added `annotateIO` to `MonadThrow` (only supported for ghc-9.10 or newer)
+
 ## 1.4.1.0
 
 ### Non-breaking changes
