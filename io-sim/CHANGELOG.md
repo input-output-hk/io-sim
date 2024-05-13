@@ -2,6 +2,10 @@
 
 ## new version
 
+### Non breaking changes
+
+- Added `writeTMVar` to `MonadSTM` instance for `(IOSim s)`.
+
 ### Breaking changes
 
 - Generalised the type of `traceSelectTraceEvents` & co.
