@@ -1,5 +1,11 @@
 # Revision history for io-classes-mtl
 
+## new version
+
+### Non breaking changes
+
+- Added `writeTMVar` to `MonadSTM` instances.
+
 ## 0.1.1.0
 
 * Support `io-classes-1.4.1.0`

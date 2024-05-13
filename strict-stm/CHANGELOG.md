@@ -1,5 +1,12 @@
 # Changelog
 
+## new version
+
+### Non breaking changes
+
+- Added `writeTMVar` function.
+
+
 ## 1.4.0.0
 
 * `io-sim-1.4.0.0`.
