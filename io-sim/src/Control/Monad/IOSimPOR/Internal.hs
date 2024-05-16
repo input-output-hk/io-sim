@@ -1771,17 +1771,27 @@ updateRaces thread@Thread { threadId = tid }
                                            stepInfoRaces  } =
           -- if this step depends on the previous step, or is not concurrent,
           -- then any threads that it wakes up become non-concurrent also.
-          let !lessConcurrent = concurrent Set.\\ effectWakeup newEffect in
+          let !lessConcurrent = concurrent Set.\\ effectWakeup newEffect
+
+              -- `step` happened before `newStep` (`newStep` happened after
+              -- `step`)
+              happensBefore   = step `happensBeforeStep` newStep
+
+              !stepInfoNonDep'
+                -- `newStep` happened after `step`
+                | happensBefore =           stepInfoNonDep
+                -- `newStep` did not happen after `step`
+                | otherwise     = newStep : stepInfoNonDep in
 
           if tid `notElem` concurrent
-            then stepInfo { stepInfoConcurrent = lessConcurrent }
+            then let
+                  in stepInfo { stepInfoConcurrent = lessConcurrent
+                              , stepInfoNonDep = stepInfoNonDep'
+                              }
 
             -- The core of IOSimPOR.  Detect if `newStep` is racing with any
             -- previous steps and update each `StepInfo`.
             else let theseStepsRace = step `racingSteps` newStep
-                     -- `step` happened before `newStep` (`newStep` happened after
-                     -- `step`)
-                     happensBefore   = step `happensBeforeStep` newStep
                      -- `newStep` happens after any of the racing steps
                      afterRacingStep = any (`happensBeforeStep` newStep) stepInfoRaces
 
@@ -1794,12 +1804,6 @@ updateRaces thread@Thread { threadId = tid }
                        | theseStepsRace  = Set.delete tid concurrent
                        | afterRacingStep = Set.delete tid concurrent
                        | otherwise       = concurrent
-
-                     !stepInfoNonDep'
-                       -- `newStep` happened after `step`
-                       | happensBefore =           stepInfoNonDep
-                       -- `newStep` did not happen after `step`
-                       | otherwise     = newStep : stepInfoNonDep
 
                      -- Here we record discovered races.  We only record a new
                      -- race if we are following the default schedule, to avoid
