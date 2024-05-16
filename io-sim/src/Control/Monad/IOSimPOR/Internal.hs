@@ -1786,7 +1786,7 @@ updateRaces thread@Thread { threadId = tid }
           if tid `notElem` concurrent
             then let
                   in stepInfo { stepInfoConcurrent = lessConcurrent
-                              , stepInfoNonDep = stepInfoNonDep'
+                              , stepInfoNonDep     = stepInfoNonDep'
                               }
 
             -- The core of IOSimPOR.  Detect if `newStep` is racing with any
