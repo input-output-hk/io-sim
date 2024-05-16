@@ -20,7 +20,7 @@ IOSimPOR will usually not explore all possible schedules, because
 there are too many for this to be feasible (even infinitely many, in
 some cases). It prioritises races that occur earlier in a test
 execution, and prioritises making a small number of race reversals
-over making many. 
+over making many.
 
 It can test non-terminating programs with an infinite trace; in such
 cases it only reverse races in the part of the trace that the property
@@ -309,14 +309,48 @@ Exception:
 then the probable cause is a bug in IOSimPOR itself. The message
 indicates that IOSimPOR scheduler is trying to follow a schedule
 modification that specifies that thread `[5]` should run next, but this
-is impossible because thread `[5]` is not in the runqueue (the list of
+is impossible because thread `[5]` is not in the `runqueue` (the list of
 runnable threads). If you supplied a schedule control explicitly,
-using withReplay, then you may perhaps have supplied a schedule
+using `withReplay`, then you may perhaps have supplied a schedule
 control that does not match the version of the code you are running:
 in this case the exception is your fault. But if this message appears
 while you are exploring races, then it indicates a problem in
 IOSimPOR's dependency analysis: IOSimPOR has constructed a schedule as
 a result of race reversal that tries to run thread `[5]` at this point,
 because the dependency analysis indicates that thread `[5]` ought to be
-runnable---but it is not. Best to consult Quviq at this point.
+runnable---but it is not.
 
+Another similar instance of such a problem is the following assertion failure:
+
+```
+InternalError "assertion failure: Thread {4} not runnable"
+assertion failure: Thread {4} not runnable
+```
+
+This indicates that IOSimPOR was following a schedule where the next scheduled
+thread was thread 4. However, this thread does not exist in the `runqueue`,
+possibly because it was blocked and not unblocked before being scheduled
+again.
+
+To debug this, follow these steps:
+
+1. **Get the shrunken test input**: Minimize the test input to simplify the
+   failure case.
+2. **Retrieve the failing schedule**: Obtain the failing Schedule control the
+   failure case.
+3. **Create a unit test**: Use the failing input in a unit test and run it
+   with `explorationDebugLevel = 2` to display the races in each scheduled
+   run.
+4. **Analyze the output**: Manually review the output, focusing on the
+   schedule that leads to the failure. Look for the schedule in the
+   `RacesFound` log messages.
+5. **Examine the faulty schedule**: Investigate the trace of the identified
+   schedule to understand why it causes the failure, i.e. find the race which
+   leads to the error.
+6. **Implement the fix**: Correct the identified issue.
+
+Most likely, the root cause lies within the vector clocks logic or the
+`updateRaces` function, particularly in the management of the
+`stepInfoConcurrent` and `stepInfoNonDep` sets, which are crucial for race
+discovery. So analyse `updateRaces` function along the execution trace to see
+if everything makes sense.
