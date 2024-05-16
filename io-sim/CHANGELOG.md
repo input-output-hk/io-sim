@@ -5,6 +5,7 @@
 ### Non breaking changes
 
 - Added `writeTMVar` to `MonadSTM` instance for `(IOSim s)`.
+- Fixes IOSimPOR test failure (see issue #154).
 
 ### Breaking changes
 
