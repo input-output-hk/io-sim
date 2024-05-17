@@ -14,7 +14,7 @@ category:            Time
 build-type:          Simple
 extra-doc-files:     CHANGELOG.md README.md
 bug-reports:         https://github.com/input-output-hk/io-sim/issues
-tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6, 9.8 }
+tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6, 9.8, 9.10 }
 
 flag asserts
   description: Enable assertions
@@ -53,7 +53,7 @@ library
                        NumericUnderscores,
                        ScopedTypeVariables,
                        TypeFamilies
-  build-depends:       base              >=4.9 && <4.20,
+  build-depends:       base              >=4.9 && <4.21,
                        deepseq,
                        mtl,
                        nothunks,

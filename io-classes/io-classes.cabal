@@ -19,7 +19,7 @@ category:            Control
 build-type:          Simple
 extra-doc-files:     CHANGELOG.md README.md
 bug-reports:         https://github.com/input-output-hk/io-sim/issues
-tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6, 9.8 }
+tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6, 9.8, 9.10 }
 
 source-repository head
   type:     git
@@ -93,12 +93,12 @@ library
                        TypeFamilyDependencies
                        TypeOperators
                        UndecidableInstances
-  build-depends:       base  >=4.9 && <4.20,
+  build-depends:       base  >=4.9 && <4.21,
                        array,
                        async >=2.1,
                        bytestring,
                        mtl   >=2.2 && <2.4,
-                       primitive >= 0.7 && <0.10,
+                       primitive >= 0.7 && <0.11,
                        stm   >=2.5 && <2.6,
                        time  >=1.9.1 && <1.13
 
