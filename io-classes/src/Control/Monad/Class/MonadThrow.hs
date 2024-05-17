@@ -57,6 +57,9 @@ class Monad m => MonadThrow m where
   bracket_ :: m a -> m b -> m c -> m c
   finally  :: m a -> m b -> m a
 #if __GLASGOW_HASKELL__ >= 910
+  -- | See 'IO.annotateIO'.
+  --
+  -- @since 1.5.0.0
   annotateIO :: forall e a. ExceptionAnnotation e => e -> m a -> m a
 #endif
 
