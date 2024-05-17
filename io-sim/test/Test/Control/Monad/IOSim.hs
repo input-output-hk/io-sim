@@ -24,7 +24,9 @@ module Test.Control.Monad.IOSim
 
 import Data.Either (isLeft)
 import Data.Fixed (Micro)
+#if __GLASGOW_HASKELL__ < 910
 import Data.Foldable (foldl')
+#endif
 import Data.Functor (($>))
 import Data.Time.Clock (picosecondsToDiffTime)
 
