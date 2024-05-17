@@ -1,16 +1,16 @@
 # Revsion history of io-classes
 
-## next release
-
-### Non breaking change
-
-* Add `writeTMVar` to `MonadSTM`.
+## 1.5.0.0
 
 ### Breaking changes
 
 * `MonadST` depends on `PrimMonad`.
 * Provide a default implementation of `withLiftST`.
 * Added `annotateIO` to `MonadThrow` (only supported for ghc-9.10 or newer).
+
+### Non-breaking change
+
+* Add `writeTMVar` to `MonadSTM`.
 
 ## 1.4.1.0
 

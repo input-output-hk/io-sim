@@ -1,11 +1,6 @@
 # Revision history of io-sim
 
-## new version
-
-### Non breaking changes
-
-- Added `writeTMVar` to `MonadSTM` instance for `(IOSim s)`.
-- Fixes IOSimPOR test failure (see issue #154).
+## 1.5.0.0
 
 ### Breaking changes
 
@@ -13,6 +8,8 @@
 
 ### Non-breaking changes
 
+- Added `writeTMVar` to `MonadSTM` instance for `(IOSim s)`.
+- Fixes IOSimPOR test failure (see issue #154).
 - Reverted commit 4534b6eae64072a87bd81584f479a123681358a3 which uses
   `unsafePerformIO` instead of ST, to regain lazyness on infinite simulations.
 - Added a test to check for lazyness on infinite simulations

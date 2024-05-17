@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0.0
+
+* `io-sim-1.5.0.0`.
+
 ## 1.4.0.0
 
 ### Non-breaking changes
