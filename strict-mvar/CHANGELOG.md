@@ -1,5 +1,9 @@
 # Revsion history of strict-mvar
 
+## 1.5.0.0
+
+* `io-sim-1.5.0.0`.
+
 ## 1.4.0.0
 
 * `io-sim-1.4.0.0`.

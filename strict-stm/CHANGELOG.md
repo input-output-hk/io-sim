@@ -1,11 +1,10 @@
 # Changelog
 
-## new version
+## 1.5.0.0
 
-### Non breaking changes
+### Non-breaking changes
 
 - Added `writeTMVar` function.
-
 
 ## 1.4.0.0
 
