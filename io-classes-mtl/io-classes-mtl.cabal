@@ -44,7 +44,7 @@ library
                       array,
                       mtl,
 
-                      io-classes ^>=1.4.1.0 || ^>=1.5,
+                      io-classes ^>=1.5,
                       si-timers,
 
 
