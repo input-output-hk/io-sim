@@ -2,62 +2,24 @@
 
 -- | Test whether functions on 'StrictMVar's correctly force values to WHNF
 -- before they are put inside the 'StrictMVar'.
-module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF (tests) where
+module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
+  ( prop_newMVar
+  , prop_putMVar
+  , prop_swapMVar
+  , prop_tryPutMVar
+  , prop_modifyMVar_
+  , prop_modifyMVar
+  , prop_modifyMVarMasked_
+  , prop_modifyMVarMasked
+  , (.:)
+  ) where
 
 import Control.Concurrent.Class.MonadMVar.Strict
 import Control.Monad (void)
-import Control.Monad.IOSim (monadicIOSim_)
 import Data.Typeable (Typeable)
 import NoThunks.Class (OnlyCheckWhnf (OnlyCheckWhnf), unsafeNoThunks)
-import Test.QuickCheck.Monadic (PropertyM, monadicIO, monitor, run)
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (Fun, applyFun, counterexample, testProperty)
-
-{-------------------------------------------------------------------------------
-  Main test tree
--------------------------------------------------------------------------------}
-
-tests :: TestTree
-tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict" [
-      testGroup "WHNF" [
-          testGroup "IO" [
-              testProperty "prop_newMVar" $
-                monadicIO .: prop_newMVar
-            , testProperty "prop_putMVar" $
-                monadicIO .: prop_putMVar
-            , testProperty "prop_swapMVar" $
-                monadicIO .: prop_swapMVar
-            , testProperty "prop_tryPutMVar" $
-                monadicIO .: prop_tryPutMVar
-            , testProperty "prop_modifyMVar_" $
-                monadicIO .: prop_modifyMVar_
-            , testProperty "prop_modifyMVar" $
-                monadicIO .: prop_modifyMVar
-            , testProperty "prop_modifyMVarMasked_" $
-                monadicIO .: prop_modifyMVarMasked_
-            , testProperty "prop_modifyMVarMasked" $
-                monadicIO .: prop_modifyMVarMasked
-            ]
-        , testGroup "IOSim" [
-              testProperty "prop_newMVar" $ \x f ->
-                monadicIOSim_ $ prop_newMVar x f
-            , testProperty "prop_putMVar" $ \x f ->
-                monadicIOSim_ $ prop_putMVar x f
-            , testProperty "prop_swapMVar" $ \x f ->
-                monadicIOSim_ $ prop_swapMVar x f
-            , testProperty "prop_tryPutMVar" $ \x f ->
-                monadicIOSim_ $ prop_tryPutMVar x f
-            , testProperty "prop_modifyMVar_" $ \x f ->
-                monadicIOSim_ $ prop_modifyMVar_ x f
-            , testProperty "prop_modifyMVar" $ \x f ->
-                monadicIOSim_ $ prop_modifyMVar x f
-            , testProperty "prop_modifyMVarMasked_" $ \x f ->
-                monadicIOSim_ $ prop_modifyMVarMasked_ x f
-            , testProperty "prop_modifyMVarMasked" $ \x f ->
-                monadicIOSim_ $ prop_modifyMVarMasked x f
-            ]
-        ]
-    ]
+import Test.QuickCheck
+import Test.QuickCheck.Monadic (PropertyM, monitor, run)
 
 {-------------------------------------------------------------------------------
   Utilities
