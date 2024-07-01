@@ -99,6 +99,7 @@ test-suite test
   hs-source-dirs:      test
   main-is:             Main.hs
   other-modules:       Test.Control.Concurrent.Class.MonadMVar
+                       Test.Control.Concurrent.Class.MonadMVar.Strict
                        Test.Control.Monad.STM
                        Test.Control.Monad.Utils
                        Test.Control.Monad.IOSim
@@ -108,7 +109,7 @@ test-suite test
   build-depends:       base,
                        array,
                        containers,
-                       io-classes:{io-classes,strict-stm,si-timers},
+                       io-classes:{io-classes,strict-stm,si-timers,testlib},
                        io-sim,
                        QuickCheck,
                        tasty,
