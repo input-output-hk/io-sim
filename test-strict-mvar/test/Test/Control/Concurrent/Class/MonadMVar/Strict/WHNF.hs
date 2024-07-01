@@ -6,12 +6,12 @@ module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF (tests) where
 
 import Control.Concurrent.Class.MonadMVar.Strict
 import Control.Monad (void)
+import Control.Monad.IOSim (monadicIOSim_)
 import Data.Typeable (Typeable)
 import NoThunks.Class (OnlyCheckWhnf (OnlyCheckWhnf), unsafeNoThunks)
 import Test.QuickCheck.Monadic (PropertyM, monadicIO, monitor, run)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (Fun, applyFun, counterexample, testProperty)
-import Test.Utils (monadicSim)
 
 {-------------------------------------------------------------------------------
   Main test tree
@@ -40,21 +40,21 @@ tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict" [
             ]
         , testGroup "IOSim" [
               testProperty "prop_newMVar" $ \x f ->
-                monadicSim $ prop_newMVar x f
+                monadicIOSim_ $ prop_newMVar x f
             , testProperty "prop_putMVar" $ \x f ->
-                monadicSim $ prop_putMVar x f
+                monadicIOSim_ $ prop_putMVar x f
             , testProperty "prop_swapMVar" $ \x f ->
-                monadicSim $ prop_swapMVar x f
+                monadicIOSim_ $ prop_swapMVar x f
             , testProperty "prop_tryPutMVar" $ \x f ->
-                monadicSim $ prop_tryPutMVar x f
+                monadicIOSim_ $ prop_tryPutMVar x f
             , testProperty "prop_modifyMVar_" $ \x f ->
-                monadicSim $ prop_modifyMVar_ x f
+                monadicIOSim_ $ prop_modifyMVar_ x f
             , testProperty "prop_modifyMVar" $ \x f ->
-                monadicSim $ prop_modifyMVar x f
+                monadicIOSim_ $ prop_modifyMVar x f
             , testProperty "prop_modifyMVarMasked_" $ \x f ->
-                monadicSim $ prop_modifyMVarMasked_ x f
+                monadicIOSim_ $ prop_modifyMVarMasked_ x f
             , testProperty "prop_modifyMVarMasked" $ \x f ->
-                monadicSim $ prop_modifyMVarMasked x f
+                monadicIOSim_ $ prop_modifyMVarMasked x f
             ]
         ]
     ]
