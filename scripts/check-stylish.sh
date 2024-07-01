@@ -7,6 +7,3 @@ export LC_ALL=C.UTF-8
 
 $FD . './io-sim' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
 $FD . './io-classes' -e hs -E Setup.hs -E src/Control/Concurrent/Class/MonadSTM.hs -X stylish-haskell -c .stylish-haskell.yaml -i
-$FD . './strict-mvar' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
-$FD . './strict-stm' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
-$FD . './si-timers' -e hs -E Setup.hs -X stylish-haskell -c .stylish-haskell.yaml -i
