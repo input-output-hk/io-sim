@@ -30,20 +30,20 @@ jobs:
         cabal-version: "3.10.3.0"
 
     - name: Install LLVM (macOS)
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && matrix.ghc == '8.10'
       run: |
         brew install llvm@13
         echo "LLVM_CONFIG=$(brew --prefix llvm@13)/bin/llvm-config" >> $GITHUB_ENV
         echo "$(brew --prefix llvm@13)/bin" >> $GITHUB_PATH
 
     - name: Verify LLVM installation
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && matrix.ghc == '8.10'
       run: |
         llvm-config --version
         opt --version
 
     - name: Print environment variables
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && matrix.ghc == '8.10'
       run: |
         echo "PATH = $PATH"
         echo "LLVM_CONFIG = $LLVM_CONFIG"
