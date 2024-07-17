@@ -181,8 +181,16 @@ tests =
     ]
   , testGroup "MonadSTM"
     [ testGroup "flushTQueue"
-      [ testProperty "empties the queue" prop_flushTQueueEmpties
-      , testProperty "maintains FIFO order" prop_flushTQueueOrder
+      [ testProperty "empties the queue IO" prop_flushTQueueEmpties_IO
+      , testProperty "empties the queue IOSim" prop_flushTQueueEmpties_IOSim
+      , testProperty "maintains FIFO order IO" prop_flushTQueueOrder_IO
+      , testProperty "maintains FIFO order IOSim" prop_flushTQueueOrder_IOSim
+      ]
+    , testGroup "flushTBQueue"
+      [ testProperty "empties the queue IO" prop_flushTBQueueEmpties_IO
+      , testProperty "empties the queue IOSim" prop_flushTBQueueEmpties_IOSim
+      , testProperty "maintains FIFO order IO" prop_flushTBQueueOrder_IO
+      , testProperty "maintains FIFO order IOSim" prop_flushTBQueueOrder_IOSim
       ]
     ]
   ]
@@ -1385,32 +1393,76 @@ prop_registerDelayCancellable_IO =
         cancelTimeout
         awaitTimeout
 
--- | Test that 'flushTQueue' empties the queue.
-prop_flushTQueueEmpties :: Property
-prop_flushTQueueEmpties =
-  ioProperty emptyQueueAfterFlush
-  .&&. runSimOrThrow emptyQueueAfterFlush
+-- | Test that 'flushTQueue' empties the queue in `IO`.
+prop_flushTQueueEmpties_IO :: Property
+prop_flushTQueueEmpties_IO =
+  ioProperty emptyTQueueAfterFlush
 
-emptyQueueAfterFlush :: MonadSTM m => m Bool
-emptyQueueAfterFlush = do
+-- | Test that 'flushTQueue' empties the queue in `IOSim`.
+prop_flushTQueueEmpties_IOSim :: Bool
+prop_flushTQueueEmpties_IOSim =
+  runSimOrThrow emptyTQueueAfterFlush
+
+emptyTQueueAfterFlush :: MonadSTM m => m Bool
+emptyTQueueAfterFlush = do
   q <- newTQueueIO
   atomically $ do
     writeTQueue q (1 :: Int)
     _ <- flushTQueue q
     isEmptyTQueue q
 
--- | Test that 'flushTQueue' returns values in FIFO order.
-prop_flushTQueueOrder :: [Int] -> Property
-prop_flushTQueueOrder entries =
-  ioProperty (writeAndFlushQueue entries >>= \actual -> pure $ actual === entries)
-  .&&. runSimOrThrow (writeAndFlushQueue entries) === entries
+-- | Test that 'flushTQueue' returns values in FIFO order in `IO`.
+prop_flushTQueueOrder_IO :: [Int] -> Property
+prop_flushTQueueOrder_IO entries =
+  ioProperty (writeAndFlushTQueue entries >>= \actual -> pure $ actual === entries)
 
-writeAndFlushQueue :: MonadSTM m => [Int] -> m [Int]
-writeAndFlushQueue entries =
+-- | Test that 'flushTQueue' returns values in FIFO order in `IOSim`.
+prop_flushTQueueOrder_IOSim :: [Int] -> Property
+prop_flushTQueueOrder_IOSim entries =
+  runSimOrThrow (writeAndFlushTQueue entries) === entries
+
+writeAndFlushTQueue :: MonadSTM m => [Int] -> m [Int]
+writeAndFlushTQueue entries =
   atomically $ do
     q <- newTQueue
     forM_ entries $ writeTQueue q
     flushTQueue q
+
+-- | Test that 'flushTBQueue' empties the queue in `IO`.
+prop_flushTBQueueEmpties_IO :: Property
+prop_flushTBQueueEmpties_IO =
+  ioProperty emptyTBQueueAfterFlush
+
+-- | Test that 'flushTBQueue' empties the queue in `IOSim`.
+prop_flushTBQueueEmpties_IOSim :: Bool
+prop_flushTBQueueEmpties_IOSim =
+  runSimOrThrow emptyTBQueueAfterFlush
+
+emptyTBQueueAfterFlush :: MonadSTM m => m Bool
+emptyTBQueueAfterFlush = do
+  q <- newTBQueueIO 10
+  atomically $ do
+    writeTBQueue q (1 :: Int)
+    writeTBQueue q 2
+    _ <- flushTBQueue q
+    isEmptyTBQueue q
+
+-- | Test that 'flushTBQueue' returns values in FIFO order in `IO`.
+prop_flushTBQueueOrder_IO :: [Int] -> Property
+prop_flushTBQueueOrder_IO entries =
+  ioProperty (writeAndFlushTBQueue entries >>= \actual -> pure $ actual === entries)
+
+-- | Test that 'flushTBQueue' returns values in FIFO order in `IOSim`.
+prop_flushTBQueueOrder_IOSim :: [Int] -> Property
+prop_flushTBQueueOrder_IOSim entries =
+  runSimOrThrow (writeAndFlushTBQueue entries) === entries
+
+writeAndFlushTBQueue :: MonadSTM m => [Int] -> m [Int]
+writeAndFlushTBQueue entries =
+  atomically $ do
+    q <- newTBQueue (1 + fromIntegral (length entries))
+    forM_ entries $ writeTBQueue q
+    flushTBQueue q
 
 --
 -- Utils
