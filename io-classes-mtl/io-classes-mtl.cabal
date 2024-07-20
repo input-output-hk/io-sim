@@ -44,8 +44,7 @@ library
                       array,
                       mtl,
 
-                      io-classes ^>=1.5,
-                      si-timers,
+                      io-classes:{io-classes,si-timers} ^>= 1.5
 
 
     hs-source-dirs:   src

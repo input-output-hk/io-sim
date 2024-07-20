@@ -10,17 +10,20 @@ constraints in mind:
   as timer API;
 * provide zero-cost abstractions.
 
-We provide also non-standard extensions of this API:
+We provide also non-standard extensions of this API in **sublibraries**:
 
-* [`strict-stm`]: strict `TVar`'s, and other mutable `STM` variables, with
+* [`io-classes:strict-stm`]: strict `TVar`'s, and other mutable `STM` variables, with
   support of the [`nothunks`] library;
-* [`si-timers`]: timers api:
+* [`io-classes:strict-mvar`]: strict `MVar`s
+* [`io-classes:si-timers`]: timers api:
     - 32-bit safe API using `DiffTime` measured in seconds (rather than time in
       microseconds represented as `Int` as in `base`)
     - cancellable timeouts.
+* [`io-classes-mtl`]: MTL instances.
 
-[`strict-stm`] and [`nothunks`] were successfully used in a large code base to
-eliminate space leaks and keep that property over long development cycles.
+[`io-classes:strict-stm`] and [`nothunks`] were successfully used in a large
+code base to eliminate space leaks and keep that property over long development
+cycles.
 
 ## Exception Class Hierarchy
 
@@ -61,15 +64,14 @@ delays & timers.
 ## Software Transactional Memory API
 
 We provide two interfaces to `stm` API: lazy, included in `io-classes`; and
-strict one provided by [`strict-stm`].
-
+strict one provided by [`io-classes:strict-stm`].
 
 ## Threads API
 
 We draw a line between `base` API and `async` API.  The former is provided by
 [MonadFork](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadFork.html#t:MonadFork)
 the latter by
-[MonadAsync](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadFork.html#t:MonadAsync).
+[MonadAsync](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadAsync.html#t:MonadAsync).
 Both are shallow abstractions around APIs exposed by the `base` and `async`
 packages.
 
@@ -140,17 +142,21 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 [`base`]: https://hackage.haskell.org/package/base
 [`exceptions`]: https://hackage.haskell.org/package/exceptions
 [`io-sim`]: https://hackage.haskell.org/package/io-sim
-[`si-timers`]: https://hackage.haskell.org/package/si-timers
+[`io-classes-mtl`]: https://hackage.haskell.org/package/io-classes-mtl
 [`stm`]: https://hackage.haskell.org/package/stm
-[`strict-stm`]: https://hackage.haskell.org/package/strict-stm
-[`threadDelay`]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadTimer.html#v:threadDela
+[`threadDelay`]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadTimer.html#v:threadDelay
 [`time`]: https://hackage.haskell.org/package/time
 [contributing]: https://www.github.com/input-output-hk/io-sim/tree/master/CONTRIBUTING.md
 [`nothunks`]: https://hackage.haskell.org/package/nothunks
 [labelThread-base]: https://hackage.haskell.org/package/base-4.17.0.0/docs/GHC-Conc-Sync.html#v:labelThread
 [io-deadlock]: https://hackage.haskell.org/package/base-4.19.0.0/docs/Control-Exception.html#t:Deadlock
 
-[MonadEventlog]: https://hackage.haskell.org/package/io-sim-classes/docs/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
+<!-- these links need to be updated once haskell/hackage-server#1218 is done --!>
+[`io-classes:si-timers`]: https://hackage.haskell.org/package/io-classes
+[`io-classes:strict-stm`]: https://hackage.haskell.org/package/io-classes
+[`io-classes:strict-mvar`]: https://hackage.haskell.org/package/io-classes
+
+[MonadEventlog]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
 [Debug.Trace]: https://hackage.haskell.org/package/base/docs/Debug-Trace.html
 [MonadST]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadST.html#t:MonadST
 [MonadSay]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadSay.html#t:MonadSay
