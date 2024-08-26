@@ -43,6 +43,8 @@ module Control.Monad.IOSim
     -- * Simulation trace
   , type SimTrace
   , Trace (Cons, Nil, SimTrace, SimPORTrace, TraceDeadlock, TraceLoop, TraceMainReturn, TraceMainException, TraceRacesFound, TraceInternalError)
+  , traceEvents
+  , traceResult
   , SimResult (..)
   , SimEvent (..)
   , SimEventType (..)
@@ -59,8 +61,6 @@ module Control.Monad.IOSim
   , ppSimEvent
   , ppDebug
     -- ** Selectors
-  , traceEvents
-  , traceResult
     -- *** list selectors
   , selectTraceEvents
   , selectTraceEvents'
