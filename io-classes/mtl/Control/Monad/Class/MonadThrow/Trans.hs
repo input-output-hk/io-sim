@@ -1,18 +1,18 @@
-{-# LANGUAGE CPP             #-}
-{-# LANGUAGE RankNTypes      #-}
+{-# LANGUAGE CPP        #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Control.Monad.Class.MonadThrow.Trans () where
 
-import           Control.Monad.Except (ExceptT (..), runExceptT)
-import qualified Control.Monad.RWS.Lazy as Lazy
-import qualified Control.Monad.RWS.Strict as Strict
-import qualified Control.Monad.State.Lazy as Lazy
-import qualified Control.Monad.State.Strict as Strict
-import           Control.Monad.Trans (lift)
-import qualified Control.Monad.Writer.Lazy as Lazy
-import qualified Control.Monad.Writer.Strict as Strict
- 
-import           Control.Monad.Class.MonadThrow
+import Control.Monad.Except (ExceptT (..), runExceptT)
+import Control.Monad.RWS.Lazy qualified as Lazy
+import Control.Monad.RWS.Strict qualified as Strict
+import Control.Monad.State.Lazy qualified as Lazy
+import Control.Monad.State.Strict qualified as Strict
+import Control.Monad.Trans (lift)
+import Control.Monad.Writer.Lazy qualified as Lazy
+import Control.Monad.Writer.Strict qualified as Strict
+
+import Control.Monad.Class.MonadThrow
 
 --
 -- ExceptT Instances
@@ -82,7 +82,7 @@ instance (Monoid w, MonadCatch m) => MonadCatch (Lazy.WriterT w m) where
         (\(resource, w) e ->
           case e of
             ExitCaseSuccess (b, w') ->
-              g w' <$> Lazy.runWriterT (release resource (ExitCaseSuccess b)) 
+              g w' <$> Lazy.runWriterT (release resource (ExitCaseSuccess b))
             ExitCaseException err ->
               g w  <$> Lazy.runWriterT (release resource (ExitCaseException err))
             ExitCaseAbort ->
@@ -125,7 +125,7 @@ instance (Monoid w, MonadCatch m) => MonadCatch (Strict.WriterT w m) where
         (\(resource, w) e ->
           case e of
             ExitCaseSuccess (b, w') ->
-              g w' <$> Strict.runWriterT (release resource (ExitCaseSuccess b)) 
+              g w' <$> Strict.runWriterT (release resource (ExitCaseSuccess b))
             ExitCaseException err ->
               g w  <$> Strict.runWriterT (release resource (ExitCaseException err))
             ExitCaseAbort ->

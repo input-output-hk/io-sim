@@ -5,19 +5,19 @@
 
 module Control.Monad.Class.MonadTimer.SI.Trans () where
 
-import           Control.Monad.Cont (ContT (..))
-import           Control.Monad.Except (ExceptT (..))
-import           Control.Monad.RWS (RWST (..))
-import           Control.Monad.State (StateT (..))
-import           Control.Monad.Trans (lift)
-import           Control.Monad.Writer (WriterT (..))
+import Control.Monad.Cont (ContT (..))
+import Control.Monad.Except (ExceptT (..))
+import Control.Monad.RWS (RWST (..))
+import Control.Monad.State (StateT (..))
+import Control.Monad.Trans (lift)
+import Control.Monad.Writer (WriterT (..))
 
-import           Control.Monad.Class.MonadTimer.SI
+import Control.Monad.Class.MonadTimer.SI
 
-import           Control.Monad.Class.MonadTime.SI.Trans ()
-import           Control.Monad.Class.MonadTimer.Trans ()
+import Control.Monad.Class.MonadTime.SI.Trans ()
+import Control.Monad.Class.MonadTimer.Trans ()
 
-import           Data.Bifunctor (bimap)
+import Data.Bifunctor (bimap)
 
 
 instance MonadDelay m => MonadDelay (ContT r m) where

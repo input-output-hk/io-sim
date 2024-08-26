@@ -2,18 +2,18 @@
 
 module Control.Monad.Class.MonadTime.SI.Trans () where
 
-import           Control.Monad.Cont (ContT)
-import           Control.Monad.Except (ExceptT)
-import qualified Control.Monad.RWS.Lazy as Lazy
-import qualified Control.Monad.RWS.Strict as Strict
-import qualified Control.Monad.State.Lazy as Lazy
-import qualified Control.Monad.State.Strict as Strict
-import           Control.Monad.Trans (lift)
-import qualified Control.Monad.Writer.Lazy as Lazy
-import qualified Control.Monad.Writer.Strict as Strict
+import Control.Monad.Cont (ContT)
+import Control.Monad.Except (ExceptT)
+import Control.Monad.RWS.Lazy qualified as Lazy
+import Control.Monad.RWS.Strict qualified as Strict
+import Control.Monad.State.Lazy qualified as Lazy
+import Control.Monad.State.Strict qualified as Strict
+import Control.Monad.Trans (lift)
+import Control.Monad.Writer.Lazy qualified as Lazy
+import Control.Monad.Writer.Strict qualified as Strict
 
-import           Control.Monad.Class.MonadTime.Trans ()
-import           Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTime.Trans ()
 
 instance MonadMonotonicTime m => MonadMonotonicTime (ExceptT e m) where
   getMonotonicTime = lift getMonotonicTime
