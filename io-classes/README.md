@@ -16,18 +16,28 @@ We provide also non-standard extensions of this API in **sublibraries**:
   support of the [`nothunks`] library;
 * [`io-classes:strict-mvar`](https://input-output-hk.github.io/io-sim/io-classes/strict-mvar/index.html): strict `MVar`s
 * [`io-classes:si-timers`](https://input-output-hk.github.io/io-sim/io-classes/si-timers/index.html): timers api:
+
     - 32-bit safe API using `DiffTime` measured in seconds (rather than time in
       microseconds represented as `Int` as in `base`)
     - cancellable timeouts.
-* [`io-classes:mtl`](https://input-output-hk.github.io/io-sim/io-classes/io-classes-mtl/index.html): MTL instances.
 
-[`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html) and [`nothunks`] were successfully used in a large
+* [`io-classes:io-classes-mtl`](https://input-output-hk.github.io/io-sim/io-classes/io-classes-mtl/index.html):
+  MTL instances.
+
+[`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html)
+and [`nothunks`] were successfully used in a large
 code base to eliminate space leaks and keep that property over long development
 cycles.
 
 ## Documentation
 
-Hackage doesn't yet support public sublibraries, thus Haddocks are published [here][io-classes-haddocks]
+Hackage doesn't yet support public sublibraries, thus Haddocks are published
+[here][io-classes-haddocks].
+
+### Support material
+
+* [Philipp Kant (@kantp) at Bobconf 2022][bob-conf]
+* [Armando Santos (@bolt12) at ZuriHac 2022][zuriHac-2022]
 
 ## Exception Class Hierarchy
 
@@ -160,3 +170,6 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 [MonadST]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadST.html#t:MonadST
 [MonadSay]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadSay.html#t:MonadSay
 [io-classes-haddocks]: https://input-output-hk.github.io/io-sim
+
+[bob-conf]: https://youtu.be/uedUGeWN4ZM
+[zuriHac-2022]: https://youtu.be/tKIYQgJnGkA

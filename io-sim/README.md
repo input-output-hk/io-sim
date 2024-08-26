@@ -2,7 +2,7 @@
 
 A pure simulator monad built on top of the lazy `ST` monad which supports:
 
-  * optional dynamic race discovery and schedule exploration
+  * optional dynamic race discovery and schedule exploration (see [`IOSimPOR`])
   * synchronous and asynchronous exceptions; including: throwing, catching and
     masking synchronous and asynchronous exceptions;
   * concurrency (using simulated threads), with interfaces shaped by the
@@ -15,7 +15,6 @@ A pure simulator monad built on top of the lazy `ST` monad which supports:
   * inspection of `STM` mutable data structures;
   * deadlock detection;
   * `MonadFix` instances for both [`IOSim`] and its corresponding `STM` monad.
-  * partial order reduction (see [`IOSimPOR`]).
 
 [`io-sim`] together with [`io-classes`] is a drop-in replacement for the `IO`
 monad (with some ramifications).  It was designed to write easily testable
@@ -42,7 +41,7 @@ also the other way around: that `GHC`s `STM` implementation meets the
 specification.
 
 [`io-sim`]:  https://hackage.haskell.org/package/io-sim
-[`io-classes`]: https://hackage.haskell.org/package/io-classes
-[`si-timers`]: https://hackage.haskell.org/package/si-timers
+[`io-classes`]: https://input-output-hk.github.io/io-sim/io-classes/index.html
+[`si-timers`]: https://input-output-hk.github.io/io-sim/io-classes/si-timers/index.html
 [`IOSimPOR`]: https://github.com/input-output-hk/io-sim/tree/main/io-sim/how-to-use-IOSimPOR.md
 [`IOSim`]: https://hackage.haskell.org/package/io-sim/docs/Control-Monad-IOSim.html#t:IOSim
