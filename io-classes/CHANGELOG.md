@@ -5,6 +5,7 @@
 ### Breaking changes
 
 * `strict-stm`, `strict-mvar` and `si-timers` are now public sublibraries of `io-classes` package.
+* Moved `io-classes-mtl` to `io-classes` as a public sublibrary.
 
 ## 1.5.0.0
 

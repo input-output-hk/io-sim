@@ -2,7 +2,6 @@ index-state: hackage.haskell.org 2024-05-17T03:42:00Z
 
 packages: ./io-sim
           ./io-classes
-          ./io-classes-mtl
 
 package io-sim
   flags: +asserts
