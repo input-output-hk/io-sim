@@ -1,0 +1,74 @@
+name: "Haddock documentation"
+
+on:
+  schedule:
+    - cron:  '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  haddocks:
+    name: "Haddocks"
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ["9.10.1"]
+        os: [ubuntu-latest]
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Checkout ouroboros-network repository
+      uses: actions/checkout@v3
+
+      # we need nix to later build the spec documents
+    - name: Install Nix
+      uses: cachix/install-nix-action@v20
+
+    - name: Install Haskell
+      uses: haskell/actions/setup@v2
+      id: setup-haskell
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        # we need unpublished `cabal` version to support sublibraries
+        cabal-version: 'head'
+
+    - uses: actions/cache@v3
+      name: Cache cabal store
+      with:
+        path: ${{ steps.setup-haskell.outputs.cabal-store }}
+        key: cache-haddock-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles('cabal-cache.cabal') }}-${{ github.sha }}
+        restore-keys: cache-haddock-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles('cabal-cache.cabal') }}-
+
+    - name: Update Hackage index
+      run: cabal update
+
+    - name: Build plan
+      run: cabal build --dry-run --enable-tests all
+
+    - name: Build Haddock documentation 🔧
+      run: |
+        cabal haddock-project --hackage all
+
+    - name: Upload artifacts
+      uses: actions/upload-pages-artifact@v1
+      with:
+        path: ./haddocks
+
+    - name: Deploy 🚀
+      id: deployment
+      uses: actions/deploy-pages@v2
+
+
