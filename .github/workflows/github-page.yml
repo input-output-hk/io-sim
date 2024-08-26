@@ -30,15 +30,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-    - name: Checkout ouroboros-network repository
-      uses: actions/checkout@v3
+    - name: Install pandoc
+      run: sudo apt install pandoc
 
-      # we need nix to later build the spec documents
-    - name: Install Nix
-      uses: cachix/install-nix-action@v20
+    - name: Checkout io-sim repository
+      uses: actions/checkout@v4
 
     - name: Install Haskell
-      uses: haskell/actions/setup@v2
+      uses: haskell-actions/setup@v2
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
@@ -58,17 +57,20 @@ jobs:
     - name: Build plan
       run: cabal build --dry-run --enable-tests all
 
+    - name: Run pandoc
+      run: pandoc --from=markdown_github --to=haddock --output=README.haddock io-classes/README.md io-sim/README.md
+
     - name: Build Haddock documentation 🔧
       run: |
-        cabal haddock-project --hackage all
+        cabal haddock-project --prologue=README.haddock --hackage all
 
     - name: Upload artifacts
-      uses: actions/upload-pages-artifact@v1
+      uses: actions/upload-pages-artifact@v3
       with:
         path: ./haddocks
 
     - name: Deploy 🚀
       id: deployment
-      uses: actions/deploy-pages@v2
+      uses: actions/deploy-pages@v4
 
 

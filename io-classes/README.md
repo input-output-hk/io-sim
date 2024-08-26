@@ -1,4 +1,4 @@
-# IO Monad Class Hierarchy
+# IO Monad Class Hierarchy: `io-classes`
 
 This package provides a monad class hierarchy which is an interface for both
 the [`io-sim`] and [`IO`] monads.  It was developed with the following
@@ -12,18 +12,22 @@ constraints in mind:
 
 We provide also non-standard extensions of this API in **sublibraries**:
 
-* [`io-classes:strict-stm`]: strict `TVar`'s, and other mutable `STM` variables, with
+* [`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html) strict `TVar`'s, and other mutable `STM` variables, with
   support of the [`nothunks`] library;
-* [`io-classes:strict-mvar`]: strict `MVar`s
-* [`io-classes:si-timers`]: timers api:
+* [`io-classes:strict-mvar`](https://input-output-hk.github.io/io-sim/io-classes/strict-mvar/index.html): strict `MVar`s
+* [`io-classes:si-timers`](https://input-output-hk.github.io/io-sim/io-classes/si-timers/index.html): timers api:
     - 32-bit safe API using `DiffTime` measured in seconds (rather than time in
       microseconds represented as `Int` as in `base`)
     - cancellable timeouts.
-* [`io-classes-mtl`]: MTL instances.
+* [`io-classes:mtl`](https://input-output-hk.github.io/io-sim/io-classes/io-classes-mtl/index.html): MTL instances.
 
-[`io-classes:strict-stm`] and [`nothunks`] were successfully used in a large
+[`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html) and [`nothunks`] were successfully used in a large
 code base to eliminate space leaks and keep that property over long development
 cycles.
+
+## Documentation
+
+Hackage doesn't yet support public sublibraries, thus Haddocks are published [here][io-classes-haddocks]
 
 ## Exception Class Hierarchy
 
@@ -64,7 +68,7 @@ delays & timers.
 ## Software Transactional Memory API
 
 We provide two interfaces to `stm` API: lazy, included in `io-classes`; and
-strict one provided by [`io-classes:strict-stm`].
+strict one provided by [`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html).
 
 ## Threads API
 
@@ -78,9 +82,9 @@ packages.
 
 ## Some other APIs
 
-* [MonadEventlog]: provides an API to the [Debug.Trace] event log interface.
-* [MonadST]: provides a way to lift `ST`-computations.
-* [MonadSay]: dummy debugging interface
+* [MonadEventlog][MonadEventlog]: provides an API to the [Debug.Trace] event log interface.
+* [MonadST][MonadST]: provides a way to lift `ST`-computations.
+* [MonadSay][MonadSay]: dummy debugging interface
 
 ## Differences from `base`, `async`, or `exceptions` packages
 
@@ -142,7 +146,7 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 [`base`]: https://hackage.haskell.org/package/base
 [`exceptions`]: https://hackage.haskell.org/package/exceptions
 [`io-sim`]: https://hackage.haskell.org/package/io-sim
-[`io-classes-mtl`]: https://hackage.haskell.org/package/io-classes-mtl
+[io-classes:mtl]: https://input-output-hk.github.io/io-sim/io-classes/mtl/index.html
 [`stm`]: https://hackage.haskell.org/package/stm
 [`threadDelay`]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadTimer.html#v:threadDelay
 [`time`]: https://hackage.haskell.org/package/time
@@ -151,12 +155,8 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 [labelThread-base]: https://hackage.haskell.org/package/base-4.17.0.0/docs/GHC-Conc-Sync.html#v:labelThread
 [io-deadlock]: https://hackage.haskell.org/package/base-4.19.0.0/docs/Control-Exception.html#t:Deadlock
 
-<!-- these links need to be updated once haskell/hackage-server#1218 is done --!>
-[`io-classes:si-timers`]: https://hackage.haskell.org/package/io-classes
-[`io-classes:strict-stm`]: https://hackage.haskell.org/package/io-classes
-[`io-classes:strict-mvar`]: https://hackage.haskell.org/package/io-classes
-
-[MonadEventlog]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
+[MonadEventlog]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
 [Debug.Trace]: https://hackage.haskell.org/package/base/docs/Debug-Trace.html
-[MonadST]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadST.html#t:MonadST
-[MonadSay]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadSay.html#t:MonadSay
+[MonadST]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadST.html#t:MonadST
+[MonadSay]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadSay.html#t:MonadSay
+[io-classes-haddocks]: https://input-output-hk.github.io/io-sim
