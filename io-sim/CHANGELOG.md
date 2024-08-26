@@ -1,5 +1,9 @@
 # Revision history of io-sim
 
+## 1.6.0.0
+
+- Upgraded to `io-classes-1.6.0.0`
+
 ## 1.5.0.0
 
 ### Breaking changes
