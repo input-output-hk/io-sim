@@ -13,25 +13,24 @@
 {-# LANGUAGE UndecidableInstances       #-}
 {-# OPTIONS_GHC -Wno-orphans            #-}
 
-module Control.Monad.Class.MonadSTM.Trans
-  ( ContTSTM (..)) where
+module Control.Monad.Class.MonadSTM.Trans (ContTSTM (..)) where
 
-import           Control.Monad.Cont (ContT (..))
-import           Control.Monad.Except (ExceptT (..), runExceptT)
-import           Control.Monad.Trans (lift)
-import qualified Control.Monad.RWS.Lazy as Lazy
-import qualified Control.Monad.RWS.Strict as Strict
-import qualified Control.Monad.State.Lazy as Lazy
-import qualified Control.Monad.State.Strict as Strict
-import qualified Control.Monad.Writer.Lazy as Lazy
-import qualified Control.Monad.Writer.Strict as Strict
+import Control.Monad.Cont (ContT (..))
+import Control.Monad.Except (ExceptT (..), runExceptT)
+import Control.Monad.RWS.Lazy qualified as Lazy
+import Control.Monad.RWS.Strict qualified as Strict
+import Control.Monad.State.Lazy qualified as Lazy
+import Control.Monad.State.Strict qualified as Strict
+import Control.Monad.Trans (lift)
+import Control.Monad.Writer.Lazy qualified as Lazy
+import Control.Monad.Writer.Strict qualified as Strict
 
-import qualified Control.Monad.Class.MonadThrow as MonadThrow
-import           Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadSTM.Internal
+import Control.Monad.Class.MonadThrow qualified as MonadThrow
 
-import           Data.Array.Base (MArray (..))
-import           Data.Function (on)
-import           Data.Kind (Type)
+import Data.Array.Base (MArray (..))
+import Data.Function (on)
+import Data.Kind (Type)
 
 
 -- | A newtype wrapper for an 'STM' monad for 'ContT'
