@@ -263,4 +263,4 @@ test-suite test-si-timers
                        tasty,
                        tasty-quickcheck,
 
-                       si-timers
+                       io-classes:si-timers
