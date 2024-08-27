@@ -186,8 +186,7 @@ library si-timers
   if flag(asserts)
      ghc-options:      -fno-ignore-asserts
 
--- https://github.com/haskell/cabal/issues/10277
-library io-classes-mtl
+library mtl
     import:           warnings
     visibility:       public
     exposed-modules:  Control.Monad.Class.Trans
