@@ -1,5 +1,11 @@
 # Revsion history of io-classes
 
+### 1.7.0.0
+
+### Breaking changes
+
+* Renamed `io-classes:io-classes-mtl` as `io-classes:mtl`.
+
 ### 1.6.0.0
 
 ### Breaking changes
