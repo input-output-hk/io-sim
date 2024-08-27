@@ -1,4 +1,4 @@
-# IO Monad Class Hierarchy: `io-classes`
+# IO Monad Class Hierarchy: `io-classes` package
 
 This package provides a monad class hierarchy which is an interface for both
 the [`io-sim`] and [`IO`] monads.  It was developed with the following
@@ -21,7 +21,7 @@ We provide also non-standard extensions of this API in **sublibraries**:
       microseconds represented as `Int` as in `base`)
     - cancellable timeouts.
 
-* [`io-classes:io-classes-mtl`](https://input-output-hk.github.io/io-sim/io-classes/io-classes-mtl/index.html):
+* [`io-classes:mtl`](https://input-output-hk.github.io/io-sim/io-classes/mtl/index.html):
   MTL instances.
 
 [`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html)
@@ -63,6 +63,8 @@ in [`si-timers`] (ref [SI]), which provides a monoidal action of `DiffTime` on
 monotonic time as well as exposes 32-bit safe timer API (on 32-bit systems time
 in microseconds represented as an `Int` can only hold timeouts of ~35 minutes).
 
+[`si-timers`] sublibrary provides cancellable timers API, see [`registerDelayCancellable`].
+
 `Control.Monad.Class.MonadTimer.NonStandard.MonadTimeout` provides a low-level
 timeout abstraction.  On systems that support a native timer manager, it's used
 to implement its API, which is very efficient even for low-latency timeouts.
@@ -77,17 +79,22 @@ delays & timers.
 
 ## Software Transactional Memory API
 
-We provide two interfaces to `stm` API: lazy, included in `io-classes`; and
+We provide two interfaces to `stm` API: lazy, included in [`io-classes`][lazy-stm]; and
 strict one provided by [`io-classes:strict-stm`](https://input-output-hk.github.io/io-sim/io-classes/strict-stm/index.html).
 
 ## Threads API
 
 We draw a line between `base` API and `async` API.  The former is provided by
-[MonadFork](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadFork.html#t:MonadFork)
-the latter by
-[MonadAsync](https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadAsync.html#t:MonadAsync).
-Both are shallow abstractions around APIs exposed by the `base` and `async`
-packages.
+[MonadFork] the latter by
+[MonadAsync] Both are shallow abstractions around APIs exposed by the `base`
+and `async` packages.
+
+## `MVar` API
+
+We also provide lazy and strict `MVar`s:
+
+* [lazy `MVar`][MonadMVar] API
+* [strict `MVar`][strict-mvar] API is provided in the [io-classes:strict-mvar] sublibrary.
 
 
 ## Some other APIs
@@ -95,6 +102,14 @@ packages.
 * [MonadEventlog][MonadEventlog]: provides an API to the [Debug.Trace] event log interface.
 * [MonadST][MonadST]: provides a way to lift `ST`-computations.
 * [MonadSay][MonadSay]: dummy debugging interface
+
+
+## Monad Transformers
+
+We provide support for monad transformers, see [io-classes:mtl] sublibrary.
+Although at this stage it might have its limitations and so there might be some
+rough edges.  PRs are welcomed, [contributing].
+
 
 ## Differences from `base`, `async`, or `exceptions` packages
 
@@ -142,13 +157,6 @@ only possible because we can control the execution environment of [`io-sim`].
 * `MonadInspectSTM` which allows inspecting values of `STM` mutable variables
   when they are committed. ([`io-sim`], not provided by `GHC`).
 
-
-## Monad Transformers
-
-We provide support for monad transformers (although at this stage it might have
-its limitations and so there might be some rough edges.  PRs are welcomed,
-[contributing]).
-
 [SI]: https://www.wikiwand.com/en/International_System_of_Units 
 [`DiffTime`]: https://hackage.haskell.org/package/time-1.10/docs/Data-Time-Clock.html#t:DiffTime
 [`IO`]: https://hackage.haskell.org/package/base-4.14.0.0/docs/GHC-IO.html#t:IO
@@ -156,8 +164,10 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 [`base`]: https://hackage.haskell.org/package/base
 [`exceptions`]: https://hackage.haskell.org/package/exceptions
 [`io-sim`]: https://hackage.haskell.org/package/io-sim
+[io-classes:strict-mvar]: https://input-output-hk.github.io/io-sim/io-classes/strict-mvar/index.html
 [io-classes:mtl]: https://input-output-hk.github.io/io-sim/io-classes/mtl/index.html
 [`stm`]: https://hackage.haskell.org/package/stm
+[lazy-stm]: https://input-output-hk.github.io/io-sim/io-classes/Control-Concurrent-Class-MonadSTM.html
 [`threadDelay`]: https://hackage.haskell.org/package/io-classes/docs/Control-Monad-Class-MonadTimer.html#v:threadDelay
 [`time`]: https://hackage.haskell.org/package/time
 [contributing]: https://www.github.com/input-output-hk/io-sim/tree/master/CONTRIBUTING.md
@@ -167,6 +177,11 @@ its limitations and so there might be some rough edges.  PRs are welcomed,
 
 [MonadEventlog]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadEventlog.html#t:MonadEventlog
 [Debug.Trace]: https://hackage.haskell.org/package/base/docs/Debug-Trace.html
+[MonadAsync]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadAsync.html#t:MonadAsync
+[MonadFork]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadFork.html#t:MonadFork
+[MonadMVar]: https://input-output-hk.github.io/io-sim/io-classes/Control-Concurrent-Class-MonadMVar.html#t:MonadMVar
+[`registerDelayCancellable`]: http://input-output-hk.github.io/io-sim/io-classes/si-timers/Control-Monad-Class-MonadTimer-SI.html#v:registerDelayCancellable
+[strict-mvar]: https://input-output-hk.github.io/io-sim/io-classes/strict-mvar/Control-Concurrent-Class-MonadMVar-Strict.html
 [MonadST]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadST.html#t:MonadST
 [MonadSay]: https://input-output-hk.github.io/io-sim/io-classes/Control-Monad-Class-MonadSay.html#t:MonadSay
 [io-classes-haddocks]: https://input-output-hk.github.io/io-sim

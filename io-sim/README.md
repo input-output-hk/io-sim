@@ -1,4 +1,4 @@
-# [IO Simulator Monad][`io-sim`]: `io-sim`
+# [IO Simulator Monad][`io-sim`]: `io-sim` package
 
 A pure simulator monad built on top of the lazy `ST` monad which supports:
 

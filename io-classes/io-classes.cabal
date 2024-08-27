@@ -14,6 +14,21 @@ description:
 
   packages.
 
+  = Sublibraries
+  @io-classes@ provides non-standard extensions distributed in public
+  sublibraries
+
+    * @io-classes:io-classes@ - the main library compatible with the above
+      packages
+    * @io-classes:strict-stm@ - strict @STM@ API
+    * @io-classes:strict-mvar@ - strict @MVar@ API
+    * @io-classes:si-timers@ - SI-unit based time / timers API, cancellable timers
+    * @io-classes:mtl@ - MTL instances, some of which are experiemental
+
+  = Documentation
+  Haddocks of all public sublibraries are published
+  [here](https://input-output-hk.github.io/io-sim).
+
 license:             Apache-2.0
 license-files:       LICENSE NOTICE
 copyright:           2019-2024 Input Output Global Inc (IOG)
