@@ -95,19 +95,6 @@ in `strict-stm` package.
 
 We run CI using [GitHub actions][ci].
 
-# Releases
-
-The major version of `io-sim`, `io-classes`, `strict-stm` and `si-timers`
-packages are kept in sync.  This means that if any of the packages introduce
-a breaking change all major versions SHOULD be bumped.  The minor versions are
-kept independent.  The `io-classes-mtl` is still experimental and thus it's not
-following that principle.
-
-The drawback is that if you declare `io-classes ^>= 0.x` then you will need to
-bump it when a new version of `io-sim` is published (even if there are no changes
-in `io-classes`).  The con is that you just need to declare the version of
-`io-classes` to have a consistent ecosystem of the four packages.
-
 # Tips
 
 ## `ppTrace` is strict
