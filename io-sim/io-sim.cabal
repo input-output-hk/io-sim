@@ -1,4 +1,4 @@
-cabal-version:       3.0
+cabal-version:       3.4
 name:                io-sim
 version:             1.6.0.0
 synopsis:            A pure simulator for monadic concurrency with STM.

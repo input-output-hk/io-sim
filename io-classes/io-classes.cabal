@@ -1,4 +1,4 @@
-cabal-version:       3.0
+cabal-version:       3.4
 name:                io-classes
 version:             1.6.0.0
 synopsis:            Type classes for concurrency with STM, ST and timing
