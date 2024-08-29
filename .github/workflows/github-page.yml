@@ -1,4 +1,4 @@
-name: "Haddock documentation"
+name: Haddocks
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   haddocks:
-    name: "Haddocks"
+    name: Haddocks
 
     runs-on: ${{ matrix.os }}
 
@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["9.10.1"]
+        ghc: ["9.10"]
         os: [ubuntu-latest]
 
     permissions:
@@ -54,13 +54,10 @@ jobs:
     - name: Update Hackage index
       run: cabal update
 
-    - name: Build plan
-      run: cabal build --dry-run --enable-tests all
-
     - name: Run pandoc
-      run: pandoc --from=markdown_github --to=haddock --output=README.haddock io-classes/README.md io-sim/README.md
+      run: pandoc --from=gfm --to=haddock --output=README.haddock io-classes/README.md io-sim/README.md
 
-    - name: Build Haddock documentation 🔧
+    - name: Build haddocks 🔧
       run: |
         cabal haddock-project --prologue=README.haddock --hackage all
 
