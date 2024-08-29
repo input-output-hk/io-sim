@@ -1,5 +1,11 @@
 # Revsion history of io-classes
 
+### next version
+
+### Breaking changes
+
+* Added `threadLabel` to `MonadThread`
+
 ### 1.7.0.0
 
 ### Breaking changes

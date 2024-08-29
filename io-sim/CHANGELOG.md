@@ -1,5 +1,9 @@
 # Revision history of io-sim
 
+## next version
+
+- Support `threadLabel` (`io-classes-1.8`)
+
 ## 1.6.0.0
 
 - Upgraded to `io-classes-1.6.0.0`
