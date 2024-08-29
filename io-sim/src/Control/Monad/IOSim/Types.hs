@@ -186,9 +186,10 @@ data SimA s a where
                   SimA s a -> (e -> SimA s a) -> (a -> SimA s b) -> SimA s b
   Evaluate     :: a -> (a -> SimA s b) -> SimA s b
 
-  Fork         :: IOSim s () -> (IOSimThreadId -> SimA s b) -> SimA s b
-  GetThreadId  :: (IOSimThreadId -> SimA s b) -> SimA s b
-  LabelThread  :: IOSimThreadId -> String -> SimA s b -> SimA s b
+  Fork           :: IOSim s () -> (IOSimThreadId -> SimA s b) -> SimA s b
+  GetThreadId    :: (IOSimThreadId -> SimA s b) -> SimA s b
+  LabelThread    :: IOSimThreadId -> String -> SimA s b -> SimA s b
+  GetThreadLabel :: IOSimThreadId -> (Maybe String -> SimA s b) -> SimA s b
 
   Atomically   :: STM  s a -> (a -> SimA s b) -> SimA s b
 
@@ -469,6 +470,7 @@ instance MonadThread (IOSim s) where
   type ThreadId (IOSim s) = IOSimThreadId
   myThreadId       = IOSim $ oneShot $ \k -> GetThreadId k
   labelThread t l  = IOSim $ oneShot $ \k -> LabelThread t l (k ())
+  threadLabel t    = IOSim $ oneShot $ \k -> GetThreadLabel t k
 
 instance MonadFork (IOSim s) where
   forkIO task        = IOSim $ oneShot $ \k -> Fork task k
@@ -815,10 +817,8 @@ ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime = Time time, seThread
            tidWidth
            (ppIOSimThreadId seThreadId)
            tLabelWidth
-           threadLabel
+           (fromMaybe "" seThreadLabel)
            (ppSimEventType seType)
-  where
-    threadLabel = fromMaybe "" seThreadLabel
 
 ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime = Time time, seThreadId, seStep, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
@@ -827,10 +827,8 @@ ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime = Time time, seThr
            tidWidth
            (ppStepId (seThreadId, seStep))
            tLableWidth
-           threadLabel
+           (fromMaybe "" seThreadLabel)
            (ppSimEventType seType)
-  where
-    threadLabel = fromMaybe "" seThreadLabel
 
 ppSimEvent _ _ _ (SimRacesFound controls) =
     "RacesFound "++show controls

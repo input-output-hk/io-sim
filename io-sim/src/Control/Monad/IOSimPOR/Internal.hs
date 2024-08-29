@@ -703,6 +703,13 @@ schedule thread@Thread{
                            , threadLabel   = Just l }
       schedule thread' simstate
 
+    GetThreadLabel tid' k -> do
+      let tlbl' | tid' == tid = tlbl
+                | otherwise   = tid' `Map.lookup` threads
+                            >>= threadLabel
+          thread' = thread { threadControl = ThreadControl (k tlbl') ctl }
+      schedule thread' simstate
+
     LabelThread tid' l k -> do
       let thread'  = thread { threadControl = ThreadControl k ctl }
           threads' = Map.adjust (\t -> t { threadLabel = Just l }) tid' threads

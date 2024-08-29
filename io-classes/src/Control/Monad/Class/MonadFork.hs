@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -18,7 +19,7 @@ import Control.Exception (AsyncException (ThreadKilled), Exception,
            SomeException)
 import Control.Monad.Reader (ReaderT (..), lift)
 import Data.Kind (Type)
-import GHC.Conc.Sync qualified as IO (labelThread)
+import GHC.Conc.Sync qualified as IO
 
 
 class (Monad m, Eq   (ThreadId m),
@@ -29,6 +30,11 @@ class (Monad m, Eq   (ThreadId m),
 
   myThreadId     :: m (ThreadId m)
   labelThread    :: ThreadId m -> String -> m ()
+
+  -- | Requires ghc-9.6.1 or newer.
+  --
+  -- @since 1.8.0.0
+  threadLabel    :: ThreadId m -> m (Maybe String)
 
 -- | Apply the label to the current thread
 labelThisThread :: MonadThread m => String -> m ()
@@ -53,6 +59,11 @@ instance MonadThread IO where
   type ThreadId IO = IO.ThreadId
   myThreadId   = IO.myThreadId
   labelThread  = IO.labelThread
+#if MIN_VERSION_base(4,18,0)
+  threadLabel = IO.threadLabel
+#else
+  threadLabel = \_ -> pure Nothing
+#endif
 
 instance MonadFork IO where
   forkIO           = IO.forkIO
@@ -67,6 +78,7 @@ instance MonadThread m => MonadThread (ReaderT r m) where
   type ThreadId (ReaderT r m) = ThreadId m
   myThreadId      = lift myThreadId
   labelThread t l = lift (labelThread t l)
+  threadLabel     = lift . threadLabel
 
 instance MonadFork m => MonadFork (ReaderT e m) where
   forkIO (ReaderT f)   = ReaderT $ \e -> forkIO (f e)
