@@ -124,7 +124,7 @@ class ( MonadTimer.MonadTimer m
 
   -- | A timeout function.
   --
-  -- TODO: 'IO' instance is not safe on 32-bit systems.
+  -- __TODO__: /'IO' instance is not safe on 32-bit systems./
   timeout                  :: DiffTime -> m a -> m (Maybe a)
 
 
@@ -244,7 +244,7 @@ defaultRegisterDelayCancellable newTimeout _readTimeout _cancelTimeout awaitTime
 -- small enough it will use the `MonadTimer`'s `registerDelay` (e.g. for `IO`
 -- monad it will use the `GHC`'s `GHC.Conc.registerDelay`).
 --
--- TODO: 'timeout' not safe on 32-bit systems.
+-- __TODO__: /'timeout' is not safe on 32-bit systems./
 instance MonadTimer IO where
   registerDelay d
       | d <= maxDelay =
