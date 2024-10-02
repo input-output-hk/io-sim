@@ -606,6 +606,9 @@ instance MonadInspectMVar (IOSim s) where
         MVarEmpty _ _ -> pure Nothing
         MVarFull x _  -> pure (Just x)
 
+instance MonadLabelledMVar (IOSim s) where
+  labelMVar = labelMVarDefault
+
 data Async s a = Async !IOSimThreadId (STM s (Either SomeException a))
 
 instance Eq (Async s a) where

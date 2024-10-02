@@ -5,7 +5,9 @@
 
 module Control.Concurrent.Class.MonadMVar
   ( MonadMVar (..)
+    -- * non-standard extensions
   , MonadInspectMVar (..)
+  , MonadLabelledMVar (..)
   ) where
 
 import Control.Concurrent.MVar qualified as IO
@@ -153,7 +155,6 @@ instance MonadMVar IO where
     modifyMVarMasked_ = IO.modifyMVarMasked_
     modifyMVarMasked  = IO.modifyMVarMasked
 
-
 --
 -- ReaderT instance
 --
@@ -204,6 +205,18 @@ instance MonadInspectMVar IO where
   type InspectMVarMonad IO = IO
   inspectMVar _ = tryReadMVar
 
+-- | Labelled `MVar`s
+--
+-- The `IO` instances is no-op, the `IOSim` instance enhances simulation trace.
+-- This is very useful when analysing low lever concurrency issues (e.g.
+-- deadlocks, livelocks etc).
+class MonadMVar m
+   => MonadLabelledMVar m where
+  -- | Name an `MVar`
+  labelMVar :: MVar m a -> String -> m ()
+
+instance MonadLabelledMVar IO where
+  labelMVar = \_ _ -> pure ()
 --
 -- Utilities
 --

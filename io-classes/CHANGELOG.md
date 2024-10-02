@@ -5,6 +5,7 @@
 ### Breaking changes
 
 * Added `threadLabel` to `MonadThread`
+* Added `MonadLabelledMVar` class.
 
 ### 1.7.0.0
 

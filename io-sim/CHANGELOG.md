@@ -7,6 +7,7 @@
   `TVars`.
 - `Show` instance for `ScheduleMod` now prints `ThreadId`s in a slightly nicer
   way, matching the way those steps would be traced in the `SimTrace`.
+- Implement `MonadLabelledMVar` instance for `(IOSim s)`
 
 ## 1.6.0.0
 
