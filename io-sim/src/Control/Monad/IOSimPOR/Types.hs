@@ -171,11 +171,12 @@ instance Show ScheduleMod where
   showsPrec d (ScheduleMod tgt ctrl insertion) =
     showParen (d>10) $
       showString "ScheduleMod " .
-      showsPrec 11 tgt .
+      showParen True (showString (ppStepId tgt)) .
       showString " " .
       showsPrec 11 ctrl .
-      showString " " .
-      showsPrec 11 insertion
+      showString " [" .
+      showString (List.intercalate "," (map ppStepId insertion)) .
+      showString "]"
 
 --
 -- Steps

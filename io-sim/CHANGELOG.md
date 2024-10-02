@@ -5,6 +5,8 @@
 - Support `threadLabel` (`io-classes-1.8`)
 - `IOSimPOR`'s `Effect` traces now will correctly show labels on read/written
   `TVars`.
+- `Show` instance for `ScheduleMod` now prints `ThreadId`s in a slightly nicer
+  way, matching the way those steps would be traced in the `SimTrace`.
 
 ## 1.6.0.0
 
