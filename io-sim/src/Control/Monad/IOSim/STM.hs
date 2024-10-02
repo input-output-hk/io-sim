@@ -261,13 +261,17 @@ data MVarState m a = MVarEmpty   !(Deque (TVar m (Maybe a))) -- blocked on take
 newEmptyMVarDefault :: MonadSTM m => m (MVarDefault m a)
 newEmptyMVarDefault = MVar <$> newTVarIO (MVarEmpty mempty mempty)
 
+labelMVarDefault
+  :: MonadLabelledSTM m
+  => MVarDefault m a -> String -> m ()
+labelMVarDefault (MVar tvar) = atomically . labelTVar tvar . (<> "-MVar")
 
 newMVarDefault :: MonadSTM m => a -> m (MVarDefault m a)
 newMVarDefault a = MVar <$> newTVarIO (MVarFull a mempty)
 
 
 putMVarDefault :: ( MonadMask  m
-                  , MonadSTM   m
+                  , MonadLabelledSTM m
                   , forall x tvar. tvar ~ TVar m x => Eq tvar
                   )
                => MVarDefault m a -> a -> m ()
@@ -278,6 +282,7 @@ putMVarDefault (MVar tv) x = mask_ $ do
         -- It's full, add ourselves to the end of the 'put' blocked queue.
         MVarFull x' putq -> do
           putvar <- newTVar False
+          labelTVar putvar "internal-putvar"
           writeTVar tv (MVarFull x' (Deque.snoc (x, putvar) putq))
           return (Just putvar)
 
@@ -350,7 +355,7 @@ tryPutMVarDefault (MVar tv) x =
 
 
 takeMVarDefault :: ( MonadMask m
-                   , MonadSTM  m
+                   , MonadLabelledSTM m
                    , forall x tvar. tvar ~ TVar m x => Eq tvar
                    )
                 => MVarDefault m a
@@ -362,6 +367,7 @@ takeMVarDefault (MVar tv) = mask_ $ do
         -- It's empty, add ourselves to the end of the 'take' blocked queue.
         MVarEmpty takeq readq -> do
           takevar <- newTVar Nothing
+          labelTVar takevar "internal-takevar"
           writeTVar tv (MVarEmpty (Deque.snoc takevar takeq) readq)
           return (Left takevar)
 
@@ -433,7 +439,7 @@ tryTakeMVarDefault (MVar tv) = do
 -- 'putMVar' value.  It will also not block if the 'MVar' is full, even if there
 -- are other threads attempting to 'putMVar'.
 --
-readMVarDefault :: ( MonadSTM m
+readMVarDefault :: ( MonadLabelledSTM m
                    , MonadMask m
                    , forall x tvar. tvar ~ TVar m x => Eq tvar
                    )
@@ -446,6 +452,7 @@ readMVarDefault (MVar tv) = do
         -- It's empty, add ourselves to the 'read' blocked queue.
         MVarEmpty takeq readq -> do
           readvar <- newTVar Nothing
+          labelTVar readvar "internal-readvar"
           writeTVar tv (MVarEmpty takeq (Deque.snoc readvar readq))
           return (Left readvar)
 
