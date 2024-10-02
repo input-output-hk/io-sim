@@ -58,7 +58,6 @@ module Control.Monad.IOSim.Types
   , ppTrace_
   , ppSimEvent
   , ppDebug
-  , Labelled (..)
   , module Control.Monad.IOSim.CommonTypes
   , Thrower (..)
   , Time (..)
@@ -1206,21 +1205,6 @@ ppSimEventType = \case
              ppVectorClock clock, " ",
              ppEffect eff ]
   EventRaces a -> show a
-
--- | A labelled value.
---
--- For example 'labelThread' or `labelTVar' will insert a label to `IOSimThreadId`
--- (or `TVarId`).
-data Labelled a = Labelled {
-    l_labelled :: !a,
-    l_label    :: !(Maybe String)
-  }
-  deriving (Eq, Ord, Generic)
-  deriving Show via Quiet (Labelled a)
-
-ppLabelled :: (a -> String) -> Labelled a -> String
-ppLabelled pp Labelled { l_labelled = a, l_label = Nothing  } = pp a
-ppLabelled pp Labelled { l_labelled = a, l_label = Just lbl } = concat ["Labelled ", pp a, " ", lbl]
 
 --
 -- Executing STM Transactions

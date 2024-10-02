@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DerivingVia                #-}
@@ -25,9 +26,12 @@ module Control.Monad.IOSim.CommonTypes
   , TVarLabel
   , TVar (..)
   , SomeTVar (..)
+  , someTVarToLabelled
   , Deschedule (..)
   , ThreadStatus (..)
   , BlockedReason (..)
+  , Labelled (..)
+  , ppLabelled
     -- * Utils
   , ppList
   ) where
@@ -145,6 +149,11 @@ instance Eq (TVar s a) where
 data SomeTVar s where
   SomeTVar :: !(TVar s a) -> SomeTVar s
 
+someTVarToLabelled :: SomeTVar s -> ST s (Labelled (SomeTVar s))
+someTVarToLabelled tv@(SomeTVar var) = do
+  lbl <- readSTRef (tvarLabel var)
+  pure (Labelled tv lbl)
+
 data Deschedule = Yield
                 | Interruptable
                 | Blocked BlockedReason
@@ -161,6 +170,21 @@ data BlockedReason = BlockedOnSTM
                    | BlockedOnDelay
                    | BlockedOnThrowTo
   deriving (Eq, Show)
+
+-- | A labelled value.
+--
+-- For example 'labelThread' or `labelTVar' will insert a label to `IOSimThreadId`
+-- (or `TVarId`).
+data Labelled a = Labelled {
+    l_labelled :: !a,
+    l_label    :: !(Maybe String)
+  }
+  deriving (Eq, Ord, Generic, Functor)
+  deriving Show via Quiet (Labelled a)
+
+ppLabelled :: (a -> String) -> Labelled a -> String
+ppLabelled pp Labelled { l_labelled = a, l_label = Nothing  } = pp a
+ppLabelled pp Labelled { l_labelled = a, l_label = Just lbl } = concat ["Labelled ", pp a, " ", lbl]
 
 --
 -- Utils
