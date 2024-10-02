@@ -38,8 +38,8 @@ import Control.Monad.IOSim.CommonTypes
 -- execution step.  Only used by *IOSimPOR*.
 --
 data Effect = Effect {
-    effectReads  :: !(Set TVarId),
-    effectWrites :: !(Set TVarId),
+    effectReads  :: !(Set (Labelled TVarId)),
+    effectWrites :: !(Set (Labelled TVarId)),
     effectForks  :: !(Set IOSimThreadId),
     effectThrows :: ![IOSimThreadId],
     effectWakeup :: !(Set IOSimThreadId)
@@ -50,11 +50,11 @@ ppEffect :: Effect -> String
 ppEffect Effect { effectReads, effectWrites, effectForks, effectThrows, effectWakeup } =
   "Effect { " ++
     concat (List.intersperse ", " $
-           [ "reads = "  ++ show effectReads  | not (null effectReads)  ]
-        ++ [ "writes = " ++ show effectWrites | not (null effectWrites) ]
-        ++ [ "forks = "  ++ ppList ppIOSimThreadId (Set.toList effectForks)  | not (null effectForks)  ]
-        ++ [ "throws = " ++ ppList ppIOSimThreadId             effectThrows  | not (null effectThrows) ]
-        ++ [ "wakeup = " ++ ppList ppIOSimThreadId (Set.toList effectWakeup) | not (null effectWakeup) ])
+           [ "reads = "  ++ ppList (ppLabelled show) (Set.toList effectReads)  | not (null effectReads)  ]
+        ++ [ "writes = " ++ ppList (ppLabelled show) (Set.toList effectWrites) | not (null effectWrites) ]
+        ++ [ "forks = "  ++ ppList ppIOSimThreadId (Set.toList effectForks)    | not (null effectForks)  ]
+        ++ [ "throws = " ++ ppList ppIOSimThreadId             effectThrows    | not (null effectThrows) ]
+        ++ [ "wakeup = " ++ ppList ppIOSimThreadId (Set.toList effectWakeup)   | not (null effectWakeup) ])
         ++ " }"
 
 
@@ -72,14 +72,14 @@ instance Monoid Effect where
 -- readEffect :: SomeTVar s -> Effect
 -- readEffect r = mempty{effectReads = Set.singleton $ someTvarId r }
 
-readEffects :: [SomeTVar s] -> Effect
-readEffects rs = mempty{effectReads = Set.fromList (map someTvarId rs)}
+readEffects :: [Labelled (SomeTVar s)] -> Effect
+readEffects rs = mempty{effectReads = Set.fromList (map (someTvarId <$>) rs)}
 
 -- writeEffect :: SomeTVar s -> Effect
 -- writeEffect r = mempty{effectWrites = Set.singleton $ someTvarId r }
 
-writeEffects :: [SomeTVar s] -> Effect
-writeEffects rs = mempty{effectWrites = Set.fromList (map someTvarId rs)}
+writeEffects :: [Labelled (SomeTVar s)] -> Effect
+writeEffects rs = mempty{effectWrites = Set.fromList (map (someTvarId <$>) rs)}
 
 forkEffect :: IOSimThreadId -> Effect
 forkEffect tid = mempty{effectForks = Set.singleton tid}

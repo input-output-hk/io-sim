@@ -568,10 +568,11 @@ schedule thread@Thread{
     CancelTimeout (Timeout tvar tmid) k -> do
       let timers' = PSQ.delete tmid timers
       written <- execAtomically' (runSTM $ writeTVar tvar TimeoutCancelled)
+      written' <- mapM someTVarToLabelled written
       (wakeup, wokeby) <- threadsUnblockedByWrites written
       mapM_ (\(SomeTVar var) -> unblockAllThreadsFromTVar var) written
       let effect' = effect
-                 <> writeEffects written
+                 <> writeEffects written'
                  <> wakeupEffects wakeup
           thread' = thread { threadControl = ThreadControl k ctl
                            , threadEffect  = effect'
@@ -636,10 +637,12 @@ schedule thread@Thread{
           (wakeup, wokeby) <- threadsUnblockedByWrites written
           mapM_ (\(SomeTVar tvar) -> unblockAllThreadsFromTVar tvar) written
           vClockRead <- leastUpperBoundTVarVClocks read
+          read' <- mapM someTVarToLabelled read
+          written' <- mapM someTVarToLabelled written
           let vClock'     = vClock `leastUpperBoundVClock` vClockRead
               effect'     = effect
-                         <> readEffects read
-                         <> writeEffects written
+                         <> readEffects read'
+                         <> writeEffects written'
                          <> wakeupEffects unblocked
               thread'     = thread { threadControl = ThreadControl (k x) ctl,
                                      threadVClock  = vClock',
@@ -648,12 +651,12 @@ schedule thread@Thread{
                simstate') = unblockThreads True vClock' wakeup simstate
           sequence_ [ modifySTRef (tvarVClock r) (leastUpperBoundVClock vClock')
                     | SomeTVar r <- created ++ written ]
-          written' <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) written
+          written'' <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) written
           created' <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) created
           -- We deschedule a thread after a transaction... another may have woken up.
           !trace <- deschedule Yield thread' simstate' { nextVid  = nextVid' }
           return $
-            SimPORTrace time tid tstep tlbl (EventTxCommitted written' created' (Just effect')) $
+            SimPORTrace time tid tstep tlbl (EventTxCommitted written'' created' (Just effect')) $
             traceMany
               [ (time, tid', (-1), tlbl', EventTxWakeup vids')
               | tid' <- unblocked
@@ -674,7 +677,8 @@ schedule thread@Thread{
         StmTxAborted read e -> do
           -- schedule this thread to immediately raise the exception
           vClockRead <- leastUpperBoundTVarVClocks read
-          let effect' = effect <> readEffects read
+          read' <- mapM someTVarToLabelled read
+          let effect' = effect <> readEffects read'
               thread' = thread { threadControl = ThreadControl (Throw e) ctl,
                                  threadVClock  = vClock `leastUpperBoundVClock` vClockRead,
                                  threadEffect  = effect' }
@@ -686,7 +690,8 @@ schedule thread@Thread{
           mapM_ (\(SomeTVar tvar) -> blockThreadOnTVar tid tvar) read
           vids <- traverse (\(SomeTVar tvar) -> labelledTVarId tvar) read
           vClockRead <- leastUpperBoundTVarVClocks read
-          let effect' = effect <> readEffects read
+          read' <- mapM someTVarToLabelled read
+          let effect' = effect <> readEffects read'
               thread' = thread { threadVClock  = vClock `leastUpperBoundVClock` vClockRead,
                                  threadEffect  = effect' }
           !trace <- deschedule (Blocked BlockedOnSTM) thread' simstate
