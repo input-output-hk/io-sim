@@ -195,7 +195,7 @@ data SimState s a = SimState {
        -- | timeout locks in order to synchronize the timeout handler and the
        -- main thread
        clocks           :: !(Map ClockId UTCTime),
-       nextVid          :: !TVarId,     -- ^ next unused 'TVarId'
+       nextVid          :: !VarId,     -- ^ next unused 'TVarId'
        nextTmid         :: !TimeoutId,  -- ^ next unused 'TimeoutId'
        -- | previous steps (which we may race with).
        -- Note this is *lazy*, so that we don't compute races we will not reverse.
@@ -217,7 +217,7 @@ initialState =
       curTime  = Time 0,
       timers   = PSQ.empty,
       clocks   = Map.singleton (ClockId []) epoch1970,
-      nextVid  = TVarId 0,
+      nextVid  = 0,
       nextTmid = TimeoutId 0,
       races    = noRaces,
       control  = ControlDefault,
@@ -480,7 +480,7 @@ schedule thread@Thread{
       error "schedule: StartTimeout: Impossible happened"
 
     StartTimeout d action' k -> do
-      lock <- TMVar <$> execNewTVar nextVid (Just $! "lock-" ++ show nextTmid) Nothing
+      lock <- TMVar <$> execNewTVar (TMVarId nextVid) (Just $! "lock-" ++ show nextTmid) Nothing
       let expiry    = d `addTime` time
           timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           thread'   = thread { threadControl =
@@ -496,19 +496,19 @@ schedule thread@Thread{
       schedule thread' simstate { timers = PSQ.delete tmid timers }
 
     RegisterDelay d k | d < 0 -> do
-      tvar <- execNewTVar nextVid
+      tvar <- execNewTVar (TVarId nextVid)
                           (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           True
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
       let !expiry  = d `addTime` time
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
       trace <- schedule thread' simstate { nextVid = succ nextVid }
-      return (SimPORTrace time tid tstep tlbl (EventRegisterDelayCreated nextTmid nextVid expiry) $
+      return (SimPORTrace time tid tstep tlbl (EventRegisterDelayCreated nextTmid (TVarId nextVid) expiry) $
               SimPORTrace time tid tstep tlbl (EventRegisterDelayFired nextTmid) $
               trace)
 
     RegisterDelay d k -> do
-      tvar <- execNewTVar nextVid
+      tvar <- execNewTVar (TVarId nextVid)
                           (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
@@ -519,7 +519,7 @@ schedule thread@Thread{
                                          , nextVid  = succ nextVid
                                          , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl
-                (EventRegisterDelayCreated nextTmid nextVid expiry) trace)
+                (EventRegisterDelayCreated nextTmid (TVarId nextVid) expiry) trace)
 
     ThreadDelay d k | d < 0 -> do
       let expiry    = d `addTime` time
@@ -547,12 +547,12 @@ schedule thread@Thread{
           expiry  = d `addTime` time
           thread' = thread { threadControl = ThreadControl (k t) ctl }
       trace <- schedule thread' simstate { nextTmid = succ nextTmid }
-      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) $
+      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid (TVarId nextVid) expiry) $
               SimPORTrace time tid tstep tlbl (EventTimerCancelled nextTmid) $
               trace)
 
     NewTimeout d k -> do
-      tvar  <- execNewTVar nextVid
+      tvar  <- execNewTVar (TVarId nextVid)
                            (Just $! "<<timeout-state " ++ show (unTimeoutId nextTmid) ++ ">>")
                            TimeoutPending
       modifySTRef (tvarVClock tvar) (leastUpperBoundVClock vClock)
@@ -563,7 +563,7 @@ schedule thread@Thread{
       trace <- schedule thread' simstate { timers   = timers'
                                           , nextVid  = succ (succ nextVid)
                                           , nextTmid = succ nextTmid }
-      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid nextVid expiry) trace)
+      return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid (TVarId nextVid) expiry) trace)
 
     CancelTimeout (Timeout tvar tmid) k -> do
       let timers' = PSQ.delete tmid timers
@@ -1358,7 +1358,7 @@ execAtomically :: forall s a c.
                   Time
                -> IOSimThreadId
                -> Maybe ThreadLabel
-               -> TVarId
+               -> VarId
                -> StmA s a
                -> (StmTxResult s a -> ST s (SimTrace c))
                -> ST s (SimTrace c)
@@ -1371,7 +1371,7 @@ execAtomically !time !tid !tlbl !nextVid0 !action0 !k0 =
        -> Map TVarId (SomeTVar s)  -- set of vars written
        -> [SomeTVar s]             -- vars written in order (no dups)
        -> [SomeTVar s]             -- vars created in order
-       -> TVarId                   -- var fresh name supply
+       -> VarId                   -- var fresh name supply
        -> StmA s b
        -> ST s (SimTrace c)
     go !ctl !read !written !writtenSeq !createdSeq !nextVid !action =
@@ -1470,8 +1470,8 @@ execAtomically !time !tid !tlbl !nextVid0 !action0 !k0 =
         let ctl' = BranchFrame (OrElseStmA b) k written writtenSeq createdSeq ctl
         go ctl' read Map.empty [] [] nextVid a
 
-      NewTVar !mbLabel x k -> do
-        !v <- execNewTVar nextVid mbLabel x
+      NewTVar mkId !mbLabel x k -> do
+        !v <- execNewTVar (mkId nextVid) mbLabel x
         -- record a write to the TVar so we know to update its VClock
         let written' = Map.insert (tvarId v) (SomeTVar v) written
         -- save the value: it will be committed or reverted
@@ -1560,14 +1560,14 @@ execAtomically' = go Map.empty
 
 
 execNewTVar :: TVarId -> Maybe String -> a -> ST s (TVar s a)
-execNewTVar nextVid !mbLabel x = do
+execNewTVar !tvarId !mbLabel x = do
     tvarLabel   <- newSTRef mbLabel
     tvarCurrent <- newSTRef x
     tvarUndo    <- newSTRef []
     tvarBlocked <- newSTRef ([], Set.empty)
     tvarVClock  <- newSTRef bottomVClock
     tvarTrace   <- newSTRef Nothing
-    return TVar {tvarId = nextVid, tvarLabel,
+    return TVar {tvarId, tvarLabel,
                  tvarCurrent, tvarUndo, tvarBlocked, tvarVClock,
                  tvarTrace}
 

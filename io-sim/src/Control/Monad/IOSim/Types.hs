@@ -90,8 +90,8 @@ import Control.Monad.Class.MonadSay
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
            MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..), TArrayDefault,
-           TChanDefault, TMVarDefault, TSemDefault, TraceValue, atomically,
-           retry)
+           TChanDefault (..), TMVarDefault (..), TSemDefault (..), TraceValue,
+           atomically, retry)
 import Control.Monad.Class.MonadSTM.Internal qualified as MonadSTM
 import Control.Monad.Class.MonadTest
 import Control.Monad.Class.MonadThrow as MonadThrow hiding (getMaskingState)
@@ -219,7 +219,7 @@ data StmA s a where
   ThrowStm     :: SomeException -> StmA s a
   CatchStm     :: StmA s a -> (SomeException -> StmA s a) -> (a -> StmA s b) -> StmA s b
 
-  NewTVar      :: Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
+  NewTVar      :: (VarId -> TVarId) -> Maybe String -> x -> (TVar s x -> StmA s b) -> StmA s b
   LabelTVar    :: String -> TVar s a -> StmA s b -> StmA s b
   ReadTVar     :: TVar s a -> (a -> StmA s b) -> StmA s b
   WriteTVar    :: TVar s a ->  a -> StmA s b  -> StmA s b
@@ -508,14 +508,14 @@ instance MonadSTM (IOSim s) where
 
   atomically action = IOSim $ oneShot $ \k -> Atomically action k
 
-  newTVar         x = STM $ oneShot $ \k -> NewTVar Nothing x k
+  newTVar         x = STM $ oneShot $ \k -> NewTVar TVarId Nothing x k
   readTVar   tvar   = STM $ oneShot $ \k -> ReadTVar tvar k
   writeTVar  tvar x = STM $ oneShot $ \k -> WriteTVar tvar x (k ())
   retry             = STM $ oneShot $ \_ -> Retry
   orElse        a b = STM $ oneShot $ \k -> OrElse (runSTM a) (runSTM b) k
 
-  newTMVar          = MonadSTM.newTMVarDefault
-  newEmptyTMVar     = MonadSTM.newEmptyTMVarDefault
+  newTMVar          = \a -> STM $ oneShot $ \k -> NewTVar TMVarId Nothing (Just a) (k . TMVar)
+  newEmptyTMVar     = STM $ oneShot $ \k -> NewTVar TMVarId Nothing Nothing (k . TMVar)
   takeTMVar         = MonadSTM.takeTMVarDefault
   tryTakeTMVar      = MonadSTM.tryTakeTMVarDefault
   putTMVar          = MonadSTM.putTMVarDefault
@@ -526,7 +526,7 @@ instance MonadSTM (IOSim s) where
   writeTMVar        = MonadSTM.writeTMVarDefault
   isEmptyTMVar      = MonadSTM.isEmptyTMVarDefault
 
-  newTQueue         = newTQueueDefault
+  newTQueue         = STM $ oneShot $ \k -> NewTVar TQueueId Nothing ([], []) (k . TQueue)
   readTQueue        = readTQueueDefault
   tryReadTQueue     = tryReadTQueueDefault
   peekTQueue        = peekTQueueDefault
@@ -536,7 +536,10 @@ instance MonadSTM (IOSim s) where
   isEmptyTQueue     = isEmptyTQueueDefault
   unGetTQueue       = unGetTQueueDefault
 
-  newTBQueue        = newTBQueueDefault
+  newTBQueue size   | size >= fromIntegral (maxBound :: Int)
+                    = error "newTBQueue: size larger than Int"
+                    | otherwise
+                    = STM $ oneShot $ \k -> NewTVar TBQueueId Nothing ([], 0, [], size) (k . (`TBQueue` size ))
   readTBQueue       = readTBQueueDefault
   tryReadTBQueue    = tryReadTBQueueDefault
   peekTBQueue       = peekTBQueueDefault
@@ -548,7 +551,7 @@ instance MonadSTM (IOSim s) where
   isFullTBQueue     = isFullTBQueueDefault
   unGetTBQueue      = unGetTBQueueDefault
 
-  newTSem           = MonadSTM.newTSemDefault
+  newTSem           = \i -> STM $ oneShot $ \k -> NewTVar TSemId Nothing i (k . TSem)
   waitTSem          = MonadSTM.waitTSemDefault
   signalTSem        = MonadSTM.signalTSemDefault
   signalTSemN       = MonadSTM.signalTSemNDefault
@@ -588,8 +591,8 @@ instance MonadTraceSTM (IOSim s) where
 
 instance MonadMVar (IOSim s) where
   type MVar (IOSim s) = MVarDefault (IOSim s)
-  newEmptyMVar = newEmptyMVarDefault
-  newMVar      = newMVarDefault
+  newEmptyMVar = atomically $ STM $ oneShot $ \k -> NewTVar MVarId Nothing (MVarEmpty mempty mempty) (k . MVar)
+  newMVar      = \a -> atomically $ STM $ oneShot $ \k -> NewTVar MVarId Nothing (MVarFull a mempty) (k . MVar)
   takeMVar     = takeMVarDefault
   putMVar      = putMVarDefault
   tryTakeMVar  = tryTakeMVarDefault
@@ -1233,7 +1236,7 @@ data StmTxResult s a =
                         ![SomeTVar s] -- ^ created tvars
                         ![Dynamic]
                         ![String]
-                        !TVarId -- updated TVarId name supply
+                        !VarId -- updated TVarId name supply
 
        -- | A blocked transaction reports the vars that were read so that the
        -- scheduler can block the thread on those vars.
