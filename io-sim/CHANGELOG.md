@@ -8,6 +8,8 @@
 - `Show` instance for `ScheduleMod` now prints `ThreadId`s in a slightly nicer
   way, matching the way those steps would be traced in the `SimTrace`.
 - Implement `MonadLabelledMVar` instance for `(IOSim s)`
+- `TVarId` is now a sum type with one constructor per `TVar` role, e.g. `TVar`,
+  `TMVar`, `MVar` and a few others - except for `TChan`.
 
 ## 1.6.0.0
 

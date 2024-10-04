@@ -17,6 +17,7 @@ module Control.Monad.IOSim.CommonTypes
   , childThreadId
   , setRacyThread
   , TVarId (..)
+  , VarId
   , TimeoutId (..)
   , ClockId (..)
   , VectorClock (..)
@@ -92,7 +93,24 @@ ppStepId (tid, step) | step < 0
 ppStepId (tid, step) = concat [ppIOSimThreadId tid, ".", show step]
 
 
-newtype TVarId      = TVarId    Int   deriving (Eq, Ord, Enum, Show)
+type VarId = Int
+-- | 'TVar's are used to emulate other shared variables. Each one comes with
+-- its own id constructor.
+data TVarId =
+    TVarId  !VarId
+    -- ^ a `TVar`
+  | TMVarId !VarId
+    -- ^ a `TMVar` simulated by a `TVar`.
+  | MVarId  !VarId
+    -- ^ an `MVar` simulated by a `TVar`.
+  | TQueueId !VarId
+    -- ^ a 'TQueue` simulated by a `TVar`.
+  | TBQueueId !VarId
+    -- ^ a 'TBQueue` simulated by a `TVar`.
+  | TSemId !VarId
+    -- ^ a 'TSem` simulated by a `TVar`.
+  -- TODO: `TChan`
+  deriving (Eq, Ord, Show)
 newtype TimeoutId   = TimeoutId Int   deriving (Eq, Ord, Enum, Show)
 newtype ClockId     = ClockId   [Int] deriving (Eq, Ord, Show)
 newtype VectorClock = VectorClock { getVectorClock :: Map IOSimThreadId Int }
@@ -139,7 +157,7 @@ data TVar s a = TVar {
        tvarVClock  :: !(STRef s VectorClock),
 
        -- | Callback to construct a trace which will be attached to the dynamic
-       -- trace.
+       -- trace each time the `TVar` is committed.
        tvarTrace   :: !(STRef s (Maybe (Maybe a -> a -> ST s TraceValue)))
      }
 

@@ -264,7 +264,7 @@ newEmptyMVarDefault = MVar <$> newTVarIO (MVarEmpty mempty mempty)
 labelMVarDefault
   :: MonadLabelledSTM m
   => MVarDefault m a -> String -> m ()
-labelMVarDefault (MVar tvar) = atomically . labelTVar tvar . (<> "-MVar")
+labelMVarDefault (MVar tvar) = atomically . labelTVar tvar
 
 newMVarDefault :: MonadSTM m => a -> m (MVarDefault m a)
 newMVarDefault a = MVar <$> newTVarIO (MVarFull a mempty)
