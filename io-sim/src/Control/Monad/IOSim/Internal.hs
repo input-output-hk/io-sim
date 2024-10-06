@@ -1236,9 +1236,8 @@ execNewTVar !tvarId !mbLabel x = do
     !tvarBlocked <- newSTRef ([], Set.empty)
     !tvarVClock  <- newSTRef $! VectorClock Map.empty
     !tvarTrace   <- newSTRef $! Nothing
-    return TVar {tvarId, tvarLabel,
-                 tvarCurrent, tvarUndo, tvarBlocked, tvarVClock,
-                 tvarTrace}
+    return TVar {tvarId, tvarLabel, tvarCurrent, tvarUndo, tvarBlocked,
+                 tvarVClock, tvarTrace}
 
 
 -- 'execReadTVar' is defined in `Control.Monad.IOSim.Type` and shared with /IOSimPOR/

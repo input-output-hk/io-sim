@@ -561,8 +561,8 @@ schedule thread@Thread{
           timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
           thread' = thread { threadControl = ThreadControl (k t) ctl }
       trace <- schedule thread' simstate { timers   = timers'
-                                          , nextVid  = succ (succ nextVid)
-                                          , nextTmid = succ nextTmid }
+                                         , nextVid  = succ (succ nextVid)
+                                         , nextTmid = succ nextTmid }
       return (SimPORTrace time tid tstep tlbl (EventTimerCreated nextTmid (TVarId nextVid) expiry) trace)
 
     CancelTimeout (Timeout tvar tmid) k -> do
@@ -1849,7 +1849,8 @@ normalizeRaces Races{ activeRaces, completeRaces } =
                         $ activeRaces
                         )
                      ++ completeRaces
-  in Races{ activeRaces = activeRaces', completeRaces = completeRaces' }
+  in Races{ activeRaces   = activeRaces',
+            completeRaces = completeRaces' }
 
 
 -- When a thread terminates, we remove it from the concurrent thread
