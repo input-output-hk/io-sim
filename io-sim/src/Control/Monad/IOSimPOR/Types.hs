@@ -69,14 +69,8 @@ instance Monoid Effect where
 -- Effect smart constructors
 --
 
--- readEffect :: SomeTVar s -> Effect
--- readEffect r = mempty{effectReads = Set.singleton $ someTvarId r }
-
 readEffects :: [Labelled (SomeTVar s)] -> Effect
 readEffects rs = mempty{effectReads = Set.fromList (map (someTvarId <$>) rs)}
-
--- writeEffect :: SomeTVar s -> Effect
--- writeEffect r = mempty{effectWrites = Set.singleton $ someTvarId r }
 
 writeEffects :: [Labelled (SomeTVar s)] -> Effect
 writeEffects rs = mempty{effectWrites = Set.fromList (map (someTvarId <$>) rs)}
@@ -224,11 +218,18 @@ data StepInfo = StepInfo {
 -- Races
 --
 
-data Races = Races { -- These steps may still race with future steps
-                     activeRaces   :: ![StepInfo],
-                     -- These steps cannot be concurrent with future steps
-                     completeRaces :: ![StepInfo]
-                   }
+-- | Information about all discovered races in a simulation categorised as
+-- active and complete races.
+--
+-- See 'normalizeRaces' how we split `StepInfo` into the two categories.
+--
+data Races = Races {
+    -- | These steps may still race with future steps.
+    activeRaces   :: ![StepInfo],
+
+    -- | These steps cannot be concurrent with future steps.
+    completeRaces :: ![StepInfo]
+  }
   deriving Show
 
 noRaces :: Races
