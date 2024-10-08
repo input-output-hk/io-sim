@@ -398,7 +398,24 @@ takeMVarDefault (MVar tv) = mask_ $ do
                 -- takevar; we need to remove it from 'takeq', otherwise we
                 -- will have a space leak.
                 let takeq' = Deque.filter (/= takevar) takeq
-                writeTVar tv (MVarEmpty takeq' readq)
+                takevalue <- readTVar takevar
+                case takevalue of
+                  Nothing ->
+                    writeTVar tv (MVarEmpty takeq' readq)
+                  -- we were given a value before we could read it. Relay it to any
+                  -- new reading threads and possible the next take thread.
+                  Just x -> do
+                    -- notify readers
+                    mapM_ (\readvar -> writeTVar readvar (Just x)) readq
+
+                    -- notify first `takeMVar` thread
+                    case Deque.uncons takeq' of
+                      Nothing ->
+                        writeTVar tv (MVarFull x mempty)
+
+                      Just (takevar', takeq'') -> do
+                        writeTVar takevar' (Just x)
+                        writeTVar tv (MVarEmpty takeq'' mempty)
 
               -- This case is unlikely but possible if another thread ran
               -- first and modified the mvar. This situation is fine as far as

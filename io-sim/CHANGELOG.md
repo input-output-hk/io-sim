@@ -10,6 +10,8 @@
 - Implement `MonadLabelledMVar` instance for `(IOSim s)`
 - `TVarId` is now a sum type with one constructor per `TVar` role, e.g. `TVar`,
   `TMVar`, `MVar` and a few others - except for `TChan`.
+- A blocked `takeTVar` is now safe in the presence of exceptions. It will relay
+  the value to other waiting threads.
 
 ## 1.6.0.0
 
