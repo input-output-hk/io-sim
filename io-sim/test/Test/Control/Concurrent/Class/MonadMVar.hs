@@ -8,6 +8,7 @@ module Test.Control.Concurrent.Class.MonadMVar where
 import Control.Concurrent.Class.MonadMVar
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadTest
 import Control.Monad.Class.MonadTime.SI
 import Control.Monad.Class.MonadTimer.SI
 import Data.Bifoldable (bifoldMap)
@@ -64,6 +65,7 @@ tests =
       [ testCase "empty MVar is empty"    unit_isEmptyMVar_empty_sim
       , testCase "full MVar is not empty" unit_isEmptyMVar_full_sim
       ]
+    , testProperty "takeMVar is exception safe" prop_takeMVar_exception_safe
     ]
 
 
@@ -309,6 +311,29 @@ unit_isEmptyMVar_full_sim :: Assertion
 unit_isEmptyMVar_full_sim =
     assertBool "full mvar must not be empty" $
     runSimOrThrow (prop_isEmptyMVar False)
+
+--
+-- takeMVar is exception safe
+--
+prop_takeMVar_exception_safe :: Property
+prop_takeMVar_exception_safe =
+  exploreSimTrace id (do
+      exploreRaces
+      mv <- newMVar (0 :: Int)
+      t1 <- async $ void $ withMVar mv (\v -> pure (v + 1, ()))
+      t2 <- async $ void $ do
+        _ <- withMVar mv (\v -> pure (v + 1, ()))
+        withMVar mv (\v -> pure (v + 1, ()))
+      t3 <- async $ cancel t1
+      wait t3
+      wait t2
+      wait t1
+  ) (\_ trace ->
+       case traceResult False trace of
+         Left FailureDeadlock{} ->
+           counterexample (ppTrace trace) $ property False
+         _ -> property True
+    )
 
 --
 -- Utils
