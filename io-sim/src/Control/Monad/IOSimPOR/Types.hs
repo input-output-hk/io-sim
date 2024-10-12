@@ -176,6 +176,9 @@ instance Show ScheduleMod where
 -- Steps
 --
 
+-- | A unit of execution.  `deschedule` marks a boundary of a `Step`, see it's
+-- haddocks.
+--
 data Step = Step {
     stepThreadId :: !IOSimThreadId,
     stepStep     :: !Int,

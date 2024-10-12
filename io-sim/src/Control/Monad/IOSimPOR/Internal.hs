@@ -826,6 +826,21 @@ threadInterruptible thread =
         | otherwise              -> False
       MaskedUninterruptible      -> False
 
+
+-- | Deschedule a thread.
+--
+-- A thread is descheduled, which marks a boundary of a `Step` when:
+--
+-- * forking a new thread
+-- * thread termination
+-- * setting the masking state to interruptible
+-- * popping masking frame (which resets masking state)
+-- * starting or cancelling a timeout
+-- * thread delays
+-- * on committed or blocked, but not aborted STM transactions
+-- * on blocking or non-blocking `throwTo`
+-- * unhandled exception in a (non-main) thread
+--
 deschedule :: Deschedule -> Thread s a -> SimState s a -> ST s (SimTrace a)
 
 deschedule Yield thread@Thread { threadId     = tid,
