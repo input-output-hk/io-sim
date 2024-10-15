@@ -26,11 +26,12 @@ module Control.Concurrent.Class.MonadMVar.Strict
   , modifyMVarMasked_
   , modifyMVarMasked
   , tryReadMVar
+  , labelMVar
     -- * Re-exports
   , MonadMVar
   ) where
 
-import Control.Concurrent.Class.MonadMVar (MonadMVar)
+import Control.Concurrent.Class.MonadMVar (MonadLabelledMVar, MonadMVar)
 import Control.Concurrent.Class.MonadMVar qualified as Lazy
 
 --
@@ -61,6 +62,9 @@ toLazyMVar = mvar
 -- is in WHNF. This should be used with caution.
 fromLazyMVar :: Lazy.MVar m a -> StrictMVar m a
 fromLazyMVar = StrictMVar
+
+labelMVar :: MonadLabelledMVar m => StrictMVar m a -> String -> m ()
+labelMVar (StrictMVar m) = Lazy.labelMVar m
 
 newEmptyMVar :: MonadMVar m => m (StrictMVar m a)
 newEmptyMVar = fromLazyMVar <$> Lazy.newEmptyMVar
