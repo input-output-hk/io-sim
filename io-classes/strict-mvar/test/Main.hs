@@ -2,7 +2,6 @@ module Main where
 
 import Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
 
-import Test.QuickCheck.Monadic (monadicIO)
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
@@ -15,21 +14,21 @@ tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict"
         [ testGroup "WHNF"
           [ testGroup "IO"
             [ testProperty "prop_newMVar" $
-                monadicIO .: prop_newMVar
+                ioProperty .: prop_newMVar
             , testProperty "prop_putMVar" $
-                monadicIO .: prop_putMVar
+                ioProperty .: prop_putMVar
             , testProperty "prop_swapMVar" $
-                monadicIO .: prop_swapMVar
+                ioProperty .: prop_swapMVar
             , testProperty "prop_tryPutMVar" $
-                monadicIO .: prop_tryPutMVar
+                ioProperty .: prop_tryPutMVar
             , testProperty "prop_modifyMVar_" $
-                monadicIO .: prop_modifyMVar_
+                ioProperty .: prop_modifyMVar_
             , testProperty "prop_modifyMVar" $
-                monadicIO .: prop_modifyMVar
+                ioProperty .: prop_modifyMVar
             , testProperty "prop_modifyMVarMasked_" $
-                monadicIO .: prop_modifyMVarMasked_
+                ioProperty .: prop_modifyMVarMasked_
             , testProperty "prop_modifyMVarMasked" $
-                monadicIO .: prop_modifyMVarMasked
+                ioProperty .: prop_modifyMVarMasked
             ]
           ]
         ]
