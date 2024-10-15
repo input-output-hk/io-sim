@@ -45,7 +45,7 @@ jobs:
         # we need unpublished `cabal` version to support sublibraries
         cabal-version: 'head'
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       name: Cache cabal store
       with:
         path: ${{ steps.setup-haskell.outputs.cabal-store }}
