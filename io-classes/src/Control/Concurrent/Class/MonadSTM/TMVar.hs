@@ -24,6 +24,8 @@ module Control.Concurrent.Class.MonadSTM.TMVar
     -- * MonadTraceSTM
   , traceTMVar
   , traceTMVarIO
+  , debugTraceTMVar
+  , debugTraceTMVarIO
   ) where
 
 import Control.Monad.Class.MonadSTM.Internal

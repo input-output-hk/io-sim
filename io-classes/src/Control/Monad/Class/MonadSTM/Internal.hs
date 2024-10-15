@@ -99,6 +99,11 @@ module Control.Monad.Class.MonadSTM.Internal
   , isEmptyTChanDefault
   , cloneTChanDefault
   , labelTChanDefault
+    -- * Trace tvar and tmvar
+  , debugTraceTVar
+  , debugTraceTVarIO
+  , debugTraceTMVar
+  , debugTraceTMVarIO
   ) where
 
 import Prelude hiding (read)
@@ -535,6 +540,51 @@ class MonadInspectSTM m
                       -> m ()
   traceTSemIO = \v f -> atomically (traceTSem Proxy v f)
 
+debugTraceTVar :: (MonadTraceSTM m, Show a)
+               => proxy m
+               -> TVar m a
+               -> STM m ()
+debugTraceTVar p tvar =
+  traceTVar p tvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, st')   -> "Created: " <> show st'
+          (Just st', st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
+debugTraceTVarIO :: (MonadTraceSTM m, Show a)
+               => TVar m a
+               -> m ()
+debugTraceTVarIO tvar =
+  traceTVarIO tvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, st')   -> "Created: " <> show st'
+          (Just st', st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
+debugTraceTMVar :: (MonadTraceSTM m, Show a)
+               => proxy m
+               -> TMVar m a
+               -> STM m ()
+debugTraceTMVar p tmvar =
+  traceTMVar p tmvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, Nothing) -> "Created empty"
+          (Nothing, Just st') -> "Created full: " <> show st'
+          (Just Nothing, Just st') -> "Put: " <> show st'
+          (Just Nothing, Nothing) -> "Remains empty"
+          (Just Just{}, Nothing) -> "Take"
+          (Just (Just st'), Just st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
+debugTraceTMVarIO :: (Show a, MonadTraceSTM m)
+                 => TMVar m a
+                 -> m ()
+debugTraceTMVarIO tmvar =
+  traceTMVarIO tmvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, Nothing) -> "Created empty"
+          (Nothing, Just st') -> "Created full: " <> show st'
+          (Just Nothing, Just st') -> "Put: " <> show st'
+          (Just Nothing, Nothing) -> "Remains empty"
+          (Just Just{}, Nothing) -> "Take"
+          (Just (Just st'), Just st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
 
 --
 -- Instance for IO uses the existing STM library implementations
