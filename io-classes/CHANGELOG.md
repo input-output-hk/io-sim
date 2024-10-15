@@ -6,6 +6,7 @@
 
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
+* Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
 
 ### 1.7.0.0
 
