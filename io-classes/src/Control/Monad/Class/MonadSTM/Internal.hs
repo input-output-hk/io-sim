@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE PatternSynonyms            #-}
@@ -99,6 +100,9 @@ module Control.Monad.Class.MonadSTM.Internal
   , isEmptyTChanDefault
   , cloneTChanDefault
   , labelTChanDefault
+  -- * WithTMVar
+  , withTMVar
+  , withTMVarAnd
   ) where
 
 import Prelude hiding (read)
@@ -1257,3 +1261,40 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
 writeTMVar' :: STM.TMVar a -> a -> STM.STM ()
 writeTMVar' t new = STM.tryTakeTMVar t >> STM.putTMVar t new
 #endif
+
+
+-- | Apply @f@ with the content of @tv@ as state, restoring the original value when an
+-- exception occurs
+withTMVar ::
+     (MonadSTM m, MonadThrow.MonadCatch m)
+  => TMVar m a
+  -> (a -> m (c, a))
+  -> m c
+withTMVar tv f = withTMVarAnd tv (const $ pure ()) (\a -> const $ f a)
+
+-- | Apply @f@ with the content of @tv@ as state, restoring the original value
+-- when an exception occurs. Additionally run a @STM@ action when acquiring the
+-- value.
+withTMVarAnd ::
+     (MonadSTM m, MonadThrow.MonadCatch m)
+  => TMVar m a
+  -> (a -> STM m b) -- ^ Additional STM action to run in the same atomically
+                    -- block as the TMVar is acquired
+  -> (a -> b -> m (c, a)) -- ^ Action
+  -> m c
+withTMVarAnd tv guard f =
+  fst . fst <$> MonadThrow.generalBracket
+    (atomically $ do
+        istate <- takeTMVar tv
+        guarded <- guard istate
+        pure (istate, guarded)
+    )
+    (\(origState, _) -> \case
+        MonadThrow.ExitCaseSuccess (_, newState)
+          -> atomically $ putTMVar tv newState
+        MonadThrow.ExitCaseException _
+          -> atomically $ putTMVar tv origState
+        MonadThrow.ExitCaseAbort
+          -> atomically $ putTMVar tv origState
+    )
+    (uncurry f)

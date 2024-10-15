@@ -18,6 +18,8 @@ module Control.Concurrent.Class.MonadSTM.TMVar
   , swapTMVar
   , writeTMVar
   , isEmptyTMVar
+  , withTMVar
+  , withTMVarAnd
     -- * MonadLabelledSTM
   , labelTMVar
   , labelTMVarIO

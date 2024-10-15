@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns       #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE GADTs              #-}
+{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE TypeOperators      #-}
 
 -- | This module corresponds to `Control.Concurrent.STM.TMVar` in "stm" package
@@ -25,18 +26,22 @@ module Control.Concurrent.Class.MonadSTM.Strict.TMVar
   , swapTMVar
   , writeTMVar
   , isEmptyTMVar
+  , withTMVar
+  , withTMVarAnd
     -- * MonadLabelledSTM
   , labelTMVar
   , labelTMVarIO
     -- * MonadTraceSTM
   , traceTMVar
   , traceTMVarIO
+  , traceTMVarShow
+  , traceTMVarShowIO
   ) where
 
 
 import Control.Concurrent.Class.MonadSTM.TMVar qualified as Lazy
 import Control.Monad.Class.MonadSTM hiding (traceTMVar, traceTMVarIO)
-
+import Control.Monad.Class.MonadThrow
 
 type LazyTMVar   m = Lazy.TMVar m
 
@@ -59,11 +64,38 @@ traceTMVar :: MonadTraceSTM m
            -> STM m ()
 traceTMVar p (StrictTMVar var) = Lazy.traceTMVar p var
 
+traceTMVarShow :: (MonadTraceSTM m, Show a)
+               => proxy m
+               -> StrictTMVar m a
+               -> STM m ()
+traceTMVarShow p tmvar =
+  traceTMVar p tmvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, Nothing) -> "Created empty"
+          (Nothing, Just st') -> "Created full: " <> show st'
+          (Just Nothing, Just st') -> "Put: " <> show st'
+          (Just Nothing, Nothing) -> "Remains empty"
+          (Just Just{}, Nothing) -> "Take"
+          (Just (Just st'), Just st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
 traceTMVarIO :: MonadTraceSTM m
              => StrictTMVar m a
              -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
              -> m ()
 traceTMVarIO (StrictTMVar var) = Lazy.traceTMVarIO var
+
+traceTMVarShowIO :: (Show a, MonadTraceSTM m)
+                 => StrictTMVar m a
+                 -> m ()
+traceTMVarShowIO tmvar =
+  traceTMVarIO tmvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, Nothing) -> "Created empty"
+          (Nothing, Just st') -> "Created full: " <> show st'
+          (Just Nothing, Just st') -> "Put: " <> show st'
+          (Just Nothing, Nothing) -> "Remains empty"
+          (Just Just{}, Nothing) -> "Take"
+          (Just (Just st'), Just st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
 
 castStrictTMVar :: LazyTMVar m ~ LazyTMVar n
                 => StrictTMVar m a -> StrictTMVar n a
@@ -107,3 +139,24 @@ writeTMVar (StrictTMVar tmvar) !a = Lazy.writeTMVar tmvar a
 
 isEmptyTMVar :: MonadSTM m => StrictTMVar m a -> STM m Bool
 isEmptyTMVar (StrictTMVar tmvar) = Lazy.isEmptyTMVar tmvar
+
+withTMVar :: (MonadSTM m, MonadCatch m)
+          => StrictTMVar m a
+          -> (a -> m (c, a))
+          -> m c
+withTMVar (StrictTMVar tmvar) f =
+  Lazy.withTMVar tmvar (\x -> do
+                           !(!c, !a) <- f x
+                           pure $! (c, a)
+                       )
+
+withTMVarAnd :: (MonadSTM m, MonadCatch m)
+             => StrictTMVar m a
+             -> (a -> STM m b)
+             -> (a -> b -> m (c, a))
+             -> m c
+withTMVarAnd (StrictTMVar tmvar) f g =
+  Lazy.withTMVarAnd tmvar f (\x y -> do
+                                !(!c, !a) <- g x y
+                                pure $! (c, a)
+                            )

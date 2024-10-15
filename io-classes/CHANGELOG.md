@@ -6,6 +6,7 @@
 
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
+* Added `withTMVar` and `withTMVarAnd` functions.
 
 ### 1.7.0.0
 
