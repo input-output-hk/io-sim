@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE PatternSynonyms            #-}
@@ -99,6 +100,14 @@ module Control.Monad.Class.MonadSTM.Internal
   , isEmptyTChanDefault
   , cloneTChanDefault
   , labelTChanDefault
+  -- * WithTMVar
+  , withTMVar
+  , withTMVarAnd
+  -- * Trace tvar and tmvar
+  , traceTVarShow
+  , traceTVarShowIO
+  , traceTMVarShow
+  , traceTMVarShowIO
   ) where
 
 import Prelude hiding (read)
@@ -535,6 +544,51 @@ class MonadInspectSTM m
                       -> m ()
   traceTSemIO = \v f -> atomically (traceTSem Proxy v f)
 
+traceTVarShow :: (MonadTraceSTM m, Show a)
+               => proxy m
+               -> TVar m a
+               -> STM m ()
+traceTVarShow p tvar =
+  traceTVar p tvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, st') -> "Created: " <> show st'
+          (Just st', st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
+traceTVarShowIO :: (MonadTraceSTM m, Show a)
+               => TVar m a
+               -> m ()
+traceTVarShowIO tvar =
+  traceTVarIO tvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, st') -> "Created: " <> show st'
+          (Just st', st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
+traceTMVarShow :: (MonadTraceSTM m, Show a)
+               => proxy m
+               -> TMVar m a
+               -> STM m ()
+traceTMVarShow p tmvar =
+  traceTMVar p tmvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, Nothing) -> "Created empty"
+          (Nothing, Just st') -> "Created full: " <> show st'
+          (Just Nothing, Just st') -> "Put: " <> show st'
+          (Just Nothing, Nothing) -> "Remains empty"
+          (Just Just{}, Nothing) -> "Take"
+          (Just (Just st'), Just st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
+
+traceTMVarShowIO :: (Show a, MonadTraceSTM m)
+                 => TMVar m a
+                 -> m ()
+traceTMVarShowIO tmvar =
+  traceTMVarIO tmvar (\pv v -> pure $ TraceString $ case (pv, v) of
+          (Nothing, Nothing) -> "Created empty"
+          (Nothing, Just st') -> "Created full: " <> show st'
+          (Just Nothing, Just st') -> "Put: " <> show st'
+          (Just Nothing, Nothing) -> "Remains empty"
+          (Just Just{}, Nothing) -> "Take"
+          (Just (Just st'), Just st'') -> "Modified: " <> show st' <> " -> " <> show st''
+      )
 
 --
 -- Instance for IO uses the existing STM library implementations
@@ -1257,3 +1311,40 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
 writeTMVar' :: STM.TMVar a -> a -> STM.STM ()
 writeTMVar' t new = STM.tryTakeTMVar t >> STM.putTMVar t new
 #endif
+
+
+-- | Apply @f@ with the content of @tv@ as state, restoring the original value when an
+-- exception occurs
+withTMVar ::
+     (MonadSTM m, MonadThrow.MonadCatch m)
+  => TMVar m a
+  -> (a -> m (c, a))
+  -> m c
+withTMVar tv f = withTMVarAnd tv (const $ pure ()) (\a -> const $ f a)
+
+-- | Apply @f@ with the content of @tv@ as state, restoring the original value
+-- when an exception occurs. Additionally run a @STM@ action when acquiring the
+-- value.
+withTMVarAnd ::
+     (MonadSTM m, MonadThrow.MonadCatch m)
+  => TMVar m a
+  -> (a -> STM m b) -- ^ Additional STM action to run in the same atomically
+                    -- block as the TMVar is acquired
+  -> (a -> b -> m (c, a)) -- ^ Action
+  -> m c
+withTMVarAnd tv guard f =
+  fst . fst <$> MonadThrow.generalBracket
+    (atomically $ do
+        istate <- takeTMVar tv
+        guarded <- guard istate
+        pure (istate, guarded)
+    )
+    (\(origState, _) -> \case
+        MonadThrow.ExitCaseSuccess (_, newState)
+          -> atomically $ putTMVar tv newState
+        MonadThrow.ExitCaseException _
+          -> atomically $ putTMVar tv origState
+        MonadThrow.ExitCaseAbort
+          -> atomically $ putTMVar tv origState
+    )
+    (uncurry f)

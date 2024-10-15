@@ -18,12 +18,16 @@ module Control.Concurrent.Class.MonadSTM.TMVar
   , swapTMVar
   , writeTMVar
   , isEmptyTMVar
+  , withTMVar
+  , withTMVarAnd
     -- * MonadLabelledSTM
   , labelTMVar
   , labelTMVarIO
     -- * MonadTraceSTM
   , traceTMVar
   , traceTMVarIO
+  , traceTMVarShow
+  , traceTMVarShowIO
   ) where
 
 import Control.Monad.Class.MonadSTM.Internal
