@@ -236,8 +236,8 @@ data StmA s a where
   LiftSTStm    :: StrictST.ST s a -> (a -> StmA s b) -> StmA s b
   FixStm       :: (x -> STM s x) -> (x -> StmA s r) -> StmA s r
 
--- | `IOSim`'s 'MonadSTM.STM' monad, as 'IOSim' it is parametrised by @s@, e.g.
--- @STMSim s a@ is monadic expression of type @a@.
+-- | `IOSim`'s 'Control.Monad.Class.MonadSTM.Internal.STM' monad, as 'IOSim' it
+-- is parametrised by @s@, e.g. @STMSim s a@ is monadic expression of type @a@.
 --
 type STMSim = STM
 

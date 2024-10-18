@@ -234,7 +234,7 @@ unGetTBQueueDefault (TBQueue queue _size) a = do
 --
 -- /Implementation details:/
 --
--- 'STM' does not guarantee fairness, instead it provide compositionally.
+-- @STM@ does not guarantee fairness, instead it provides compositionally.
 -- Fairness of 'putMVarDefault' and 'takeMVarDefault' is provided by tracking
 -- queue of blocked operation in the 'MVarState', e.g.  when a 'putMVarDefault'
 -- is scheduled on a full 'MVar', the request is put on to the back of the queue
