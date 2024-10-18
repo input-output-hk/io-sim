@@ -31,6 +31,8 @@ module Control.Concurrent.Class.MonadSTM.Strict.TMVar
     -- * MonadTraceSTM
   , traceTMVar
   , traceTMVarIO
+  , debugTraceTMVar
+  , debugTraceTMVarIO
   ) where
 
 
@@ -59,11 +61,22 @@ traceTMVar :: MonadTraceSTM m
            -> STM m ()
 traceTMVar p (StrictTMVar var) = Lazy.traceTMVar p var
 
+debugTraceTMVar :: (MonadTraceSTM m, Show a)
+               => proxy m
+               -> StrictTMVar m a
+               -> STM m ()
+debugTraceTMVar p (StrictTMVar var) = Lazy.debugTraceTMVar p var
+
 traceTMVarIO :: MonadTraceSTM m
              => StrictTMVar m a
              -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
              -> m ()
 traceTMVarIO (StrictTMVar var) = Lazy.traceTMVarIO var
+
+debugTraceTMVarIO :: (MonadTraceSTM m, Show a)
+                 => StrictTMVar m a
+                 -> m ()
+debugTraceTMVarIO (StrictTMVar var) = Lazy.debugTraceTMVarIO var
 
 castStrictTMVar :: LazyTMVar m ~ LazyTMVar n
                 => StrictTMVar m a -> StrictTMVar n a

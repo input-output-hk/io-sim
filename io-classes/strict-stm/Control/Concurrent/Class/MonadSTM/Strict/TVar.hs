@@ -27,6 +27,8 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar
     -- * MonadTraceSTM
   , traceTVar
   , traceTVarIO
+  , debugTraceTVar
+  , debugTraceTVarIO
   ) where
 
 import Control.Concurrent.Class.MonadSTM.TVar qualified as Lazy
@@ -51,11 +53,22 @@ traceTVar :: MonadTraceSTM m
           -> STM m ()
 traceTVar p StrictTVar {tvar} = Lazy.traceTVar p tvar
 
+debugTraceTVar :: (MonadTraceSTM m, Show a)
+              => proxy m
+              -> StrictTVar m a
+              -> STM m ()
+debugTraceTVar p StrictTVar {tvar} = Lazy.debugTraceTVar p tvar
+
 traceTVarIO :: MonadTraceSTM m
             => StrictTVar m a
             -> (Maybe a -> a -> InspectMonad m TraceValue)
             -> m ()
 traceTVarIO StrictTVar {tvar} = Lazy.traceTVarIO tvar
+
+debugTraceTVarIO :: (MonadTraceSTM m, Show a)
+                => StrictTVar m a
+                -> m ()
+debugTraceTVarIO StrictTVar {tvar} = Lazy.debugTraceTVarIO tvar
 
 -- | Cast the monad if both use the same representation of `TVar`s.
 --

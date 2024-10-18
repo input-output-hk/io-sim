@@ -6,6 +6,8 @@
 
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
+* Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
+* Added `debugTraceTVar`, `debugTraceTMVar`, `debugTraceTVarIO`, `debugTraceTMVarIO` for `Show`-based tracing.
 
 ### 1.7.0.0
 
