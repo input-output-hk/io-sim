@@ -1247,6 +1247,17 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     unGetTChan        = lift .: unGetTChan
     isEmptyTChan      = lift .  isEmptyTChan
 
+instance MonadInspectSTM m => MonadInspectSTM (ReaderT r m) where
+  type InspectMonad (ReaderT r m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy :: Proxy m)
+  inspectTMVar _ = inspectTMVar (Proxy :: Proxy m)
+
+instance MonadTraceSTM m => MonadTraceSTM (ReaderT r m) where
+  traceTVar    _ = lift .: traceTVar    Proxy
+  traceTMVar   _ = lift .: traceTMVar   Proxy
+  traceTQueue  _ = lift .: traceTQueue  Proxy
+  traceTBQueue _ = lift .: traceTBQueue Proxy
+  traceTSem    _ = lift .: traceTSem    Proxy
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
 (f .: g) x y = f (g x y)

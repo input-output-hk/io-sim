@@ -7,6 +7,11 @@
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
 
+### Non-breaking changes
+
+* Added monad transformer instances for `MonadInspectSTM` & `MonadTraceSTM`
+  type classes.
+
 ### 1.7.0.0
 
 ### Breaking changes

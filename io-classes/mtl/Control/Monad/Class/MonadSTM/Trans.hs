@@ -5,7 +5,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 -- undecidable instances needed for 'ContTSTM' instances of
@@ -31,6 +33,7 @@ import Control.Monad.Class.MonadThrow qualified as MonadThrow
 import Data.Array.Base (MArray (..))
 import Data.Function (on)
 import Data.Kind (Type)
+import Data.Proxy (Proxy (..))
 
 
 -- | A newtype wrapper for an 'STM' monad for 'ContT'
@@ -161,6 +164,19 @@ instance MonadSTM m => MonadSTM (ContT r m) where
     isEmptyTChan      = ContTSTM .  isEmptyTChan
 
 
+instance MonadInspectSTM m => MonadInspectSTM (ContT r m) where
+  type InspectMonad (ContT r m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance MonadTraceSTM m => MonadTraceSTM (ContT r m) where
+  traceTVar    _ = ContTSTM .: traceTVar    (Proxy @m)
+  traceTMVar   _ = ContTSTM .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = ContTSTM .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = ContTSTM .: traceTBQueue (Proxy @m)
+  traceTSem    _ = ContTSTM .: traceTSem    (Proxy @m)
+
+
 -- | The underlying stm monad is also transformed.
 --
 instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.WriterT w m) where
@@ -237,6 +253,19 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.WriterT w m) where
     writeTChan        = lift .: writeTChan
     unGetTChan        = lift .: unGetTChan
     isEmptyTChan      = lift .  isEmptyTChan
+
+
+instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Lazy.WriterT w m) where
+  type InspectMonad (Lazy.WriterT w m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance (Monoid w, MonadTraceSTM m) => MonadTraceSTM (Lazy.WriterT w m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
 
 
 -- | The underlying stm monad is also transformed.
@@ -317,6 +346,19 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Strict.WriterT w m) where
     isEmptyTChan      = lift .  isEmptyTChan
 
 
+instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Strict.WriterT w m) where
+  type InspectMonad (Strict.WriterT w m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance (Monoid w, MonadTraceSTM m) => MonadTraceSTM (Strict.WriterT w m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
+
+
 -- | The underlying stm monad is also transformed.
 --
 instance MonadSTM m => MonadSTM (Lazy.StateT s m) where
@@ -393,6 +435,19 @@ instance MonadSTM m => MonadSTM (Lazy.StateT s m) where
     writeTChan        = lift .: writeTChan
     unGetTChan        = lift .: unGetTChan
     isEmptyTChan      = lift .  isEmptyTChan
+
+
+instance MonadInspectSTM m => MonadInspectSTM (Lazy.StateT s m) where
+  type InspectMonad (Lazy.StateT s m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance MonadTraceSTM m => MonadTraceSTM (Lazy.StateT s m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
 
 
 -- | The underlying stm monad is also transformed.
@@ -473,6 +528,19 @@ instance MonadSTM m => MonadSTM (Strict.StateT s m) where
     isEmptyTChan      = lift .  isEmptyTChan
 
 
+instance MonadInspectSTM m => MonadInspectSTM (Strict.StateT s m) where
+  type InspectMonad (Strict.StateT s m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance MonadTraceSTM m => MonadTraceSTM (Strict.StateT s m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
+
+
 -- | The underlying stm monad is also transformed.
 --
 instance MonadSTM m => MonadSTM (ExceptT e m) where
@@ -549,6 +617,19 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
     writeTChan        = lift .: writeTChan
     unGetTChan        = lift .: unGetTChan
     isEmptyTChan      = lift .  isEmptyTChan
+
+
+instance MonadInspectSTM m => MonadInspectSTM (ExceptT e m) where
+  type InspectMonad (ExceptT e m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance MonadTraceSTM m => MonadTraceSTM (ExceptT e m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
 
 
 -- | The underlying stm monad is also transformed.
@@ -629,6 +710,19 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.RWST r w s m) where
     isEmptyTChan      = lift .  isEmptyTChan
 
 
+instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Lazy.RWST r w s m) where
+  type InspectMonad (Lazy.RWST r w s m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance (Monoid w, MonadTraceSTM m) => MonadTraceSTM (Lazy.RWST r w s m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
+
+
 -- | The underlying stm monad is also transformed.
 --
 instance (Monoid w, MonadSTM m) => MonadSTM (Strict.RWST r w s m) where
@@ -705,6 +799,19 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Strict.RWST r w s m) where
     writeTChan        = lift .: writeTChan
     unGetTChan        = lift .: unGetTChan
     isEmptyTChan      = lift .  isEmptyTChan
+
+
+instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Strict.RWST r w s m) where
+  type InspectMonad (Strict.RWST r w s m) = InspectMonad m
+  inspectTVar  _ = inspectTVar  (Proxy @m)
+  inspectTMVar _ = inspectTMVar (Proxy @m)
+
+instance (Monoid w, MonadTraceSTM m) => MonadTraceSTM (Strict.RWST r w s m) where
+  traceTVar    _ = lift .: traceTVar    (Proxy @m)
+  traceTMVar   _ = lift .: traceTMVar   (Proxy @m)
+  traceTQueue  _ = lift .: traceTQueue  (Proxy @m)
+  traceTBQueue _ = lift .: traceTBQueue (Proxy @m)
+  traceTSem    _ = lift .: traceTSem    (Proxy @m)
 
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
