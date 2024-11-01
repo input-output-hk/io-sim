@@ -48,17 +48,18 @@ module Control.Monad.IOSim.Internal
 
 import Prelude hiding (read)
 
+import Data.Coerce
 import Data.Deque.Strict (Deque)
 import Data.Deque.Strict qualified as Deque
 import Data.Dynamic
 import Data.Foldable (foldlM, toList, traverse_)
+import Data.IntPSQ (IntPSQ)
+import Data.IntPSQ qualified as PSQ
 import Data.List qualified as List
 import Data.List.Trace qualified as Trace
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
-import Data.OrdPSQ (OrdPSQ)
-import Data.OrdPSQ qualified as PSQ
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Time (UTCTime (..), fromGregorian)
@@ -134,7 +135,7 @@ data TimerCompletionInfo s =
      -- `TimeoutId` (only used to report in a trace).
 
 
-type Timeouts s = OrdPSQ TimeoutId Time (TimerCompletionInfo s)
+type Timeouts s = IntPSQ Time (TimerCompletionInfo s)
 
 -- | Internal state.
 --
@@ -263,7 +264,7 @@ schedule !thread@Thread{
 
       DelayFrame tmid k ctl' -> do
         let thread' = thread { threadControl = ThreadControl k ctl' }
-            timers' = PSQ.delete tmid timers
+            timers' = (PSQ.delete . coerce) tmid timers
         schedule thread' simstate { timers = timers' }
 
     Throw e -> case unwindControlStack e thread timers of
@@ -360,7 +361,7 @@ schedule !thread@Thread{
     StartTimeout d action' k -> do
       !lock <- TMVar <$> execNewTVar (TMVarId nextVid) (Just $! "lock-" ++ show nextTmid) Nothing
       let !expiry    = d `addTime` time
-          !timers'   = PSQ.insert nextTmid expiry (TimerTimeout tid nextTmid lock) timers
+          !timers'   = (PSQ.insert . coerce) nextTmid expiry (TimerTimeout tid nextTmid lock) timers
           !thread'   = thread { threadControl =
                                  ThreadControl action'
                                                (TimeoutFrame nextTmid lock k ctl)
@@ -373,7 +374,7 @@ schedule !thread@Thread{
 
     UnregisterTimeout tmid k -> do
       let thread' = thread { threadControl = ThreadControl k ctl }
-      schedule thread' simstate { timers = PSQ.delete tmid timers }
+      schedule thread' simstate { timers = (PSQ.delete . coerce) tmid timers }
 
     RegisterDelay d k | d < 0 -> do
       !tvar <- execNewTVar (TVarId nextVid)
@@ -391,7 +392,7 @@ schedule !thread@Thread{
                           (Just $! "<<timeout " ++ show (unTimeoutId nextTmid) ++ ">>")
                           False
       let !expiry  = d `addTime` time
-          !timers' = PSQ.insert nextTmid expiry (TimerRegisterDelay tvar) timers
+          !timers' = (PSQ.insert . coerce) nextTmid expiry (TimerRegisterDelay tvar) timers
           !thread' = thread { threadControl = ThreadControl (k tvar) ctl }
       trace <- schedule thread' simstate { timers   = timers'
                                          , nextVid  = succ nextVid
@@ -410,7 +411,7 @@ schedule !thread@Thread{
 
     ThreadDelay d k -> do
       let !expiry  = d `addTime` time
-          !timers' = PSQ.insert nextTmid expiry (TimerThreadDelay tid nextTmid) timers
+          !timers' = (PSQ.insert . coerce) nextTmid expiry (TimerThreadDelay tid nextTmid) timers
           !thread' = thread { threadControl = ThreadControl (Return ()) (DelayFrame nextTmid k ctl) }
       !trace <- deschedule (Blocked BlockedOnDelay) thread' simstate { timers   = timers'
                                                                      , nextTmid = succ nextTmid }
@@ -434,7 +435,7 @@ schedule !thread@Thread{
                            TimeoutPending
       let !expiry  = d `addTime` time
           !t       = Timeout tvar nextTmid
-          !timers' = PSQ.insert nextTmid expiry (Timer tvar) timers
+          !timers' = (PSQ.insert . coerce) nextTmid expiry (Timer tvar) timers
           !thread' = thread { threadControl = ThreadControl (k t) ctl }
       trace <- schedule thread' simstate { timers   = timers'
                                          , nextVid  = succ nextVid
@@ -442,7 +443,7 @@ schedule !thread@Thread{
       return (SimTrace time tid tlbl (EventTimerCreated nextTmid (TVarId nextVid) expiry) trace)
 
     CancelTimeout (Timeout tvar tmid) k -> do
-      let !timers' = PSQ.delete tmid timers
+      let !timers' = (PSQ.delete . coerce) tmid timers
           !thread' = thread { threadControl = ThreadControl k ctl }
       !written <- execAtomically' (runSTM $ writeTVar tvar TimeoutCancelled)
       -- note: we are not running traceTVar on 'tvar', since its not exposed to
@@ -925,8 +926,8 @@ unwindControlStack e thread = \timers ->
   where
     unwind :: forall s' c. MaskingState
            -> ControlStack s' c a
-           -> OrdPSQ TimeoutId Time (TimerCompletionInfo s)
-           -> (Either Bool (Thread s' a), OrdPSQ TimeoutId Time (TimerCompletionInfo s))
+           -> IntPSQ Time (TimerCompletionInfo s)
+           -> (Either Bool (Thread s' a), IntPSQ Time (TimerCompletionInfo s))
     unwind _  MainFrame                 timers = (Left True, timers)
     unwind _  ForkFrame                 timers = (Left False, timers)
     unwind _ (MaskFrame _k maskst' ctl) timers = unwind maskst' ctl timers
@@ -962,13 +963,13 @@ unwindControlStack e thread = \timers ->
           _ -> unwind maskst ctl timers'
       where
         -- Remove the timeout associated with the 'TimeoutFrame'.
-        timers' = PSQ.delete tmid timers
+        timers' = (PSQ.delete . coerce) tmid timers
 
     unwind maskst (DelayFrame tmid _k ctl) timers =
         unwind maskst ctl timers'
       where
         -- Remove the timeout associated with the 'DelayFrame'.
-        timers' = PSQ.delete tmid timers
+        timers' = (PSQ.delete . coerce) tmid timers
 
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState
@@ -976,10 +977,10 @@ unwindControlStack e thread = \timers ->
     atLeastInterruptibleMask ms       = ms
 
 
-removeMinimums :: (Ord k, Ord p)
-               => OrdPSQ k p a
-               -> Maybe ([k], p, [a], OrdPSQ k p a)
-removeMinimums = \psq ->
+removeMinimums :: (Coercible k Int, Ord p)
+               => IntPSQ p a
+               -> Maybe ([k], p, [a], IntPSQ p a)
+removeMinimums = \psq -> coerce $
     case PSQ.minView psq of
       Nothing              -> Nothing
       Just (k, p, x, psq') -> Just (collectAll [k] p [x] psq')
