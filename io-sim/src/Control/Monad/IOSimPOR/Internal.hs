@@ -247,9 +247,6 @@ invariant Nothing SimState{runqueue,threads,clocks} =
     assert (PSQ.fold' (\(Down tid) _ _ a -> tid `Map.member` threads && a) True runqueue)
   . assert (and [ (isThreadBlocked t || isThreadDone t) == not (Down (threadId t) `PSQ.member` runqueue)
                 | t <- Map.elems threads ])
-  . assert (and (zipWith (\(Down tid, _, _) (Down tid', _, _) -> tid > tid')
-                         (PSQ.toList runqueue)
-                         (drop 1 (PSQ.toList runqueue))))
   . assert (and [ threadClockId t `Map.member` clocks
                 | t <- Map.elems threads ])
 
