@@ -12,6 +12,8 @@
   `TMVar`, `MVar` and a few others - except for `TChan`.
 - A blocked `takeTVar` is now safe in the presence of exceptions. It will relay
   the value to other waiting threads.
+- Faster handling of timeouts and timers by using a more efficient
+  internal representation.
 
 ## 1.6.0.0
 
