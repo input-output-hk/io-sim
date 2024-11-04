@@ -43,6 +43,7 @@ import Control.Monad.ST.Lazy
 
 import NoThunks.Class
 
+import Data.Hashable
 import Data.List (intercalate, intersperse)
 import Data.Map (Map)
 import Data.Map qualified as Map
@@ -69,6 +70,8 @@ data IOSimThreadId =
   deriving stock    (Eq, Ord, Show, Generic)
   deriving anyclass NFData
   deriving anyclass NoThunks
+
+instance Hashable IOSimThreadId
 
 ppIOSimThreadId :: IOSimThreadId -> String
 ppIOSimThreadId (RacyThreadId as) = "Thread {"++ intercalate "," (map show as) ++"}"
