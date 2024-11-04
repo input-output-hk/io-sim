@@ -16,6 +16,7 @@
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
 -- and 'reschedule'.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 #if __GLASGOW_HASKELL__ >= 908
 -- We use partial functions from `Data.List`.
 {-# OPTIONS_GHC -Wno-x-partial #-}
@@ -53,16 +54,16 @@ import Prelude hiding (read)
 
 import Data.Dynamic
 import Data.Foldable (foldlM, traverse_)
+import Data.HashPSQ (HashPSQ)
+import Data.HashPSQ qualified as PSQ
+import Data.IntPSQ (IntPSQ)
+import Data.IntPSQ qualified as IPSQ
 import Data.List qualified as List
 import Data.List.Trace qualified as Trace
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (mapMaybe)
 import Data.Ord
-import Data.OrdPSQ (OrdPSQ)
-import Data.OrdPSQ qualified as PSQ
-import Data.IntPSQ (IntPSQ)
-import Data.IntPSQ qualified as IPSQ
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Time (UTCTime (..), fromGregorian)
@@ -87,7 +88,8 @@ import Control.Monad.IOSim.Types hiding (SimEvent (SimEvent), Trace (SimTrace))
 import Control.Monad.IOSim.Types (SimEvent)
 import Control.Monad.IOSimPOR.Timeout (unsafeTimeout)
 import Control.Monad.IOSimPOR.Types
-import Data.Coerce (coerce, Coercible)
+import Data.Coerce (Coercible, coerce)
+import Data.Hashable
 
 --
 -- Simulation interpreter
@@ -181,7 +183,9 @@ data TimerCompletionInfo s =
      -- ^ `timeout` timer run by `IOSimThreadId` which was assigned the given
      -- `TimeoutId` (only used to report in a trace).
 
-type RunQueue   = OrdPSQ (Down IOSimThreadId) (Down IOSimThreadId) ()
+instance Hashable a => Hashable (Down a)
+
+type RunQueue   = HashPSQ (Down IOSimThreadId) (Down IOSimThreadId) ()
 type Timeouts s = IntPSQ Time (TimerCompletionInfo s)
 
 -- | Internal state.
