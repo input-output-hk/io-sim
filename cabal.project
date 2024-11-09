@@ -1,4 +1,4 @@
-index-state: hackage.haskell.org 2024-05-17T03:42:00Z
+index-state: hackage.haskell.org 2024-11-09T08:47:35Z
 
 packages: ./io-sim
           ./io-classes
@@ -11,3 +11,6 @@ package io-classes
 
 package strict-stm
   flags: +asserts
+
+-- ghc-9.12
+allow-newer: splitmix:base, hashable:base
