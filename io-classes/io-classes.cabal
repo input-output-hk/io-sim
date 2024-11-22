@@ -233,6 +233,7 @@ library testlib
   default-extensions:  ImportQualifiedPost
   build-depends:       base              >=4.9 && <4.21,
                        nothunks,
+                       io-classes,
                        QuickCheck,
                        io-classes:strict-mvar
   if flag(asserts)

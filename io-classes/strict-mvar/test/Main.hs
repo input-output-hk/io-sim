@@ -21,6 +21,10 @@ tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict"
                 ioProperty .: prop_swapMVar
             , testProperty "prop_tryPutMVar" $
                 ioProperty .: prop_tryPutMVar
+            , testProperty "prop_withMVar" $
+                ioProperty .: prop_withMVar
+            , testProperty "prop_withMVarMasked" $
+                ioProperty .: prop_withMVarMasked
             , testProperty "prop_modifyMVar_" $
                 ioProperty .: prop_modifyMVar_
             , testProperty "prop_modifyMVar" $

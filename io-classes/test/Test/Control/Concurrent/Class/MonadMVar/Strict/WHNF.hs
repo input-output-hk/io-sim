@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 {-# OPTIONS_GHC -fno-ignore-asserts #-}
 
 -- | Test whether functions on 'StrictMVar's correctly force values to WHNF
@@ -7,6 +9,8 @@ module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
   , prop_putMVar
   , prop_swapMVar
   , prop_tryPutMVar
+  , prop_withMVar
+  , prop_withMVarMasked
   , prop_modifyMVar_
   , prop_modifyMVar
   , prop_modifyMVarMasked_
@@ -15,11 +19,13 @@ module Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
   ) where
 
 import Control.Concurrent.Class.MonadMVar.Strict
-import Control.Exception (assert)
+import Control.Exception (assert, SomeException)
 import Control.Monad (void)
 import Data.Typeable (Typeable)
 import NoThunks.Class (OnlyCheckWhnf (OnlyCheckWhnf), unsafeNoThunks)
 import Test.QuickCheck
+import Control.Monad.Class.MonadThrow (MonadCatch (..), MonadThrow (..))
+import Data.Either (isLeft)
 
 {-------------------------------------------------------------------------------
   Utilities
@@ -81,6 +87,38 @@ prop_tryPutMVar x f = do
     assert b $ pure ()
     isInWHNF v
 
+prop_withMVar ::
+     (MonadMVar m, MonadCatch m)
+  => Int
+  -> Fun Int (Maybe Int)
+  -> m Property
+prop_withMVar x f = do
+    v <-  newMVar x
+    eith <- try @_ @SomeException $
+              withMVar v $ applyFunOrThrow f
+    classifyException eith <$> isInWHNF v
+
+classifyException :: Either SomeException a -> (Property -> Property)
+classifyException eith = classify (isLeft eith) "exception"
+
+applyFunOrThrow :: (MonadCatch m, Show a) => Fun a (Maybe a) -> a -> m a
+applyFunOrThrow f x =
+    case applyFun f x of
+      Nothing -> throwIO $ userError $
+        "applyFunOrThrow: " <> show f <> " " <> show x
+      Just y -> pure y
+
+prop_withMVarMasked ::
+     (MonadMVar m, MonadCatch m)
+  => Int
+  -> Fun Int (Maybe Int)
+  -> m Property
+prop_withMVarMasked x f = do
+    v <-  newMVar x
+    eith <- try @_ @SomeException $
+              withMVarMasked v $ applyFunOrThrow f
+    classifyException eith <$> isInWHNF v
+
 prop_modifyMVar_ ::
      MonadMVar m
   => Int
@@ -101,6 +139,7 @@ prop_modifyMVar x f = do
     void $ modifyMVar v (pure . applyFun f)
     isInWHNF v
 
+{-# SPECIALISE prop_modifyMVarMasked_ :: Int -> Fun Int Int -> IO Property #-}
 prop_modifyMVarMasked_ ::
      MonadMVar m
   => Int
