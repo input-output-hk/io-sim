@@ -23,6 +23,7 @@
   is more general.  These functions now accepts trace with any result, rather
   than one that finishes with `SimResult`.
 - More polymorphic `ppTrace_` type signature.
+- Fixed `tryReadTBQueue` when returning `Nothing`.
 
 ## 1.6.0.0
 
