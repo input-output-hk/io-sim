@@ -1,5 +1,9 @@
 # Revision history of io-sim
 
+## Next release
+
+- Fixed `tryReadTBQueue` when returning `Nothing`.
+
 ## 1.5.1.0
 
 - The signature of:

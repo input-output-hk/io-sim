@@ -149,9 +149,7 @@ tryReadTBQueueDefault (TBQueue queue _size) = do
       return (Just x)
     [] ->
       case reverse ys of
-        [] -> do
-          writeTVar queue $! (xs, r', ys, w)
-          return Nothing
+        [] -> return Nothing
 
         -- NB. lazy: we want the transaction to be
         -- short, otherwise it will conflict
