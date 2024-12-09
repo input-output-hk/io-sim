@@ -1,5 +1,16 @@
 # Revision history of io-sim
 
+## 1.5.1.0
+
+- The signature of:
+  - `selectTraceEvents'`,
+  - `selectTraceEventsDynamic'`,
+  - `selectTraceEventsDynamicWithTime'`,
+  - `selectTraceEventsSay'` and
+  - `selectTraceEventsSayWithTime'`
+  is more general.  These functions now accepts trace with any result, rather
+  than one that finishes with `SimResult`.
+
 ## 1.5.0.0
 
 ### Breaking changes

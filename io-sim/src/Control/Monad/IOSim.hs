@@ -144,11 +144,12 @@ selectTraceEvents fn =
     . traceSelectTraceEvents fn
 
 -- | Like 'selectTraceEvents', but it returns even if the simulation trace ends
--- with 'Failure'.
+-- with 'Failure'.  It also works with any return type, not only `SimResult`
+-- like `selectTraceEvents` does.
 --
 selectTraceEvents'
     :: (Time ->  SimEventType -> Maybe b)
-    -> SimTrace a
+    -> Trace a SimEvent
     -> [b]
 selectTraceEvents' fn =
       bifoldr ( \ _ _   -> []  )
@@ -225,20 +226,22 @@ selectTraceEventsDynamicWithTime = selectTraceEvents fn
     fn t (EventLog dyn) = (t,) <$> fromDynamic dyn
     fn _ _              = Nothing
 
--- | Like 'selectTraceEventsDynamic' but it returns even if the simulation trace
--- ends with 'Failure'.
+-- | Like 'selectTraceEventsDynamic' but it returns even if the simulation
+-- trace ends with 'Failure'.  It also works with any return type, not only
+-- `SimResult` like `selectTraceEventsDynamic` does.
 --
-selectTraceEventsDynamic' :: forall a b. Typeable b => SimTrace a -> [b]
+selectTraceEventsDynamic' :: forall a b. Typeable b => Trace a SimEvent -> [b]
 selectTraceEventsDynamic' = selectTraceEvents' fn
   where
     fn :: Time -> SimEventType -> Maybe b
     fn _ (EventLog dyn) = fromDynamic dyn
     fn _ _              = Nothing
 
--- | Like `selectTraceEventsDynamic'` but it also captures time of the trace
--- event.
+-- | Like `selectTraceEventsDynamicWithTime'` but it also captures time of the
+-- trace event.  It also works with any return type, not only `SimResult` like
+-- `selectTraceEventsDynamicWithTime` does.
 --
-selectTraceEventsDynamicWithTime' :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
+selectTraceEventsDynamicWithTime' :: forall a b. Typeable b => Trace a SimEvent -> [(Time, b)]
 selectTraceEventsDynamicWithTime' = selectTraceEvents' fn
   where
     fn :: Time -> SimEventType -> Maybe (Time, b)
@@ -266,9 +269,10 @@ selectTraceEventsSayWithTime = selectTraceEvents fn
     fn _ _            = Nothing
 
 -- | Like 'selectTraceEventsSay' but it returns even if the simulation trace
--- ends with 'Failure'.
+-- ends with 'Failure'.  It also works with any return type, not only `SimResult`
+-- like `selectTraceEventsSay` does.
 --
-selectTraceEventsSay' :: SimTrace a -> [String]
+selectTraceEventsSay' :: Trace a SimEvent -> [String]
 selectTraceEventsSay' = selectTraceEvents' fn
   where
     fn :: Time -> SimEventType -> Maybe String
@@ -277,7 +281,7 @@ selectTraceEventsSay' = selectTraceEvents' fn
 
 -- | Like `selectTraceEventsSay'` but it also captures time of the trace event.
 --
-selectTraceEventsSayWithTime' :: SimTrace a -> [(Time, String)]
+selectTraceEventsSayWithTime' :: Trace a SimEvent -> [(Time, String)]
 selectTraceEventsSayWithTime' = selectTraceEvents' fn
   where
     fn :: Time -> SimEventType -> Maybe (Time, String)
