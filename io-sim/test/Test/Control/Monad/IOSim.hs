@@ -192,6 +192,10 @@ tests =
       , testProperty "maintains FIFO order IO" prop_flushTBQueueOrder_IO
       , testProperty "maintains FIFO order IOSim" prop_flushTBQueueOrder_IOSim
       ]
+    , testGroup "tryReadTBQueue"
+      [ testProperty "works correctly when the queue is empty IO" prop_tryReadEmptyTBQueue_IO
+      , testProperty "works correctly when the queue is empty IOSim" prop_tryReadEmptyTBQueue_IOSim
+      ]
     ]
   ]
 
@@ -1463,6 +1467,24 @@ writeAndFlushTBQueue entries =
     q <- newTBQueue (1 + fromIntegral (length entries))
     forM_ entries $ writeTBQueue q
     flushTBQueue q
+
+prop_tryReadEmptyTBQueue_IO :: Bool -> Property
+prop_tryReadEmptyTBQueue_IO sndRead =
+  ioProperty $ tryReadEmptyTBQueue sndRead
+
+prop_tryReadEmptyTBQueue_IOSim :: Bool -> Property
+prop_tryReadEmptyTBQueue_IOSim sndRead =
+  runSimOrThrow $ tryReadEmptyTBQueue sndRead
+
+tryReadEmptyTBQueue :: MonadSTM m => Bool -> m Property
+tryReadEmptyTBQueue sndRead = atomically $ do
+  q <- newTBQueue 10
+  _ <- tryReadTBQueue q
+  writeTBQueue q ()
+  when sndRead $ void $ tryReadTBQueue q
+  l <- lengthTBQueue q
+
+  pure $ l === if sndRead then 0 else 1
 
 --
 -- Utils

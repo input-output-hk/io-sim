@@ -22,6 +22,7 @@
   - `selectTraceEventsSayWithTime'`
   is more general.  These functions now accepts trace with any result, rather
   than one that finishes with `SimResult`.
+- Fixed `tryReadTBQueue` when returning `Nothing`.
 
 ## 1.6.0.0
 
