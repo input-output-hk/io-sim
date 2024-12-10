@@ -14,6 +14,14 @@
   the value to other waiting threads.
 - Faster handling of timeouts and timers by using a more efficient
   internal representation.
+- The signature of:
+  - `selectTraceEvents'`,
+  - `selectTraceEventsDynamic'`,
+  - `selectTraceEventsDynamicWithTime'`,
+  - `selectTraceEventsSay'` and
+  - `selectTraceEventsSayWithTime'`
+  is more general.  These functions now accepts trace with any result, rather
+  than one that finishes with `SimResult`.
 
 ## 1.6.0.0
 
