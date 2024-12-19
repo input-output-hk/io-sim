@@ -42,6 +42,7 @@ module Control.Monad.IOSim
   , unshareClock
     -- * Simulation trace
   , type SimTrace
+  , Time (..)
   , Trace (Cons, Nil, SimTrace, SimPORTrace, TraceDeadlock, TraceLoop, TraceMainReturn, TraceMainException, TraceRacesFound, TraceInternalError)
   , traceEvents
   , traceResult
