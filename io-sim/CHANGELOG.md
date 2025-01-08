@@ -22,6 +22,7 @@
   - `selectTraceEventsSayWithTime'`
   is more general.  These functions now accepts trace with any result, rather
   than one that finishes with `SimResult`.
+- More polymorphic `ppTrace_` type signature.
 
 ## 1.6.0.0
 

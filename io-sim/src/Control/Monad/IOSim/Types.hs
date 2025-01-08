@@ -938,7 +938,7 @@ ppTrace tr = Trace.ppTrace
 
 -- | Like 'ppTrace' but does not show the result value.
 --
-ppTrace_ :: SimTrace a -> String
+ppTrace_ :: Trace.Trace a SimEvent -> String
 ppTrace_ tr = Trace.ppTrace
                 (const "")
                 (ppSimEvent timeWidth tidWidth labelWidth)
