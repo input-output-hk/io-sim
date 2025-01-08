@@ -54,9 +54,7 @@ instance ( MonadSTM m, MArray e a (STM m) ) => MArray e a (ContTSTM r m) where
     getNumElements    = ContTSTM . getNumElements
     unsafeRead arr    = ContTSTM . unsafeRead arr
     unsafeWrite arr i = ContTSTM . unsafeWrite arr i
-#if __GLASGOW_HASKELL__ >= 910
     newArray idxs     = ContTSTM . newArray idxs
-#endif
 
 
 -- note: this (and the following) instance requires 'UndecidableInstances'
