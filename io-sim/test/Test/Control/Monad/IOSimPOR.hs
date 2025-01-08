@@ -434,15 +434,31 @@ doit n = do
   threadDelay 1
   readTVarIO r
 
-
-traceNoDuplicates :: (Testable prop1, Show a1) => ((a1 -> a2 -> a2) -> prop1) -> Property
-traceNoDuplicates k = r `pseq` (k addTrace .&&. maximum (traceCounts ()) == 1)
+traceNoDuplicates :: forall a b.
+                     (Show a)
+                  => ((a -> b -> b) -> Property)
+                  -> Property
+-- this NOINLINE pragma is useful for debugging if `r` didn't flow outside of
+-- `traceNoDuplicate`.
+{-# NOINLINE traceNoDuplicates #-}
+traceNoDuplicates k = unsafePerformIO $ do
+    r <- newIORef (Map.empty :: Map String Int)
+    return $ r `pseq`
+             (k (addTrace r) .&&. counterexample "trace counts" (maximum (Map.elems (traceCounts r)) === 1))
   where
-    r = unsafePerformIO $ newIORef (Map.empty :: Map String Int)
-    addTrace t x = unsafePerformIO $ do
-      atomicModifyIORef r (\m->(Map.insertWith (+) (show t) 1 m,()))
+    addTrace :: IORef (Map String Int) -> a -> b -> b
+    addTrace r t x = unsafePerformIO $ do
+      let s = show t
+      atomicModifyIORef r
+        (\m->
+          let m' = Map.insertWith (+) s 1 m
+          in (m', ())
+        )
       return x
-    traceCounts () = unsafePerformIO $ Map.elems <$> readIORef r
+
+    traceCounts :: IORef (Map String Int) -> Map String Int
+    traceCounts r = unsafePerformIO $ readIORef r
+
 
 -- | Checks that IOSimPOR is capable of analysing an infinite simulation
 -- lazily.
