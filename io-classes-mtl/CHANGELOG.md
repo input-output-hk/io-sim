@@ -1,5 +1,12 @@
 # Revision history for io-classes-mtl
 
+## 0.1.2.1
+
+### Non breaking changes
+
+* Added `newArray` to `MArray ContTSTM` instance  (all GHC versions `9.10` were
+  affected).
+
 ## 0.1.2.0
 
 ### Non breaking changes

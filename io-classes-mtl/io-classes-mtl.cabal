@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               io-classes-mtl
-version:            0.1.2.0
+version:            0.1.2.1
 synopsis:           Experimental MTL instances for io-classes
 description:
     MTL instances for
