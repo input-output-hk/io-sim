@@ -31,8 +31,8 @@ description:
 
 license:             Apache-2.0
 license-files:       LICENSE NOTICE
-copyright:           2019-2024 Input Output Global Inc (IOG)
-author:              Alexander Vieth, Duncan Coutts, Marcin Szamotulski, Thomas Winant
+copyright:           2019-2025 Input Output Global Inc (IOG)
+author:              Alexander Vieth, Duncan Coutts, Marcin Szamotulski, Neil Davies, Thomas Winant
 maintainer:          Duncan Coutts duncan@well-typed.com, Marcin Szamotulski coot@coot.me
 category:            Control
 build-type:          Simple
