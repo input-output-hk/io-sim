@@ -1030,7 +1030,6 @@ unGetTBQueueDefault (TBQueue rsize read wsize _write _size) a = do
 -- | Default implementation of 'TArray'.
 --
 data TArrayDefault m i e = TArray (Array i (TVar m e))
-  deriving Typeable
 
 deriving instance (Eq (TVar m e), Ix i) => Eq (TArrayDefault m i e)
 
