@@ -24,6 +24,7 @@
   than one that finishes with `SimResult`.
 - More polymorphic `ppTrace_` type signature.
 - Fixed `tryReadTBQueue` when returning `Nothing`.
+- Support ghc 9.12
 
 ## 1.6.0.0
 
