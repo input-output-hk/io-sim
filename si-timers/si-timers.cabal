@@ -53,7 +53,7 @@ library
                        NumericUnderscores,
                        ScopedTypeVariables,
                        TypeFamilies
-  build-depends:       base              >=4.9 && <4.21,
+  build-depends:       base              >=4.9 && <4.22,
                        deepseq,
                        mtl,
                        nothunks,
