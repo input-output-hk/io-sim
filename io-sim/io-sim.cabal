@@ -75,7 +75,7 @@ library
                        RankNTypes,
                        ScopedTypeVariables,
                        TypeFamilies
-  build-depends:       base              >=4.9 && <4.21,
+  build-depends:       base              >=4.9 && <4.22,
                        io-classes       ^>=1.5,
                        exceptions        >=0.10,
                        containers,
