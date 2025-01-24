@@ -11,6 +11,8 @@
 -- MonadAsync's ReaderT instance is undecidable.
 {-# LANGUAGE UndecidableInstances   #-}
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 -- | <https://hackage.haskell.org/package/async async> API compatible with both
 -- 'IO' and <https://hackage.haskell.org/package/io-sim IOSim>.
 --
@@ -55,6 +57,7 @@ import Data.Bifunctor (first)
 import Data.Foldable (fold)
 import Data.Functor (void)
 import Data.Kind (Type)
+import GHC.Stack
 
 class ( MonadSTM m
       , MonadThread m
@@ -69,19 +72,19 @@ class ( MonadSTM m
   type Async m          = (async :: Type -> Type) | async -> m
 
   -- | See 'Async.async'.
-  async                 :: m a -> m (Async m a)
+  async                 :: HasCallStack => m a -> m (Async m a)
   -- | See 'Async.asyncBound'.
-  asyncBound            :: m a -> m (Async m a)
+  asyncBound            :: HasCallStack => m a -> m (Async m a)
   -- | See 'Async.asyncOn'.
-  asyncOn               :: Int -> m a -> m (Async m a)
+  asyncOn               :: HasCallStack => Int -> m a -> m (Async m a)
   -- | See 'Async.asyncThreadId'.
   asyncThreadId         :: Async m a -> ThreadId m
   -- | See 'Async.withAsync'.
-  withAsync             :: m a -> (Async m a -> m b) -> m b
+  withAsync             :: HasCallStack => m a -> (Async m a -> m b) -> m b
   -- | See 'Async.withAsyncBound'.
-  withAsyncBound        :: m a -> (Async m a -> m b) -> m b
+  withAsyncBound        :: HasCallStack => m a -> (Async m a -> m b) -> m b
   -- | See 'Async.withAsyncOn'.
-  withAsyncOn           :: Int -> m a -> (Async m a -> m b) -> m b
+  withAsyncOn           :: HasCallStack => Int -> m a -> (Async m a -> m b) -> m b
 
   -- | See 'Async.waitSTM'.
   waitSTM               :: Async m a -> STM m a
@@ -185,22 +188,22 @@ class ( MonadSTM m
   waitBoth              :: Async m a -> Async m b -> m (a, b)
 
   -- | See 'Async.race'.
-  race                  :: m a -> m b -> m (Either a b)
+  race                  :: HasCallStack => m a -> m b -> m (Either a b)
   -- | See 'Async.race_'.
-  race_                 :: m a -> m b -> m ()
+  race_                 :: HasCallStack => m a -> m b -> m ()
   -- | See 'Async.concurrently'.
-  concurrently          :: m a -> m b -> m (a,b)
+  concurrently          :: HasCallStack => m a -> m b -> m (a,b)
   -- | See 'Async.concurrently_'.
-  concurrently_         :: m a -> m b -> m ()
+  concurrently_         :: HasCallStack => m a -> m b -> m ()
 
   -- | See 'Async.concurrently_'.
-  asyncWithUnmask       :: ((forall b . m b -> m b) ->  m a) -> m (Async m a)
+  asyncWithUnmask       :: HasCallStack => ((forall b . m b -> m b) ->  m a) -> m (Async m a)
   -- | See 'Async.asyncOnWithUnmask'.
-  asyncOnWithUnmask     :: Int -> ((forall b . m b -> m b) ->  m a) -> m (Async m a)
+  asyncOnWithUnmask     :: HasCallStack => Int -> ((forall b . m b -> m b) ->  m a) -> m (Async m a)
   -- | See 'Async.withAsyncWithUnmask'.
-  withAsyncWithUnmask   :: ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
+  withAsyncWithUnmask   :: HasCallStack => ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
   -- | See 'Async.withAsyncOnWithUnmask'.
-  withAsyncOnWithUnmask :: Int -> ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
+  withAsyncOnWithUnmask :: HasCallStack => Int -> ((forall c. m c -> m c) ->  m a) -> (Async m a -> m b) -> m b
 
   -- | See 'Async.compareAsyncs'.
   compareAsyncs         :: Async m a -> Async m b -> Ordering

@@ -1,6 +1,7 @@
 cabal-version:       3.0
 name:                io-classes
 version:             1.5.0.0
+x-revision: 1
 synopsis:            Type classes for concurrency with STM, ST and timing
 description:
   IO Monad class hierarchy compatible with
@@ -99,7 +100,7 @@ library
                        bytestring,
                        mtl   >=2.2 && <2.4,
                        primitive >= 0.7 && <0.11,
-                       stm   >=2.5 && <2.6,
+                       stm   >=2.5 && <2.5.2 || >=2.5.3 && <2.6,
                        time  >=1.9.1 && <1.13
   if impl(ghc >= 9.10)
     build-depends:     ghc-internal
