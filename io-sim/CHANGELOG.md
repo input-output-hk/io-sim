@@ -25,6 +25,7 @@
 - More polymorphic `ppTrace_` type signature.
 - Fixed `tryReadTBQueue` when returning `Nothing`.
 - Support ghc 9.12
+- Export `Time` from `Control.Monad.IOSim`.
 
 ## 1.6.0.0
 
