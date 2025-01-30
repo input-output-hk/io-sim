@@ -2,6 +2,8 @@
 
 ### next version
 
+* Support ghc-9.12
+
 ### Breaking changes
 
 * Added `threadLabel` to `MonadThread`

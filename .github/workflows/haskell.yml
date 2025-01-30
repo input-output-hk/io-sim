@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10", "9.2", "9.4", "9.6", "9.8", "9.10"]
+        ghc: ["8.10", "9.2", "9.4", "9.6", "9.8", "9.10", "9.12"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     defaults:
@@ -32,9 +32,9 @@ jobs:
     - name: Install LLVM (macOS)
       if: runner.os == 'macOS' && matrix.ghc == '8.10'
       run: |
-        brew install llvm@13
-        echo "LLVM_CONFIG=$(brew --prefix llvm@13)/bin/llvm-config" >> $GITHUB_ENV
-        echo "$(brew --prefix llvm@13)/bin" >> $GITHUB_PATH
+        brew install llvm@14
+        echo "LLVM_CONFIG=$(brew --prefix llvm@14)/bin/llvm-config" >> $GITHUB_ENV
+        echo "$(brew --prefix llvm@14)/bin" >> $GITHUB_PATH
 
     - name: Verify LLVM installation
       if: runner.os == 'macOS' && matrix.ghc == '8.10'
