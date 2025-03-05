@@ -60,9 +60,9 @@ module Control.Monad.IOSim.Types
   , ppDebug
   , module Control.Monad.IOSim.CommonTypes
   , Thrower (..)
-  , Time (..)
-  , addTime
-  , diffTime
+  , SI.Time (..)
+  , SI.addTime
+  , SI.diffTime
     -- * Internal API
   , Timeout (..)
   , newTimeout
@@ -97,7 +97,8 @@ import Control.Monad.Class.MonadTest
 import Control.Monad.Class.MonadThrow as MonadThrow hiding (getMaskingState)
 import Control.Monad.Class.MonadThrow qualified as MonadThrow
 import Control.Monad.Class.MonadTime
-import Control.Monad.Class.MonadTime.SI
+import Control.Monad.Class.MonadTime.SI (DiffTime)
+import Control.Monad.Class.MonadTime.SI qualified as SI
 import Control.Monad.Class.MonadTimer
 import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 import Control.Monad.Class.MonadTimer.SI qualified as SI
@@ -167,7 +168,7 @@ data SimA s a where
 
   LiftST       :: StrictST.ST s a -> (a -> SimA s b) -> SimA s b
 
-  GetMonoTime  :: (Time    -> SimA s b) -> SimA s b
+  GetMonoTime  :: (SI.Time    -> SimA s b) -> SimA s b
   GetWallTime  :: (UTCTime -> SimA s b) -> SimA s b
   SetWallTime  ::  UTCTime -> SimA s b  -> SimA s b
   UnshareClock :: SimA s b -> SimA s b
@@ -479,6 +480,7 @@ instance MonadFork (IOSim s) where
                        forkIO $ try (restore task) >>= k
   throwTo tid e      = IOSim $ oneShot $ \k -> ThrowTo (toException e) tid (k ())
   yield              = IOSim $ oneShot $ \k -> YieldSim (k ())
+  getNumCapabilities = return 1
 
 instance MonadTest (IOSim s) where
   exploreRaces       = IOSim $ oneShot $ \k -> ExploreRaces (k ())
@@ -672,10 +674,10 @@ instance MonadMonotonicTimeNSec (IOSim s) where
   getMonotonicTimeNSec = IOSim $ oneShot $ \k -> GetMonoTime (k . conv)
     where
       -- convert time in picoseconds to nanoseconds
-      conv :: Time -> Word64
-      conv (Time d) = fromIntegral (diffTimeToPicoseconds d `div` 1_000)
+      conv :: SI.Time -> Word64
+      conv (SI.Time d) = fromIntegral (diffTimeToPicoseconds d `div` 1_000)
 
-instance MonadMonotonicTime (IOSim s) where
+instance SI.MonadMonotonicTime (IOSim s) where
   getMonotonicTime = IOSim $ oneShot $ \k -> GetMonoTime k
 
 instance MonadTime (IOSim s) where
@@ -788,14 +790,14 @@ instance MonadEventlog (IOSim s) where
 data SimEvent
     -- | Used when using `IOSim`.
   = SimEvent {
-      seTime        :: !Time,
+      seTime        :: !SI.Time,
       seThreadId    :: !IOSimThreadId,
       seThreadLabel :: !(Maybe ThreadLabel),
       seType        :: !SimEventType
     }
     -- | Only used for /IOSimPOR/
   | SimPOREvent {
-      seTime        :: !Time,
+      seTime        :: !SI.Time,
       seThreadId    :: !IOSimThreadId,
       seStep        :: !Int,
       seThreadLabel :: !(Maybe ThreadLabel),
@@ -815,7 +817,7 @@ ppSimEvent :: Int -- ^ width of the time
            -> SimEvent
            -> String
 
-ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime = Time time, seThreadId, seThreadLabel, seType} =
+ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime = SI.Time time, seThreadId, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
            timeWidth
            (show time)
@@ -825,7 +827,7 @@ ppSimEvent timeWidth tidWidth tLabelWidth SimEvent {seTime = Time time, seThread
            (fromMaybe "" seThreadLabel)
            (ppSimEventType seType)
 
-ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime = Time time, seThreadId, seStep, seThreadLabel, seType} =
+ppSimEvent timeWidth tidWidth tLableWidth SimPOREvent {seTime = SI.Time time, seThreadId, seStep, seThreadLabel, seType} =
     printf "%-*s - %-*s %-*s - %s"
            timeWidth
            (show time)
@@ -841,11 +843,11 @@ ppSimEvent _ _ _ (SimRacesFound controls) =
 
 -- | A result type of a simulation.
 data SimResult a
-    = MainReturn    !Time !(Labelled IOSimThreadId) a ![Labelled IOSimThreadId]
+    = MainReturn    !SI.Time !(Labelled IOSimThreadId) a ![Labelled IOSimThreadId]
     -- ^ Return value of the main thread.
-    | MainException !Time !(Labelled IOSimThreadId) SomeException ![Labelled IOSimThreadId]
+    | MainException !SI.Time !(Labelled IOSimThreadId) SomeException ![Labelled IOSimThreadId]
     -- ^ Exception thrown by the main thread.
-    | Deadlock      !Time ![Labelled IOSimThreadId]
+    | Deadlock      !SI.Time ![Labelled IOSimThreadId]
     -- ^ Deadlock discovered in the simulation.  Deadlocks are discovered if
     -- simply the simulation cannot do any progress in a given time slot and
     -- there's no event which would advance the time.
@@ -863,7 +865,7 @@ ppSimResult :: Show a
             -> SimResult a
             -> String
 ppSimResult timeWidth tidWidth thLabelWidth r = case r of
-    MainReturn (Time time) tid a tids ->
+    MainReturn (SI.Time time) tid a tids ->
       printf "%-*s - %-*s %-*s - %s %s"
              timeWidth
              (show time)
@@ -873,7 +875,7 @@ ppSimResult timeWidth tidWidth thLabelWidth r = case r of
              (fromMaybe "" $ l_label tid)
              ("MainReturn " ++ show a)
              ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
-    MainException (Time time) tid e tids ->
+    MainException (SI.Time time) tid e tids ->
       printf "%-*s - %-*s %-*s - %s %s"
              timeWidth
              (show time)
@@ -883,7 +885,7 @@ ppSimResult timeWidth tidWidth thLabelWidth r = case r of
              (fromMaybe "" $ l_label tid)
              ("MainException " ++ show e)
              ("[" ++ intercalate "," (ppLabelled ppIOSimThreadId `map` tids) ++ "]")
-    Deadlock (Time time) tids ->
+    Deadlock (SI.Time time) tids ->
       printf "%-*s - %-*s %-*s - %s %s"
              timeWidth
              (show time)
@@ -920,12 +922,12 @@ ppTrace tr = Trace.ppTrace
         bimaximum
       . bimap (const (Max 0, Max 0, Max 0))
               (\a -> case a of
-                SimEvent {seTime = Time time, seThreadId, seThreadLabel} ->
+                SimEvent {seTime = SI.Time time, seThreadId, seThreadLabel} ->
                   ( Max (length (show time))
                   , Max (length (show (seThreadId)))
                   , Max (length seThreadLabel)
                   )
-                SimPOREvent {seTime = Time time, seThreadId, seThreadLabel} ->
+                SimPOREvent {seTime = SI.Time time, seThreadId, seThreadLabel} ->
                   ( Max (length (show time))
                   , Max (length (show (seThreadId)))
                   , Max (length seThreadLabel)
@@ -974,13 +976,13 @@ ppDebug = appEndo
         . Trace.toList
 
 
-pattern SimTrace :: Time -> IOSimThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
+pattern SimTrace :: SI.Time -> IOSimThreadId -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                  -> SimTrace a
 pattern SimTrace time threadId threadLabel traceEvent trace =
     Trace.Cons (SimEvent time threadId threadLabel traceEvent)
                trace
 
-pattern SimPORTrace :: Time -> IOSimThreadId -> Int -> Maybe ThreadLabel -> SimEventType -> SimTrace a
+pattern SimPORTrace :: SI.Time -> IOSimThreadId -> Int -> Maybe ThreadLabel -> SimEventType -> SimTrace a
                     -> SimTrace a
 pattern SimPORTrace time threadId step threadLabel traceEvent trace =
     Trace.Cons (SimPOREvent time threadId step threadLabel traceEvent)
@@ -992,15 +994,15 @@ pattern TraceRacesFound controls trace =
     Trace.Cons (SimRacesFound controls)
                trace
 
-pattern TraceMainReturn :: Time -> Labelled IOSimThreadId -> a -> [Labelled IOSimThreadId]
+pattern TraceMainReturn :: SI.Time -> Labelled IOSimThreadId -> a -> [Labelled IOSimThreadId]
                         -> SimTrace a
 pattern TraceMainReturn time tid a threads = Trace.Nil (MainReturn time tid a threads)
 
-pattern TraceMainException :: Time -> Labelled IOSimThreadId -> SomeException -> [Labelled IOSimThreadId]
+pattern TraceMainException :: SI.Time -> Labelled IOSimThreadId -> SomeException -> [Labelled IOSimThreadId]
                            -> SimTrace a
 pattern TraceMainException time tid err threads = Trace.Nil (MainException time tid err threads)
 
-pattern TraceDeadlock :: Time -> [Labelled IOSimThreadId]
+pattern TraceDeadlock :: SI.Time -> [Labelled IOSimThreadId]
                       -> SimTrace a
 pattern TraceDeadlock time threads = Trace.Nil (Deadlock time threads)
 
@@ -1066,22 +1068,22 @@ data SimEventType
   -- Timeouts, Timers & Delays
   --
 
-  | EventThreadDelay        TimeoutId Time
+  | EventThreadDelay        TimeoutId SI.Time
   -- ^ thread delayed
   | EventThreadDelayFired   TimeoutId
   -- ^ thread woken up after a delay
 
-  | EventTimeoutCreated        TimeoutId IOSimThreadId Time
+  | EventTimeoutCreated        TimeoutId IOSimThreadId SI.Time
   -- ^ new timeout created (via `timeout`)
   | EventTimeoutFired          TimeoutId
   -- ^ timeout fired
 
-  | EventRegisterDelayCreated TimeoutId TVarId Time
+  | EventRegisterDelayCreated TimeoutId TVarId SI.Time
   -- ^ registered delay (via `registerDelay`)
   | EventRegisterDelayFired TimeoutId
   -- ^ registered delay fired
 
-  | EventTimerCreated         TimeoutId TVarId Time
+  | EventTimerCreated         TimeoutId TVarId SI.Time
   -- ^ a new 'Timeout' created (via `newTimeout`)
   | EventTimerCancelled       TimeoutId
   -- ^ a 'Timeout' was cancelled (via `cancelTimeout`)

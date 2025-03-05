@@ -43,16 +43,18 @@ labelThisThread label = myThreadId >>= \tid -> labelThread tid label
 
 class MonadThread m => MonadFork m where
 
-  forkIO           :: m () -> m (ThreadId m)
-  forkOn           :: Int -> m () -> m (ThreadId m)
-  forkIOWithUnmask :: ((forall a. m a -> m a) -> m ()) -> m (ThreadId m)
-  forkFinally      :: m a -> (Either SomeException a -> m ()) -> m (ThreadId m)
-  throwTo          :: Exception e => ThreadId m -> e -> m ()
+  forkIO             :: m () -> m (ThreadId m)
+  forkOn             :: Int -> m () -> m (ThreadId m)
+  forkIOWithUnmask   :: ((forall a. m a -> m a) -> m ()) -> m (ThreadId m)
+  forkFinally        :: m a -> (Either SomeException a -> m ()) -> m (ThreadId m)
+  throwTo            :: Exception e => ThreadId m -> e -> m ()
 
-  killThread       :: ThreadId m -> m ()
-  killThread tid = throwTo tid ThreadKilled
+  killThread         :: ThreadId m -> m ()
+  killThread tid     =  throwTo tid ThreadKilled
 
-  yield            :: m ()
+  yield              :: m ()
+
+  getNumCapabilities :: m Int
 
 
 instance MonadThread IO where
@@ -66,13 +68,14 @@ instance MonadThread IO where
 #endif
 
 instance MonadFork IO where
-  forkIO           = IO.forkIO
-  forkOn           = IO.forkOn
-  forkIOWithUnmask = IO.forkIOWithUnmask
-  forkFinally      = IO.forkFinally
-  throwTo          = IO.throwTo
-  killThread       = IO.killThread
-  yield            = IO.yield
+  forkIO             = IO.forkIO
+  forkOn             = IO.forkOn
+  forkIOWithUnmask   = IO.forkIOWithUnmask
+  forkFinally        = IO.forkFinally
+  throwTo            = IO.throwTo
+  killThread         = IO.killThread
+  yield              = IO.yield
+  getNumCapabilities = IO.getNumCapabilities
 
 instance MonadThread m => MonadThread (ReaderT r m) where
   type ThreadId (ReaderT r m) = ThreadId m
@@ -87,7 +90,9 @@ instance MonadFork m => MonadFork (ReaderT e m) where
                          let restore' :: ReaderT e m a -> ReaderT e m a
                              restore' (ReaderT f) = ReaderT $ restore . f
                          in runReaderT (k restore') e
-  forkFinally f k     = ReaderT $ \e -> forkFinally (runReaderT f e)
-                                      $ \err -> runReaderT (k err) e
+  forkFinally f k      = ReaderT $ \e -> forkFinally (runReaderT f e)
+                                       $ \err -> runReaderT (k err) e
   throwTo e t = lift (throwTo e t)
   yield       = lift yield
+
+  getNumCapabilities = lift getNumCapabilities

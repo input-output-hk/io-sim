@@ -80,11 +80,14 @@ import Control.Monad.Class.MonadFork (killThread, myThreadId, throwTo)
 import Control.Monad.Class.MonadSTM hiding (STM)
 import Control.Monad.Class.MonadSTM.Internal (TMVarDefault (TMVar))
 import Control.Monad.Class.MonadThrow as MonadThrow
-import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTime (NominalDiffTime)
+import Control.Monad.Class.MonadTime qualified as Time
+import Control.Monad.Class.MonadTime.SI qualified as SI
 import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 
 import Control.Monad.IOSim.InternalTypes
-import Control.Monad.IOSim.Types hiding (SimEvent (SimEvent), Trace (SimTrace))
+import Control.Monad.IOSim.Types hiding (SimEvent (SimEvent), Time (..),
+           Trace (SimTrace))
 import Control.Monad.IOSim.Types (SimEvent)
 import Control.Monad.IOSimPOR.Timeout (unsafeTimeout)
 import Control.Monad.IOSimPOR.Types
@@ -186,7 +189,7 @@ data TimerCompletionInfo s =
 instance Hashable a => Hashable (Down a)
 
 type RunQueue   = HashPSQ (Down IOSimThreadId) (Down IOSimThreadId) ()
-type Timeouts s = IntPSQ Time (TimerCompletionInfo s)
+type Timeouts s = IntPSQ SI.Time (TimerCompletionInfo s)
 
 -- | Internal state.
 --
@@ -196,7 +199,7 @@ data SimState s a = SimState {
        -- and blocked threads.
        threads          :: !(Map IOSimThreadId (Thread s a)),
        -- | current time
-       curTime          :: !Time,
+       curTime          :: !SI.Time,
        -- | ordered list of timers and timeouts
        timers           :: !(Timeouts s),
        -- | timeout locks in order to synchronize the timeout handler and the
@@ -221,7 +224,7 @@ initialState =
     SimState {
       runqueue = PSQ.empty,
       threads  = Map.empty,
-      curTime  = Time 0,
+      curTime  = SI.Time 0,
       timers   = IPSQ.empty,
       clocks   = Map.singleton (ClockId []) epoch1970,
       nextVid  = 0,
@@ -252,8 +255,8 @@ invariant Nothing SimState{runqueue,threads,clocks} =
 
 -- | Interpret the simulation monotonic time as a 'NominalDiffTime' since
 -- the start.
-timeSinceEpoch :: Time -> NominalDiffTime
-timeSinceEpoch (Time t) = fromRational (toRational t)
+timeSinceEpoch :: SI.Time -> NominalDiffTime
+timeSinceEpoch (SI.Time t) = fromRational (toRational t)
 
 
 -- | Insert thread into `runqueue`.
@@ -457,15 +460,15 @@ schedule thread@Thread{
     GetWallTime k -> do
       let clockid  = threadClockId thread
           clockoff = clocks Map.! clockid
-          walltime = timeSinceEpoch time `addUTCTime` clockoff
+          walltime = timeSinceEpoch time `Time.addUTCTime` clockoff
           thread'  = thread { threadControl = ThreadControl (k walltime) ctl }
       schedule thread' simstate
 
     SetWallTime walltime' k -> do
       let clockid   = threadClockId thread
           clockoff  = clocks Map.! clockid
-          walltime  = timeSinceEpoch time `addUTCTime` clockoff
-          clockoff' = addUTCTime (diffUTCTime walltime' walltime) clockoff
+          walltime  = timeSinceEpoch time `Time.addUTCTime` clockoff
+          clockoff' = (walltime' `Time.diffUTCTime` walltime) `Time.addUTCTime` clockoff
           thread'   = thread { threadControl = ThreadControl k ctl }
           simstate' = simstate { clocks = Map.insert clockid clockoff' clocks }
       schedule thread' simstate'
@@ -1322,7 +1325,7 @@ removeMinimums = \psq -> coerce $
           | p == p' -> collectAll (k:ks) p (x:xs) psq'
         _           -> (reverse ks, p, reverse xs, psq)
 
-traceMany :: [(Time, IOSimThreadId, Int, Maybe ThreadLabel, SimEventType)]
+traceMany :: [(SI.Time, IOSimThreadId, Int, Maybe ThreadLabel, SimEventType)]
           -> SimTrace a -> SimTrace a
 traceMany []                                   trace = trace
 traceMany ((time, tid, tstep, tlbl, event):ts) trace =
@@ -1374,7 +1377,7 @@ controlSimTraceST limit control mainAction =
 --
 
 execAtomically :: forall s a c.
-                  Time
+                  SI.Time
                -> IOSimThreadId
                -> Maybe ThreadLabel
                -> VarId
