@@ -48,10 +48,11 @@ a complex, highly concurrent, distributed system
 * write network simulations, to verify a complex networking stack;
 * write disk IO simulations, to verify a database implementation.
 
-### Supporting material
+## Supporting material
 
 * [Philipp Kant (@kantp) at Bobconf 2022][bob-conf]
 * [Armando Santos (@bolt12) at ZuriHac 2022][zuriHac-2022]
+* [Marcin Szamotulski (@coot) IOSim and Partial Order Reduction][io-sim-por-presentation]
 
 
 ## Packages
@@ -64,7 +65,7 @@ a complex, highly concurrent, distributed system
 * [`io-classes:strict-stm`]: strict STM operations
 * [`io-classes:si-timers`]: non-standard timers API
 
-### Issues
+## Issues
 
 New issues should be reported in [this][io-sim-issues] repository.
 
@@ -83,3 +84,4 @@ New issues should be reported in [this][io-sim-issues] repository.
 
 [bob-conf]: https://youtu.be/uedUGeWN4ZM
 [zuriHac-2022]: https://youtu.be/tKIYQgJnGkA
+[io-sim-por-presentation]: https://coot.me/presentations/iosimpor.pdf

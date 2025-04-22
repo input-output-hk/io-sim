@@ -40,8 +40,18 @@ our implementation matches the specification and the `GHC` implementation, but
 also the other way around: that `GHC`s `STM` implementation meets the
 specification.
 
+## Supporting material
+
+* [Philipp Kant (@kantp) at Bobconf 2022][bob-conf]
+* [Armando Santos (@bolt12) at ZuriHac 2022][zuriHac-2022]
+* [Marcin Szamotulski (@coot) IOSim and Partial Order Reduction][io-sim-por-presentation]
+
 [`io-sim`]:  https://hackage.haskell.org/package/io-sim
 [`io-classes`]: https://input-output-hk.github.io/io-sim/io-classes/index.html
 [`si-timers`]: https://input-output-hk.github.io/io-sim/io-classes/si-timers/index.html
 [`IOSimPOR`]: https://github.com/input-output-hk/io-sim/tree/main/io-sim/how-to-use-IOSimPOR.md
 [`IOSim`]: https://hackage.haskell.org/package/io-sim/docs/Control-Monad-IOSim.html#t:IOSim
+
+[bob-conf]: https://youtu.be/uedUGeWN4ZM
+[zuriHac-2022]: https://youtu.be/tKIYQgJnGkA
+[io-sim-por-presentation]: https://coot.me/presentations/iosimpor.pdf
