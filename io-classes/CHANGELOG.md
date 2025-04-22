@@ -10,6 +10,7 @@
 * Added `MonadLabelledMVar` class.
 * Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
 * Added `debugTraceTVar`, `debugTraceTMVar`, `debugTraceTVarIO`, `debugTraceTMVarIO` for `Show`-based tracing.
+* `MonadEvaluate` is not a supper-class of `MonadThrow` anymore.
 
 ### Non-breaking changes
 

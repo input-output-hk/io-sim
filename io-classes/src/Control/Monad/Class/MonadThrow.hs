@@ -213,7 +213,7 @@ class MonadMask m => MonadMaskingState m where
 
 -- | Monads which can 'evaluate'.
 --
-class MonadThrow m => MonadEvaluate m where
+class MonadEvaluate m where
     evaluate :: a -> m a
 
 --
@@ -321,5 +321,5 @@ instance MonadMask m => MonadMask (ReaderT r m) where
       where q :: (m a -> m a) -> ReaderT e m a -> ReaderT e m a
             q u (ReaderT b) = ReaderT (u . b)
 
-instance MonadEvaluate m => MonadEvaluate (ReaderT r m) where
+instance (Monad m, MonadEvaluate m) => MonadEvaluate (ReaderT r m) where
   evaluate = lift . evaluate
