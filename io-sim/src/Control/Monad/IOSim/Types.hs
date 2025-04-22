@@ -17,6 +17,9 @@
 
 -- Needed for `SimEvent` type.
 {-# OPTIONS_GHC -Wno-partial-fields    #-}
+-- `MonadMaskingState` is deprecated in `io-classes`, but we provide an instance
+-- for it.
+{-# OPTIONS_GHC -Wno-deprecations      #-}
 
 module Control.Monad.IOSim.Types
   ( IOSim (..)
@@ -425,7 +428,6 @@ instance MonadMask (IOSim s) where
         MaskedInterruptible   -> blockUninterruptible $ action block
         MaskedUninterruptible -> action blockUninterruptible
 
-instance MonadMaskingState (IOSim s) where
   getMaskingState = getMaskingStateImpl
   interruptible action = do
       b <- getMaskingStateImpl
@@ -433,6 +435,8 @@ instance MonadMaskingState (IOSim s) where
         Unmasked              -> action
         MaskedInterruptible   -> unblock action
         MaskedUninterruptible -> action
+
+instance MonadMaskingState (IOSim s)
 
 instance Exceptions.MonadMask (IOSim s) where
   mask                = MonadThrow.mask

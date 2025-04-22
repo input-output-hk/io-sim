@@ -16,7 +16,7 @@ module Control.Monad.Class.MonadThrow
   ( MonadThrow (..)
   , MonadCatch (..)
   , MonadMask (..)
-  , MonadMaskingState (..)
+  , MonadMaskingState
   , MonadEvaluate (..)
   , MaskingState (..)
   , Exception (..)
@@ -193,27 +193,30 @@ data ExitCase a
 --
 class MonadCatch m => MonadMask m where
 
-  {-# MINIMAL mask, uninterruptibleMask #-}
+  {-# MINIMAL mask,
+              uninterruptibleMask,
+              getMaskingState,
+              interruptible #-}
+
   mask, uninterruptibleMask :: ((forall a. m a -> m a) -> m b) -> m b
 
   mask_, uninterruptibleMask_ :: m a -> m a
   mask_                action = mask                $ \_ -> action
   uninterruptibleMask_ action = uninterruptibleMask $ \_ -> action
 
-
-class MonadMask m => MonadMaskingState m where
-  {-# MINIMAL getMaskingState, interruptible #-}
   getMaskingState :: m MaskingState
   interruptible   :: m a -> m a
-  allowInterrupt  :: m ()
 
+  allowInterrupt  :: m ()
   allowInterrupt = interruptible (return ())
 
+class MonadMask m => MonadMaskingState m
+{-# DEPRECATED MonadMaskingState "Use MonadMask instead" #-}
 
 
 -- | Monads which can 'evaluate'.
 --
-class MonadThrow m => MonadEvaluate m where
+class MonadEvaluate m where
     evaluate :: a -> m a
 
 --
@@ -254,10 +257,11 @@ instance MonadMask IO where
   uninterruptibleMask  = IO.uninterruptibleMask
   uninterruptibleMask_ = IO.uninterruptibleMask_
 
-instance MonadMaskingState IO where
   getMaskingState = IO.getMaskingState
   interruptible   = IO.interruptible
   allowInterrupt  = IO.allowInterrupt
+
+instance MonadMaskingState IO
 
 instance MonadEvaluate IO where
   evaluate = IO.evaluate
@@ -321,5 +325,10 @@ instance MonadMask m => MonadMask (ReaderT r m) where
       where q :: (m a -> m a) -> ReaderT e m a -> ReaderT e m a
             q u (ReaderT b) = ReaderT (u . b)
 
-instance MonadEvaluate m => MonadEvaluate (ReaderT r m) where
+  getMaskingState = lift getMaskingState
+  interruptible a =
+    ReaderT $ \e -> interruptible (runReaderT a e)
+  allowInterrupt  = lift allowInterrupt
+
+instance (Monad m, MonadEvaluate m) => MonadEvaluate (ReaderT r m) where
   evaluate = lift . evaluate

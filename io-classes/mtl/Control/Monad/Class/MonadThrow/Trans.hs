@@ -60,6 +60,11 @@ instance MonadMask m => MonadMask (ExceptT e m) where
         -> ExceptT e m a -> ExceptT e m a
       q u (ExceptT b) = ExceptT (u b)
 
+  getMaskingState = lift getMaskingState
+  interruptible   = ExceptT . interruptible . runExceptT
+  allowInterrupt  = lift allowInterrupt
+
+
 --
 -- Lazy.WriterT instances
 --
@@ -104,6 +109,11 @@ instance (Monoid w, MonadMask m) => MonadMask (Lazy.WriterT w m) where
         -> Lazy.WriterT w m a -> Lazy.WriterT w m a
       q u (Lazy.WriterT b) = Lazy.WriterT (u b)
 
+  getMaskingState = lift getMaskingState
+  interruptible   = Lazy.WriterT . interruptible . Lazy.runWriterT
+  allowInterrupt  = lift allowInterrupt
+
+
 --
 -- Strict.WriterT instances
 --
@@ -146,6 +156,10 @@ instance (Monoid w, MonadMask m) => MonadMask (Strict.WriterT w m) where
       q :: (forall x. m x -> m x)
         -> Strict.WriterT w m a -> Strict.WriterT w m a
       q u (Strict.WriterT b) = Strict.WriterT (u b)
+
+  getMaskingState = lift getMaskingState
+  interruptible   = Strict.WriterT . interruptible . Strict.runWriterT
+  allowInterrupt  = lift allowInterrupt
 
 
 --
@@ -193,6 +207,10 @@ instance (Monoid w, MonadMask m) => MonadMask (Lazy.RWST r w s m) where
         -> Lazy.RWST r w s m a -> Lazy.RWST r w s m a
       q u (Lazy.RWST b) = Lazy.RWST $ \r s -> u (b r s)
 
+  getMaskingState = lift getMaskingState
+  interruptible f = Lazy.RWST $ \r s -> interruptible (Lazy.runRWST f r s)
+  allowInterrupt  = lift allowInterrupt
+
 
 --
 -- Strict.RWST Instances
@@ -239,6 +257,10 @@ instance (Monoid w, MonadMask m) => MonadMask (Strict.RWST r w s m) where
         -> Strict.RWST r w s m a -> Strict.RWST r w s m a
       q u (Strict.RWST b) = Strict.RWST $ \r s -> u (b r s)
 
+  getMaskingState = lift getMaskingState
+  interruptible f = Strict.RWST $ \r s -> interruptible (Strict.runRWST f r s)
+  allowInterrupt  = lift allowInterrupt
+
 
 --
 -- Lazy.StateT instances
@@ -282,6 +304,10 @@ instance MonadMask m => MonadMask (Lazy.StateT s m) where
       q :: (forall x. m x -> m x)
         -> Lazy.StateT s m a -> Lazy.StateT s m a
       q u (Lazy.StateT b) = Lazy.StateT $ \s -> u (b s)
+
+  getMaskingState = lift getMaskingState
+  interruptible f = Lazy.StateT $ \s -> interruptible (Lazy.runStateT f s)
+  allowInterrupt  = lift allowInterrupt
 
 
 --
@@ -327,3 +353,7 @@ instance MonadMask m => MonadMask (Strict.StateT s m) where
         -> Strict.StateT s m a -> Strict.StateT s m a
       q u (Strict.StateT b) = Strict.StateT $ \s -> u (b s)
 
+
+  getMaskingState = lift getMaskingState
+  interruptible f = Strict.StateT $ \s -> interruptible (Strict.runStateT f s)
+  allowInterrupt  = lift allowInterrupt

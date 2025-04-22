@@ -893,7 +893,6 @@ type TimeoutConstraints m =
       , MonadMask  m
       , MonadThrow (STM m)
       , MonadSay   m
-      , MonadMaskingState m
       )
 
 instance Arbitrary DiffTime where

@@ -340,7 +340,7 @@ maxMS Unmasked              Unmasked              = Unmasked
 
 -- | Check that setting masking state is effective.
 --
-prop_set_masking_state :: MonadMaskingState m
+prop_set_masking_state :: MonadMask m
                        => MaskingState
                        -> m Property
 prop_set_masking_state ms =
@@ -350,7 +350,7 @@ prop_set_masking_state ms =
 
 -- | Check that 'unmask' restores the masking state.
 --
-prop_unmask :: MonadMaskingState m
+prop_unmask :: MonadMask m
             => MaskingState
             -> MaskingState
             -> m Property
@@ -362,7 +362,7 @@ prop_unmask ms ms' =
 
 -- | Check that masking state is inherited by a forked thread.
 --
-prop_fork_masking_state :: ( MonadMaskingState m
+prop_fork_masking_state :: ( MonadMask m
                            , MonadFork m
                            , MonadSTM m
                            )
@@ -378,7 +378,7 @@ prop_fork_masking_state ms = setMaskingState_ ms $ do
 -- Note: unlike 'prop_unmask', 'forkIOWithUnmask's 'unmask' function will
 -- restore 'Unmasked' state, not the encosing masking state.
 --
-prop_fork_unmask :: ( MonadMaskingState m
+prop_fork_unmask :: ( MonadMask m
                     , MonadFork m
                     , MonadSTM m
                     )
@@ -397,8 +397,9 @@ prop_fork_unmask ms ms' =
 -- | A unit test which checks the masking state in the context of a catch
 -- handler.
 --
-prop_catch_throwIO_masking_state :: forall m. MonadMaskingState m
-                                 => MaskingState -> m Property
+prop_catch_throwIO_masking_state :: forall m. MonadMask m
+                                 => MaskingState
+                                 -> m Property
 prop_catch_throwIO_masking_state ms =
     setMaskingState_ ms $ do
       throwIO (userError "error")
@@ -409,7 +410,7 @@ prop_catch_throwIO_masking_state ms =
 -- | Like 'prop_catch_masking_state' but using 'throwTo'.
 --
 prop_catch_throwTo_masking_state :: forall m.
-                                    ( MonadMaskingState m
+                                    ( MonadMask m
                                     , MonadFork m
                                     )
                                  => MaskingState -> m Property
@@ -425,7 +426,7 @@ prop_catch_throwTo_masking_state ms =
 -- thread which is in a non-blocking mode.
 --
 prop_catch_throwTo_masking_state_async :: forall m.
-                                          ( MonadMaskingState m
+                                          ( MonadMask  m
                                           , MonadFork  m
                                           , MonadSTM   m
                                           , MonadDelay m
@@ -454,7 +455,7 @@ prop_catch_throwTo_masking_state_async ms = do
 -- 'willBlock' branch of 'ThrowTo' in 'schedule' is covered.
 --
 prop_catch_throwTo_masking_state_async_mayblock :: forall m.
-                                                ( MonadMaskingState m
+                                                ( MonadMask  m
                                                 , MonadFork  m
                                                 , MonadSTM   m
                                                 , MonadDelay m
