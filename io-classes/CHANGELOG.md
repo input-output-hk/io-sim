@@ -11,6 +11,9 @@
 * Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
 * Added `debugTraceTVar`, `debugTraceTMVar`, `debugTraceTVarIO`, `debugTraceTMVarIO` for `Show`-based tracing.
 * `MonadEvaluate` is not a supper-class of `MonadThrow` anymore.
+* Moved all `MonadMaskingState` methods to `MonadMask`. `MonadMaskingState` is
+  available but deprecated, it will be removed in one of the future releases.
+* `io-classes:mtl` instances support the extended `MonadMask` instance.
 
 ### Non-breaking changes
 
