@@ -6,6 +6,7 @@
 
 ### Breaking changes
 
+- Added `MonadChan`, `MonadQSem` and `MonadQSemN` classes.
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
 * Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
