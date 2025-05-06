@@ -25,3 +25,4 @@ cabal.project.local~
 tags
 io-sim/tags
 README.haddock
+*.vim
