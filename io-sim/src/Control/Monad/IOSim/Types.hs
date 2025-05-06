@@ -86,6 +86,8 @@ import Control.Concurrent.Class.MonadChan hiding (Chan)
 import Control.Concurrent.Class.MonadChan qualified as MonadAsync
 import Control.Concurrent.Class.MonadQSem hiding (QSem)
 import Control.Concurrent.Class.MonadQSem qualified as MonadQSem
+import Control.Concurrent.Class.MonadQSemN hiding (QSemN)
+import Control.Concurrent.Class.MonadQSemN qualified as MonadQSemN
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
@@ -873,6 +875,57 @@ instance MonadQSem (IOSim s) where
       r <- takeMVar m
       r' <- signal r
       putMVar m r'
+
+newtype QSemN m = QSemN (MVar m (Int, [(Int, MVar m ())], [(Int, MVar m ())]))
+
+data MaybeMV m a = JustMV !(MVarDefault m a)
+                 | NothingMV
+
+instance MonadQSemN (IOSim s) where
+  type QSemN (IOSim s) = QSemN (IOSim s)
+
+  newQSemN initial
+    | initial < 0 = fail "newQSemN: Initial quantity must be non-negative"
+    | otherwise   = do
+        sem <- newMVar (initial, [], [])
+        return (QSemN sem)
+
+  waitQSemN qs@(QSemN m) sz = mask_ $ do
+    mmvar <- modifyMVar m $ \ (i,b1,b2) -> do
+      let z = i-sz
+      if z < 0
+        then do
+          b <- newEmptyMVar
+          return ((i, b1, (sz,b):b2), JustMV b)
+        else return ((z, b1, b2), NothingMV)
+
+    case mmvar of
+      NothingMV -> return ()
+      JustMV b -> wait' b
+    where
+      wait' :: MVar (IOSim s) () -> IOSim s ()
+      wait' b =
+        takeMVar b `onException` do
+          already_filled <- not <$> tryPutMVar b ()
+          when already_filled $ signalQSemN qs sz
+
+  signalQSemN (QSemN m) sz0 = do
+    unit <- modifyMVar m $ \(i,a1,a2) -> loop (sz0 + i) a1 a2
+
+    evaluate unit
+   where
+     loop 0  bs b2 = return ((0,  bs, b2), ())
+     loop sz [] [] = return ((sz, [], []), ())
+     loop sz [] b2 = loop sz (reverse b2) []
+     loop sz ((j,b):bs) b2
+       | j > sz = do
+         r <- isEmptyMVar b
+         if r then return ((sz, (j,b):bs, b2), ())
+              else loop sz bs b2
+       | otherwise = do
+         r <- tryPutMVar b ()
+         if r then loop (sz-j) bs b2
+              else loop sz bs b2
 
 -- | 'Trace' is a recursive data type, it is the trace of a 'IOSim'
 -- computation.  The trace will contain information about thread scheduling,

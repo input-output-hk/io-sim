@@ -69,6 +69,7 @@ library
   -- This has to be tidied up once the design becomes clear.
   exposed-modules:     Control.Concurrent.Class.MonadChan
                        Control.Concurrent.Class.MonadQSem
+                       Control.Concurrent.Class.MonadQSemN
                        Control.Concurrent.Class.MonadMVar
                        Control.Concurrent.Class.MonadSTM
                        Control.Concurrent.Class.MonadSTM.TArray
