@@ -82,6 +82,8 @@ import Control.Exception qualified as IO
 import Control.Monad
 import Control.Monad.Fix (MonadFix (..))
 
+import Control.Concurrent.Class.MonadChan hiding (Chan)
+import Control.Concurrent.Class.MonadChan qualified as MonadAsync
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
@@ -775,6 +777,45 @@ newtype EventlogMarker = EventlogMarker String
 instance MonadEventlog (IOSim s) where
   traceEventIO = traceM . EventlogEvent
   traceMarkerIO = traceM . EventlogMarker
+
+data Chan m a
+ = Chan (MVar m (Stream m a))
+        (MVar m (Stream m a))
+
+type Stream m a = MVar m (ChanItem m a)
+
+data ChanItem m a = ChanItem a (Stream m a)
+
+instance MonadChan (IOSim s) where
+  type Chan (IOSim s) = Chan (IOSim s)
+
+  newChan = do
+    hole  <- newEmptyMVar
+    readVar  <- newMVar hole
+    writeVar <- newMVar hole
+    return (Chan readVar writeVar)
+
+  writeChan (Chan _ writeVar) val = do
+    new_hole <- newEmptyMVar
+    mask_ $ do
+      old_hole <- takeMVar writeVar
+      putMVar old_hole (ChanItem val new_hole)
+      putMVar writeVar new_hole
+
+  readChan (Chan readVar _) =
+    modifyMVar readVar $ \read_end -> do
+      (ChanItem val new_read_end) <- readMVar read_end
+      return (new_read_end, val)
+
+  dupChan (Chan _ writeVar) = do
+    hole       <- readMVar writeVar
+    newReadVar <- newMVar hole
+    return (Chan newReadVar writeVar)
+
+  getChanContents ch = do
+    x  <- readChan ch
+    xs <- getChanContents ch
+    return (x:xs)
 
 -- | 'Trace' is a recursive data type, it is the trace of a 'IOSim'
 -- computation.  The trace will contain information about thread scheduling,
