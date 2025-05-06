@@ -84,6 +84,8 @@ import Control.Monad.Fix (MonadFix (..))
 
 import Control.Concurrent.Class.MonadChan hiding (Chan)
 import Control.Concurrent.Class.MonadChan qualified as MonadAsync
+import Control.Concurrent.Class.MonadQSem hiding (QSem)
+import Control.Concurrent.Class.MonadQSem qualified as MonadQSem
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
@@ -120,7 +122,7 @@ import Data.Bifunctor (bimap)
 import Data.Dynamic (Dynamic, toDyn)
 import Data.List.Trace qualified as Trace
 import Data.Map.Strict (Map)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Monoid (Endo (..))
 import Data.Semigroup (Max (..))
 import Data.STRef.Lazy
@@ -816,6 +818,61 @@ instance MonadChan (IOSim s) where
     x  <- readChan ch
     xs <- getChanContents ch
     return (x:xs)
+
+newtype QSem m = QSem (MVar m (Int, [MVar m ()], [MVar m ()]))
+
+signal
+  :: MonadMVar m
+  => (Int, [MVar m ()], [MVar m ()])
+  -> m (Int, [MVar m ()], [MVar m ()])
+signal (i,a1,a2) =
+ if i == 0
+   then loop a1 a2
+   else let !z = i+1 in return (z, a1, a2)
+ where
+   loop [] [] = return (1, [], [])
+   loop [] b2 = loop (reverse b2) []
+   loop (b:bs) b2 = do
+     r <- tryPutMVar b ()
+     if r then return (0, bs, b2)
+          else loop bs b2
+
+instance MonadQSem (IOSim s) where
+  type QSem (IOSim s) = QSem (IOSim s)
+
+  newQSem initial
+    | initial < 0 = fail "newQSem: Initial quantity must be non-negative"
+    | otherwise   = do
+        sem <- newMVar (initial, [], [])
+        return (QSem sem)
+
+  waitQSem (QSem m) =
+    mask_ $ do
+      (i,b1,b2) <- takeMVar m
+      if i == 0
+         then do
+           b <- newEmptyMVar
+           putMVar m (i, b1, b:b2)
+           uninterruptibleWait b
+         else do
+           let !z = i-1
+           putMVar m (z, b1, b2)
+           return ()
+    where
+      uninterruptibleWait b =
+        takeMVar b `onException`
+           uninterruptibleMask_ (do
+              (i,b1,b2) <- takeMVar m
+              r <- tryTakeMVar b
+              r' <- if isJust r
+                       then signal (i,b1,b2)
+                       else do putMVar b (); return (i,b1,b2)
+              putMVar m r')
+  signalQSem (QSem m) =
+    uninterruptibleMask_ $ do
+      r <- takeMVar m
+      r' <- signal r
+      putMVar m r'
 
 -- | 'Trace' is a recursive data type, it is the trace of a 'IOSim'
 -- computation.  The trace will contain information about thread scheduling,
