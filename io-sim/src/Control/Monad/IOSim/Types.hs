@@ -84,11 +84,11 @@ import Control.Monad.Fix (MonadFix (..))
 
 import Control.Concurrent.Class.MonadChan hiding (Chan)
 import Control.Concurrent.Class.MonadChan qualified as MonadAsync
+import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadQSem hiding (QSem)
 import Control.Concurrent.Class.MonadQSem qualified as MonadQSem
 import Control.Concurrent.Class.MonadQSemN hiding (QSemN)
 import Control.Concurrent.Class.MonadQSemN qualified as MonadQSemN
-import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
 import Control.Monad.Class.MonadAsync hiding (Async)
@@ -901,7 +901,7 @@ instance MonadQSemN (IOSim s) where
 
     case mmvar of
       NothingMV -> return ()
-      JustMV b -> wait' b
+      JustMV b  -> wait' b
     where
       wait' :: MVar (IOSim s) () -> IOSim s ()
       wait' b =

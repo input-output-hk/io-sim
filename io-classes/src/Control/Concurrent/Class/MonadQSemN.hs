@@ -1,8 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Control.Concurrent.Class.MonadQSemN
-  ( MonadQSemN (..)
-  ) where
+module Control.Concurrent.Class.MonadQSemN (MonadQSemN (..)) where
 
 import Control.Concurrent.QSemN qualified as IO
 

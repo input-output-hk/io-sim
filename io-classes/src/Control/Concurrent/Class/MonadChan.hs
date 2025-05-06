@@ -1,9 +1,7 @@
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies      #-}
 
-module Control.Concurrent.Class.MonadChan
-  ( MonadChan (..)
-  ) where
+module Control.Concurrent.Class.MonadChan (MonadChan (..)) where
 
 import Control.Concurrent.Chan qualified as IO
 
