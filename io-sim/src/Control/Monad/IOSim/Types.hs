@@ -82,7 +82,13 @@ import Control.Exception qualified as IO
 import Control.Monad
 import Control.Monad.Fix (MonadFix (..))
 
+import Control.Concurrent.Class.MonadChan hiding (Chan)
+import Control.Concurrent.Class.MonadChan qualified as MonadAsync
 import Control.Concurrent.Class.MonadMVar
+import Control.Concurrent.Class.MonadQSem hiding (QSem)
+import Control.Concurrent.Class.MonadQSem qualified as MonadQSem
+import Control.Concurrent.Class.MonadQSemN hiding (QSemN)
+import Control.Concurrent.Class.MonadQSemN qualified as MonadQSemN
 import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
 import Control.Monad.Class.MonadAsync hiding (Async)
@@ -118,7 +124,7 @@ import Data.Bifunctor (bimap)
 import Data.Dynamic (Dynamic, toDyn)
 import Data.List.Trace qualified as Trace
 import Data.Map.Strict (Map)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Monoid (Endo (..))
 import Data.Semigroup (Max (..))
 import Data.STRef.Lazy
@@ -775,6 +781,151 @@ newtype EventlogMarker = EventlogMarker String
 instance MonadEventlog (IOSim s) where
   traceEventIO = traceM . EventlogEvent
   traceMarkerIO = traceM . EventlogMarker
+
+data Chan m a
+ = Chan (MVar m (Stream m a))
+        (MVar m (Stream m a))
+
+type Stream m a = MVar m (ChanItem m a)
+
+data ChanItem m a = ChanItem a (Stream m a)
+
+instance MonadChan (IOSim s) where
+  type Chan (IOSim s) = Chan (IOSim s)
+
+  newChan = do
+    hole  <- newEmptyMVar
+    readVar  <- newMVar hole
+    writeVar <- newMVar hole
+    return (Chan readVar writeVar)
+
+  writeChan (Chan _ writeVar) val = do
+    new_hole <- newEmptyMVar
+    mask_ $ do
+      old_hole <- takeMVar writeVar
+      putMVar old_hole (ChanItem val new_hole)
+      putMVar writeVar new_hole
+
+  readChan (Chan readVar _) =
+    modifyMVar readVar $ \read_end -> do
+      (ChanItem val new_read_end) <- readMVar read_end
+      return (new_read_end, val)
+
+  dupChan (Chan _ writeVar) = do
+    hole       <- readMVar writeVar
+    newReadVar <- newMVar hole
+    return (Chan newReadVar writeVar)
+
+  getChanContents ch = do
+    x  <- readChan ch
+    xs <- getChanContents ch
+    return (x:xs)
+
+newtype QSem m = QSem (MVar m (Int, [MVar m ()], [MVar m ()]))
+
+signal
+  :: MonadMVar m
+  => (Int, [MVar m ()], [MVar m ()])
+  -> m (Int, [MVar m ()], [MVar m ()])
+signal (i,a1,a2) =
+ if i == 0
+   then loop a1 a2
+   else let !z = i+1 in return (z, a1, a2)
+ where
+   loop [] [] = return (1, [], [])
+   loop [] b2 = loop (reverse b2) []
+   loop (b:bs) b2 = do
+     r <- tryPutMVar b ()
+     if r then return (0, bs, b2)
+          else loop bs b2
+
+instance MonadQSem (IOSim s) where
+  type QSem (IOSim s) = QSem (IOSim s)
+
+  newQSem initial
+    | initial < 0 = fail "newQSem: Initial quantity must be non-negative"
+    | otherwise   = do
+        sem <- newMVar (initial, [], [])
+        return (QSem sem)
+
+  waitQSem (QSem m) =
+    mask_ $ do
+      (i,b1,b2) <- takeMVar m
+      if i == 0
+         then do
+           b <- newEmptyMVar
+           putMVar m (i, b1, b:b2)
+           uninterruptibleWait b
+         else do
+           let !z = i-1
+           putMVar m (z, b1, b2)
+           return ()
+    where
+      uninterruptibleWait b =
+        takeMVar b `onException`
+           uninterruptibleMask_ (do
+              (i,b1,b2) <- takeMVar m
+              r <- tryTakeMVar b
+              r' <- if isJust r
+                       then signal (i,b1,b2)
+                       else do putMVar b (); return (i,b1,b2)
+              putMVar m r')
+  signalQSem (QSem m) =
+    uninterruptibleMask_ $ do
+      r <- takeMVar m
+      r' <- signal r
+      putMVar m r'
+
+newtype QSemN m = QSemN (MVar m (Int, [(Int, MVar m ())], [(Int, MVar m ())]))
+
+data MaybeMV m a = JustMV !(MVarDefault m a)
+                 | NothingMV
+
+instance MonadQSemN (IOSim s) where
+  type QSemN (IOSim s) = QSemN (IOSim s)
+
+  newQSemN initial
+    | initial < 0 = fail "newQSemN: Initial quantity must be non-negative"
+    | otherwise   = do
+        sem <- newMVar (initial, [], [])
+        return (QSemN sem)
+
+  waitQSemN qs@(QSemN m) sz = mask_ $ do
+    mmvar <- modifyMVar m $ \ (i,b1,b2) -> do
+      let z = i-sz
+      if z < 0
+        then do
+          b <- newEmptyMVar
+          return ((i, b1, (sz,b):b2), JustMV b)
+        else return ((z, b1, b2), NothingMV)
+
+    case mmvar of
+      NothingMV -> return ()
+      JustMV b  -> wait' b
+    where
+      wait' :: MVar (IOSim s) () -> IOSim s ()
+      wait' b =
+        takeMVar b `onException` do
+          already_filled <- not <$> tryPutMVar b ()
+          when already_filled $ signalQSemN qs sz
+
+  signalQSemN (QSemN m) sz0 = do
+    unit <- modifyMVar m $ \(i,a1,a2) -> loop (sz0 + i) a1 a2
+
+    evaluate unit
+   where
+     loop 0  bs b2 = return ((0,  bs, b2), ())
+     loop sz [] [] = return ((sz, [], []), ())
+     loop sz [] b2 = loop sz (reverse b2) []
+     loop sz ((j,b):bs) b2
+       | j > sz = do
+         r <- isEmptyMVar b
+         if r then return ((sz, (j,b):bs, b2), ())
+              else loop sz bs b2
+       | otherwise = do
+         r <- tryPutMVar b ()
+         if r then loop (sz-j) bs b2
+              else loop sz bs b2
 
 -- | 'Trace' is a recursive data type, it is the trace of a 'IOSim'
 -- computation.  The trace will contain information about thread scheduling,
