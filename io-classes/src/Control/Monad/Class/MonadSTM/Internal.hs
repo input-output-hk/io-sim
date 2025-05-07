@@ -372,21 +372,21 @@ class MonadSTM m
 -- to access a 'TVar' in the underlying 'ST' monad.
 --
 class ( MonadSTM m
-      , Monad (InspectMonad m)
+      , Monad (InspectMonadSTM m)
       )
     => MonadInspectSTM m where
-    type InspectMonad m :: Type -> Type
+    type InspectMonadSTM m :: Type -> Type
     -- | Return the value of a `TVar` as an `InspectMonad` computation.
     --
     -- `inspectTVar` is useful if the value of a `TVar` observed by `traceTVar`
     -- contains other `TVar`s.
-    inspectTVar  :: proxy m -> TVar  m a -> InspectMonad m a
+    inspectTVar  :: proxy m -> TVar  m a -> InspectMonadSTM m a
     -- | Return the value of a `TMVar` as an `InspectMonad` computation.
-    inspectTMVar :: proxy m -> TMVar m a -> InspectMonad m (Maybe a)
+    inspectTMVar :: proxy m -> TMVar m a -> InspectMonadSTM m (Maybe a)
     -- TODO: inspectTQueue, inspectTBQueue
 
 instance MonadInspectSTM IO where
-    type InspectMonad IO = IO
+    type InspectMonadSTM IO = IO
     inspectTVar  _ = readTVarIO
     -- issue #3198: tryReadTMVarIO
     inspectTMVar _ = atomically . tryReadTMVar
@@ -454,7 +454,7 @@ class MonadInspectSTM m
   --
   traceTVar    :: proxy m
                -> TVar m a
-               -> (Maybe a -> a -> InspectMonad m TraceValue)
+               -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
                -- ^ callback which receives initial value or 'Nothing' (if it
                -- is a newly created 'TVar'), and the committed value.
                -> STM m ()
@@ -462,81 +462,81 @@ class MonadInspectSTM m
 
   traceTMVar   :: proxy m
                -> TMVar m a
-               -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
+               -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonadSTM m TraceValue)
                -> STM m ()
 
   traceTQueue  :: proxy m
                -> TQueue m a
-               -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+               -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
                -> STM m ()
 
   traceTBQueue :: proxy m
                -> TBQueue m a
-               -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+               -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
                -> STM m ()
 
   traceTSem    :: proxy m
                -> TSem m
-               -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+               -> (Maybe Integer -> Integer -> InspectMonadSTM m TraceValue)
                -> STM m ()
 
   default traceTMVar :: TMVar m a ~ TMVarDefault m a
                      => proxy m
                      -> TMVar m a
-                     -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
+                     -> (Maybe (Maybe a) -> Maybe a -> InspectMonadSTM m TraceValue)
                      -> STM m ()
   traceTMVar = traceTMVarDefault
 
   default traceTSem :: TSem m ~ TSemDefault m
                     => proxy m
                     -> TSem m
-                    -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                    -> (Maybe Integer -> Integer -> InspectMonadSTM m TraceValue)
                     -> STM m ()
   traceTSem = traceTSemDefault
 
 
   traceTVarIO    :: TVar m a
-                 -> (Maybe a -> a -> InspectMonad m TraceValue)
+                 -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
                  -> m ()
 
   traceTMVarIO   :: TMVar m a
-                 -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
+                 -> (Maybe (Maybe a) -> Maybe a -> InspectMonadSTM m TraceValue)
                  -> m ()
 
   traceTQueueIO  :: TQueue m a
-                 -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+                 -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
                  -> m ()
 
   traceTBQueueIO :: TBQueue m a
-                 -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+                 -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
                  -> m ()
 
   traceTSemIO    :: TSem m
-                 -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                 -> (Maybe Integer -> Integer -> InspectMonadSTM m TraceValue)
                  -> m ()
 
   default traceTVarIO :: TVar m a
-                      -> (Maybe a -> a -> InspectMonad m TraceValue)
+                      -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
                       -> m ()
   traceTVarIO = \v f -> atomically (traceTVar Proxy v f)
 
   default traceTMVarIO :: TMVar m a
-                       -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
+                       -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonadSTM m TraceValue)
                        -> m ()
   traceTMVarIO = \v f -> atomically (traceTMVar Proxy v f)
 
   default traceTQueueIO :: TQueue m a
-                        -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+                        -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
                         -> m ()
   traceTQueueIO = \v f -> atomically (traceTQueue Proxy v f)
 
   default traceTBQueueIO :: TBQueue m a
-                         -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+                         -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
                          -> m ()
   traceTBQueueIO = \v f -> atomically (traceTBQueue Proxy v f)
 
   default traceTSemIO :: TSem m
-                      -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                      -> (Maybe Integer -> Integer -> InspectMonadSTM m TraceValue)
                       -> m ()
   traceTSemIO = \v f -> atomically (traceTSem Proxy v f)
 
@@ -737,7 +737,7 @@ traceTMVarDefault
   :: MonadTraceSTM m
   => proxy m
   -> TMVarDefault m a
-  -> (Maybe (Maybe a) -> Maybe a -> InspectMonad m TraceValue)
+  -> (Maybe (Maybe a) -> Maybe a -> InspectMonadSTM m TraceValue)
   -> STM m ()
 traceTMVarDefault p (TMVar t) f = traceTVar p t f
 
@@ -1076,7 +1076,7 @@ labelTSemDefault (TSem t) = labelTVar t
 traceTSemDefault :: MonadTraceSTM m
                  => proxy m
                  -> TSemDefault m
-                 -> (Maybe Integer -> Integer -> InspectMonad m TraceValue)
+                 -> (Maybe Integer -> Integer -> InspectMonadSTM m TraceValue)
                  -> STM m ()
 traceTSemDefault proxy (TSem t) k = traceTVar proxy t k
 
@@ -1295,7 +1295,7 @@ instance MonadSTM m => MonadSTM (ReaderT r m) where
     isEmptyTChan      = lift .  isEmptyTChan
 
 instance MonadInspectSTM m => MonadInspectSTM (ReaderT r m) where
-  type InspectMonad (ReaderT r m) = InspectMonad m
+  type InspectMonadSTM (ReaderT r m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy :: Proxy m)
   inspectTMVar _ = inspectTMVar (Proxy :: Proxy m)
 

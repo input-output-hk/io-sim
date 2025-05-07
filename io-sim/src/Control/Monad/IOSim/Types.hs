@@ -575,7 +575,7 @@ instance MonadSTM (IOSim s) where
   cloneTChan        = MonadSTM.cloneTChanDefault
 
 instance MonadInspectSTM (IOSim s) where
-  type InspectMonad (IOSim s) = ST s
+  type InspectMonadSTM (IOSim s) = ST s
   inspectTVar  _                 TVar { tvarCurrent }  = readSTRef tvarCurrent
   inspectTMVar _ (MonadSTM.TMVar TVar { tvarCurrent }) = readSTRef tvarCurrent
 
