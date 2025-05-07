@@ -2,6 +2,8 @@
 
 ## next version
 
+- Provided `MonadTraceMVar`
+- Renamed `InspectMonad` to `InspectMonadSTM`
 - Support `threadLabel` (`io-classes-1.8`)
 - `IOSimPOR`'s `Effect` traces now will correctly show labels on read/written
   `TVars`.
