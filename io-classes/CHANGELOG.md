@@ -6,6 +6,8 @@
 
 ### Breaking changes
 
+- Provided `MonadTraceMVar`
+- Renamed `InspectMonad` to `InspectMonadSTM`
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
 * Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
