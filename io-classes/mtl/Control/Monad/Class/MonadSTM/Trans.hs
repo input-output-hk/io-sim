@@ -163,7 +163,7 @@ instance MonadSTM m => MonadSTM (ContT r m) where
 
 
 instance MonadInspectSTM m => MonadInspectSTM (ContT r m) where
-  type InspectMonad (ContT r m) = InspectMonad m
+  type InspectMonadSTM (ContT r m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -254,7 +254,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.WriterT w m) where
 
 
 instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Lazy.WriterT w m) where
-  type InspectMonad (Lazy.WriterT w m) = InspectMonad m
+  type InspectMonadSTM (Lazy.WriterT w m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -345,7 +345,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Strict.WriterT w m) where
 
 
 instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Strict.WriterT w m) where
-  type InspectMonad (Strict.WriterT w m) = InspectMonad m
+  type InspectMonadSTM (Strict.WriterT w m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -436,7 +436,7 @@ instance MonadSTM m => MonadSTM (Lazy.StateT s m) where
 
 
 instance MonadInspectSTM m => MonadInspectSTM (Lazy.StateT s m) where
-  type InspectMonad (Lazy.StateT s m) = InspectMonad m
+  type InspectMonadSTM (Lazy.StateT s m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -527,7 +527,7 @@ instance MonadSTM m => MonadSTM (Strict.StateT s m) where
 
 
 instance MonadInspectSTM m => MonadInspectSTM (Strict.StateT s m) where
-  type InspectMonad (Strict.StateT s m) = InspectMonad m
+  type InspectMonadSTM (Strict.StateT s m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -618,7 +618,7 @@ instance MonadSTM m => MonadSTM (ExceptT e m) where
 
 
 instance MonadInspectSTM m => MonadInspectSTM (ExceptT e m) where
-  type InspectMonad (ExceptT e m) = InspectMonad m
+  type InspectMonadSTM (ExceptT e m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -709,7 +709,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Lazy.RWST r w s m) where
 
 
 instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Lazy.RWST r w s m) where
-  type InspectMonad (Lazy.RWST r w s m) = InspectMonad m
+  type InspectMonadSTM (Lazy.RWST r w s m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 
@@ -800,7 +800,7 @@ instance (Monoid w, MonadSTM m) => MonadSTM (Strict.RWST r w s m) where
 
 
 instance (Monoid w, MonadInspectSTM m) => MonadInspectSTM (Strict.RWST r w s m) where
-  type InspectMonad (Strict.RWST r w s m) = InspectMonad m
+  type InspectMonadSTM (Strict.RWST r w s m) = InspectMonadSTM m
   inspectTVar  _ = inspectTVar  (Proxy @m)
   inspectTMVar _ = inspectTMVar (Proxy @m)
 

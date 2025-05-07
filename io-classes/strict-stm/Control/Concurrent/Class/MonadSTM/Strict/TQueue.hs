@@ -56,13 +56,13 @@ labelTQueueIO (StrictTQueue queue) = Lazy.labelTQueueIO queue
 traceTQueue :: MonadTraceSTM m
             => proxy m
             -> StrictTQueue m a
-            -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
+            -> ((Maybe [a]) -> [a] -> InspectMonadSTM m TraceValue)
             -> STM m ()
 traceTQueue p (StrictTQueue queue) = Lazy.traceTQueue p queue
 
 traceTQueueIO :: MonadTraceSTM m
               => StrictTQueue m a
-              -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
+              -> ((Maybe [a]) -> [a] -> InspectMonadSTM m TraceValue)
               -> m ()
 traceTQueueIO (StrictTQueue queue) = Lazy.traceTQueueIO queue
 

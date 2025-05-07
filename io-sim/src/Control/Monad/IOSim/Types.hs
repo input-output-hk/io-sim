@@ -575,7 +575,7 @@ instance MonadSTM (IOSim s) where
   cloneTChan        = MonadSTM.cloneTChanDefault
 
 instance MonadInspectSTM (IOSim s) where
-  type InspectMonad (IOSim s) = ST s
+  type InspectMonadSTM (IOSim s) = ST s
   inspectTVar  _                 TVar { tvarCurrent }  = readSTRef tvarCurrent
   inspectTMVar _ (MonadSTM.TMVar TVar { tvarCurrent }) = readSTRef tvarCurrent
 
@@ -614,6 +614,16 @@ instance MonadInspectMVar (IOSim s) where
       case st of
         MVarEmpty _ _ -> pure Nothing
         MVarFull x _  -> pure (Just x)
+
+instance MonadTraceMVar (IOSim s) where
+  traceMVarIO _ (MVar mvar) f = traceTVarIO mvar traceMVarAsTVar
+    where
+      traceMVarAsTVar Nothing                (MVarEmpty _ _) = f Nothing         Nothing
+      traceMVarAsTVar Nothing                (MVarFull a _)  = f Nothing         (Just a)
+      traceMVarAsTVar (Just (MVarEmpty _ _)) (MVarEmpty _ _) = f (Just Nothing)  Nothing
+      traceMVarAsTVar (Just (MVarEmpty _ _)) (MVarFull a _)  = f (Just Nothing)  (Just a)
+      traceMVarAsTVar (Just (MVarFull a _))  (MVarEmpty _ _) = f (Just (Just a)) Nothing
+      traceMVarAsTVar (Just (MVarFull a _))  (MVarFull a' _) = f (Just (Just a)) (Just a')
 
 instance MonadLabelledMVar (IOSim s) where
   labelMVar = labelMVarDefault
