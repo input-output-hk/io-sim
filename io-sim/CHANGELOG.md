@@ -1,6 +1,12 @@
 # Revision history of io-sim
 
-## next version
+## next release
+
+### Breaking changes
+
+### Non-breaking changes
+
+## 1.8.0.0
 
 - Provided `MonadTraceMVar`
 - Renamed `InspectMonad` to `InspectMonadSTM`
