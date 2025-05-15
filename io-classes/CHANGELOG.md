@@ -2,8 +2,6 @@
 
 ### next version
 
-* Support ghc-9.12
-
 ### Breaking changes
 
 - Provided `MonadTraceMVar`
@@ -21,6 +19,7 @@
 
 * Added monad transformer instances for `MonadInspectSTM` & `MonadTraceSTM`
   type classes.
+* Support ghc-9.12
 
 ### 1.7.0.0
 
