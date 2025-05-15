@@ -80,8 +80,8 @@ library
                        ScopedTypeVariables,
                        TypeFamilies
   build-depends:       base              >=4.9 && <4.22,
-                       io-classes:{io-classes,strict-stm,si-timers}
-                                        ^>=1.6 || ^>= 1.7,
+                       io-classes:{io-classes, io-classes-strict-stm, io-classes-si-timers}
+                                        ^>=1.8,
                        exceptions        >=0.10,
                        containers,
                        deepseq,
@@ -114,7 +114,7 @@ test-suite test
   build-depends:       base,
                        array,
                        containers,
-                       io-classes:{io-classes,strict-stm,si-timers,testlib},
+                       io-classes:{io-classes, io-classes-strict-stm, io-classes-si-timers, testlib},
                        io-sim,
                        QuickCheck,
                        tasty,

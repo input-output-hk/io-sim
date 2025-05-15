@@ -14,6 +14,7 @@
 * Moved all `MonadMaskingState` methods to `MonadMask`. `MonadMaskingState` is
   available but deprecated, it will be removed in one of the future releases.
 * `io-classes:mtl` instances support the extended `MonadMask` instance.
+* Renamed sublibraries by adding `io-classes-` prefix.
 
 ### Non-breaking changes
 
