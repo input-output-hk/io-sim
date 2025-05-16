@@ -38,7 +38,7 @@ traceTQueueDefault
   :: MonadTraceSTM m
   => proxy m
   -> TQueueDefault m a
-  -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+  -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
   -> STM m ()
 traceTQueueDefault p (TQueue queue) f =
     traceTVar p queue
@@ -122,7 +122,7 @@ traceTBQueueDefault
   :: MonadTraceSTM m
   => proxy m
   -> TBQueueDefault m a
-  -> (Maybe [a] -> [a] -> InspectMonad m TraceValue)
+  -> (Maybe [a] -> [a] -> InspectMonadSTM m TraceValue)
   -> STM m ()
 traceTBQueueDefault p (TBQueue queue _size) f =
     traceTVar p queue (\mas as -> f (g <$> mas) (g as))

@@ -49,7 +49,7 @@ labelTVarIO v = atomically . labelTVar v
 traceTVar :: MonadTraceSTM m
           => proxy m
           -> StrictTVar m a
-          -> (Maybe a -> a -> InspectMonad m TraceValue)
+          -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
           -> STM m ()
 traceTVar p StrictTVar {tvar} = Lazy.traceTVar p tvar
 
@@ -61,7 +61,7 @@ debugTraceTVar p StrictTVar {tvar} = Lazy.debugTraceTVar p tvar
 
 traceTVarIO :: MonadTraceSTM m
             => StrictTVar m a
-            -> (Maybe a -> a -> InspectMonad m TraceValue)
+            -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
             -> m ()
 traceTVarIO StrictTVar {tvar} = Lazy.traceTVarIO tvar
 

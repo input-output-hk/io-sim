@@ -7,6 +7,7 @@ module Control.Concurrent.Class.MonadMVar
   ( MonadMVar (..)
     -- * non-standard extensions
   , MonadInspectMVar (..)
+  , MonadTraceMVar (..)
   , MonadLabelledMVar (..)
   ) where
 
@@ -16,6 +17,7 @@ import Control.Monad.Class.MonadThrow
 import Control.Monad.Reader (ReaderT (..))
 import Control.Monad.Trans (lift)
 
+import Control.Concurrent.Class.MonadSTM (TraceValue)
 import Data.Kind (Type)
 
 
@@ -204,6 +206,15 @@ class (MonadMVar m, Monad (InspectMVarMonad m)) => MonadInspectMVar m where
 instance MonadInspectMVar IO where
   type InspectMVarMonad IO = IO
   inspectMVar _ = tryReadMVar
+
+class MonadTraceMVar m where
+  traceMVarIO :: proxy
+              -> MVar m a
+              -> (Maybe (Maybe a) -> Maybe a -> InspectMVarMonad m TraceValue)
+              -> m ()
+
+instance MonadTraceMVar IO where
+  traceMVarIO = \_ _ _ -> pure ()
 
 -- | Labelled `MVar`s
 --
