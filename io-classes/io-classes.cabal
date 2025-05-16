@@ -38,7 +38,7 @@ category:            Control
 build-type:          Simple
 extra-doc-files:     CHANGELOG.md README.md strict-stm/README.md strict-mvar/README.md
 bug-reports:         https://github.com/input-output-hk/io-sim/issues
-tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6, 9.8, 9.10 }
+tested-with:         GHC == { 9.6, 9.8, 9.10, 9.12 }
 
 source-repository head
   type:     git
