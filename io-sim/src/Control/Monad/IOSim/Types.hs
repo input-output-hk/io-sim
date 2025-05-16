@@ -6,6 +6,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE GADTSyntax                #-}
+{-# LANGUAGE InstanceSigs              #-}
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE MultiParamTypeClasses     #-}
 {-# LANGUAGE NamedFieldPuns            #-}
@@ -616,14 +617,24 @@ instance MonadInspectMVar (IOSim s) where
         MVarFull x _  -> pure (Just x)
 
 instance MonadTraceMVar (IOSim s) where
-  traceMVarIO _ (MVar mvar) f = traceTVarIO mvar traceMVarAsTVar
+  traceMVarIO :: forall proxy a.
+                 proxy
+              -> MVar (IOSim s) a
+              -> (    Maybe (Maybe a)
+                  ->         Maybe a
+                  -> ST s TraceValue
+                 )
+              -> IOSim s ()
+  traceMVarIO _ (MVar mvar) f = traceTVarIO mvar f'
     where
-      traceMVarAsTVar Nothing                (MVarEmpty _ _) = f Nothing         Nothing
-      traceMVarAsTVar Nothing                (MVarFull a _)  = f Nothing         (Just a)
-      traceMVarAsTVar (Just (MVarEmpty _ _)) (MVarEmpty _ _) = f (Just Nothing)  Nothing
-      traceMVarAsTVar (Just (MVarEmpty _ _)) (MVarFull a _)  = f (Just Nothing)  (Just a)
-      traceMVarAsTVar (Just (MVarFull a _))  (MVarEmpty _ _) = f (Just (Just a)) Nothing
-      traceMVarAsTVar (Just (MVarFull a _))  (MVarFull a' _) = f (Just (Just a)) (Just a')
+      f' :: Maybe (MVarState m a)
+         ->        MVarState m a
+         -> ST s TraceValue
+      f' mst st = f (g <$> mst) (g st)
+
+      g :: MVarState m a -> Maybe a
+      g MVarEmpty{}    = Nothing
+      g (MVarFull a _) = Just a
 
 instance MonadLabelledMVar (IOSim s) where
   labelMVar = labelMVarDefault
