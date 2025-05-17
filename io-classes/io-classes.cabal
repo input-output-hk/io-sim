@@ -91,11 +91,11 @@ library
   default-extensions:  LambdaCase
   build-depends:       base  >=4.9 && <4.22,
                        array,
-                       async >=2.1,
+                       async >=2.1 && <2.3,
                        bytestring,
                        mtl   >=2.2 && <2.4,
                        primitive >= 0.7 && <0.11,
-                       stm   >=2.5 && <2.5.2 || >=2.5.3 && <2.6,
+                       stm   >=2.5 && <2.5.2 || ^>=2.5.3,
                        time  >=1.9.1 && <1.13
   if impl(ghc >= 9.10)
     build-depends:     ghc-internal
@@ -117,9 +117,9 @@ library strict-stm
   reexported-modules:  Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base        >= 4.9 && <4.22,
+  build-depends:       base,
                        array,
-                       stm         >= 2.5 && <2.6,
+                       stm,
 
                        io-classes:io-classes,
   ghc-options:         -Wall
@@ -140,7 +140,7 @@ library strict-mvar
   exposed-modules:     Control.Concurrent.Class.MonadMVar.Strict
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base        >= 4.9 && <4.22,
+  build-depends:       base,
                        io-classes:io-classes,
   ghc-options:         -Wall
                        -Wno-unticked-promoted-constructors
@@ -159,12 +159,12 @@ library si-timers
   other-modules:       Control.Monad.Class.MonadTimer.NonStandard
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base              >=4.9 && <4.22,
+  build-depends:       base,
                        deepseq,
                        mtl,
                        nothunks,
                        stm,
-                       time              >=1.9.1 && <1.13,
+                       time,
 
                        io-classes:io-classes
   if flag(asserts)
@@ -183,7 +183,7 @@ library mtl
                    ,  Control.Monad.Class.MonadTime.SI.Trans
                    ,  Control.Monad.Class.MonadTimer.Trans
                    ,  Control.Monad.Class.MonadTimer.SI.Trans
-    build-depends:    base >=4.9 && <4.22,
+    build-depends:    base,
                       array,
                       mtl,
 
@@ -200,7 +200,7 @@ library testlib
   exposed-modules:     Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base              >=4.9 && <4.22,
+  build-depends:       base,
                        nothunks,
                        QuickCheck,
                        io-classes:strict-mvar
