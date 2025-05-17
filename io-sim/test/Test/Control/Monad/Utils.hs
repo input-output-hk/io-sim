@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Test.Control.Monad.Utils where
 
 import Data.Array

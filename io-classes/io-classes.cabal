@@ -87,31 +87,8 @@ library
                        Control.Monad.Class.MonadTime
                        Control.Monad.Class.MonadTimer
                        Control.Monad.Class.MonadTest
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  other-extensions:    CPP
-                       DataKinds
-                       DefaultSignatures
-                       DeriveFunctor
-                       DeriveGeneric
-                       DerivingStrategies
-                       ExistentialQuantification
-                       ExplicitNamespaces
-                       FlexibleContexts
-                       FlexibleInstances
-                       FunctionalDependencies
-                       GADTs
-                       GeneralisedNewtypeDeriving
-                       MultiParamTypeClasses
-                       NamedFieldPuns
-                       QuantifiedConstraints
-                       RankNTypes
-                       ScopedTypeVariables
-                       StandaloneDeriving
-                       TypeFamilies
-                       TypeFamilyDependencies
-                       TypeOperators
-                       UndecidableInstances
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base  >=4.9 && <4.22,
                        array,
                        async >=2.1,
@@ -138,8 +115,8 @@ library strict-stm
                        Control.Concurrent.Class.MonadSTM.Strict.TQueue
                        Control.Concurrent.Class.MonadSTM.Strict.TVar
   reexported-modules:  Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base        >= 4.9 && <4.22,
                        array,
                        stm         >= 2.5 && <2.6,
@@ -161,8 +138,8 @@ library strict-mvar
   hs-source-dirs:      strict-mvar/src
 
   exposed-modules:     Control.Concurrent.Class.MonadMVar.Strict
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base        >= 4.9 && <4.22,
                        io-classes:io-classes,
   ghc-options:         -Wall
@@ -180,16 +157,8 @@ library si-timers
   exposed-modules:     Control.Monad.Class.MonadTime.SI
                        Control.Monad.Class.MonadTimer.SI
   other-modules:       Control.Monad.Class.MonadTimer.NonStandard
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  other-extensions:    BangPatterns,
-                       CPP,
-                       ConstraintKinds,
-                       DefaultSignatures,
-                       DeriveGeneric,
-                       NumericUnderscores,
-                       ScopedTypeVariables,
-                       TypeFamilies
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base              >=4.9 && <4.22,
                        deepseq,
                        mtl,
@@ -221,16 +190,16 @@ library mtl
                       io-classes:{io-classes,si-timers}
 
     hs-source-dirs:   mtl
-    default-language: Haskell2010
-    default-extensions:  ImportQualifiedPost
+    default-language: GHC2021
+    default-extensions: LambdaCase
 
 library testlib
   import:              warnings
   visibility:          public
   hs-source-dirs:      test
   exposed-modules:     Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base              >=4.9 && <4.22,
                        nothunks,
                        QuickCheck,
@@ -243,8 +212,8 @@ test-suite test-strict-mvar
   hs-source-dirs:      strict-mvar/test
   main-is:             Main.hs
 
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base,
                        QuickCheck,
                        tasty,
@@ -269,8 +238,8 @@ test-suite test-si-timers
   hs-source-dirs:      si-timers/test
   main-is:             Main.hs
   other-modules:       Test.MonadTimer
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base,
 
                        QuickCheck,

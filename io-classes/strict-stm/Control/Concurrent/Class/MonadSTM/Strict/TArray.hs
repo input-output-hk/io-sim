@@ -1,10 +1,5 @@
-{-# LANGUAGE BangPatterns          #-}
-{-# LANGUAGE ExplicitNamespaces    #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | This module corresponds to `Control.Concurrent.STM.TArray` in "stm" package
 --

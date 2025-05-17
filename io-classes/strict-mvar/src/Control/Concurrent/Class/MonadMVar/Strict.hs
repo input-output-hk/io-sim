@@ -1,7 +1,3 @@
-{-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE TypeOperators #-}
-
 -- | This module corresponds to "Control.Concurrent.MVar" in the @base@ package.
 module Control.Concurrent.Class.MonadMVar.Strict
   ( -- * StrictMVar

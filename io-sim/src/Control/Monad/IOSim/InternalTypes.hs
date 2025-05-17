@@ -1,6 +1,4 @@
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 
 -- | Internal types shared between `IOSim` and `IOSimPOR`.
 --

@@ -60,25 +60,8 @@ library
                        Control.Monad.IOSimPOR.QuickCheckUtils,
                        Control.Monad.IOSimPOR.Timeout,
                        Data.Deque.Strict
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  other-extensions:    BangPatterns,
-                       CPP,
-                       DeriveFunctor,
-                       DeriveGeneric,
-                       DerivingVia,
-                       ExistentialQuantification,
-                       ExplicitNamespaces,
-                       FlexibleContexts,
-                       FlexibleInstances,
-                       GADTSyntax,
-                       GeneralizedNewtypeDeriving,
-                       MultiParamTypeClasses,
-                       NamedFieldPuns,
-                       NumericUnderscores,
-                       RankNTypes,
-                       ScopedTypeVariables,
-                       TypeFamilies
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base              >=4.9 && <4.22,
                        io-classes:{io-classes,strict-stm,si-timers}
                                         ^>=1.6 || ^>= 1.7 || ^>= 1.8,
@@ -109,8 +92,8 @@ test-suite test
                        Test.Control.Monad.Utils
                        Test.Control.Monad.IOSim
                        Test.Control.Monad.IOSimPOR
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base,
                        array,
                        containers,
@@ -131,8 +114,8 @@ benchmark bench
   type:                exitcode-stdio-1.0
   hs-source-dirs:      bench
   main-is:             Main.hs
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base,
                        criterion ^>= 1.6,
 

@@ -1,8 +1,3 @@
-{-# LANGUAGE BangPatterns   #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TypeFamilies   #-}
-{-# LANGUAGE TypeOperators  #-}
-
 -- | This module corresponds to `Control.Concurrent.STM.TVar` in "stm" package
 --
 module Control.Concurrent.Class.MonadSTM.Strict.TVar

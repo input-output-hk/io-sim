@@ -1,8 +1,5 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE CPP          #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | A generalisation of
 -- <https://hackage.haskell.org/package/base/docs/Control-Concurrent.html Control.Concurrent>

@@ -1,6 +1,4 @@
 {-# LANGUAGE DefaultSignatures      #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE QuantifiedConstraints  #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 module Control.Concurrent.Class.MonadMVar

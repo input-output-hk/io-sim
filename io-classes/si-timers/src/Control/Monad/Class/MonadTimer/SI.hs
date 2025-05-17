@@ -1,9 +1,3 @@
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE InstanceSigs        #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NumericUnderscores  #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Control.Monad.Class.MonadTimer.SI
   ( -- * Type classes
     MonadDelay (..)
