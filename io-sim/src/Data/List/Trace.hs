@@ -1,5 +1,4 @@
-{-# LANGUAGE CPP           #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE CPP #-}
 
 module Data.List.Trace
   ( Trace (..)

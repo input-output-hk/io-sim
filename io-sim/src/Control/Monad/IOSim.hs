@@ -1,8 +1,4 @@
-{-# LANGUAGE ExplicitNamespaces    #-}
-{-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE QuantifiedConstraints #-}

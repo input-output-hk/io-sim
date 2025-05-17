@@ -1,4 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
 module Control.Monad.IOSimPOR.Types
   ( -- * Effects
     Effect (..)

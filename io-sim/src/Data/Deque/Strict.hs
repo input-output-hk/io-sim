@@ -1,6 +1,4 @@
-{-# LANGUAGE CPP        #-}
-{-# LANGUAGE LambdaCase #-}
-
+{-# LANGUAGE CPP #-}
 -- | A minimal implementation of a strict deque.
 --
 module Data.Deque.Strict where

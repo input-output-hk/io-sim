@@ -1,13 +1,11 @@
 # Revsion history of io-classes
 
-### next version
-
-* Support ghc-9.12
+### 1.8.0.0
 
 ### Breaking changes
 
-- Provided `MonadTraceMVar`
-- Renamed `InspectMonad` to `InspectMonadSTM`
+* Provided `MonadTraceMVar`
+* Renamed `InspectMonad` to `InspectMonadSTM`
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
 * Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
@@ -16,11 +14,13 @@
 * Moved all `MonadMaskingState` methods to `MonadMask`. `MonadMaskingState` is
   available but deprecated, it will be removed in one of the future releases.
 * `io-classes:mtl` instances support the extended `MonadMask` instance.
+* Renamed sublibraries by adding `io-classes-` prefix.
 
 ### Non-breaking changes
 
 * Added monad transformer instances for `MonadInspectSTM` & `MonadTraceSTM`
   type classes.
+* Support ghc-9.12
 
 ### 1.7.0.0
 

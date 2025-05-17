@@ -1,17 +1,8 @@
-{-# LANGUAGE BangPatterns              #-}
-{-# LANGUAGE CPP                       #-}
-{-# LANGUAGE DerivingVia               #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE GADTSyntax                #-}
-{-# LANGUAGE MultiParamTypeClasses     #-}
-{-# LANGUAGE NamedFieldPuns            #-}
-{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE DerivingVia     #-}
 -- only used to construct records if its clear to do so
-{-# LANGUAGE RecordWildCards           #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE TypeFamilies              #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies    #-}
 
 -- incomplete uni patterns in 'schedule' (when interpreting 'StmTxCommitted')
 -- and 'reschedule'.
