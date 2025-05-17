@@ -1,7 +1,4 @@
-{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 
 -- | 'io-sim' implementation of 'TQueue', 'TBQueue' and 'MVar'.
 --

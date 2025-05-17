@@ -1,12 +1,6 @@
-{-# LANGUAGE CPP                       #-}
-{-# LANGUAGE DefaultSignatures         #-}
-{-# LANGUAGE DeriveFunctor             #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE RankNTypes                #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE StandaloneDeriving        #-}
-{-# LANGUAGE TupleSections             #-}
-{-# LANGUAGE TypeFamilies              #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeFamilies      #-}
 
 -- | A generalisation of
 -- <https://hackage.haskell.org/package/base/docs/Control-Exception.html Control.Exception>

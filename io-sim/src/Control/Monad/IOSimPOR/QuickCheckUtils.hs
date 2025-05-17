@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Control.Monad.IOSimPOR.QuickCheckUtils where

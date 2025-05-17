@@ -1,7 +1,4 @@
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE GADTs #-}
 
 module Test.Control.Concurrent.Class.MonadMVar where
 
