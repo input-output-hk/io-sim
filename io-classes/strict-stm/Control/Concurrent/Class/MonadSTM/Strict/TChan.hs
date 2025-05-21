@@ -1,9 +1,3 @@
-{-# LANGUAGE BangPatterns       #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE NamedFieldPuns     #-}
-{-# LANGUAGE TypeOperators      #-}
-
 -- | This module corresponds to `Control.Concurrent.STM.TChan` in "stm" package
 --
 module Control.Concurrent.Class.MonadSTM.Strict.TChan

@@ -1,6 +1,6 @@
 cabal-version:       3.4
 name:                io-classes
-version:             1.7.0.0
+version:             1.8.0.0
 synopsis:            Type classes for concurrency with STM, ST and timing
 description:
   IO Monad class hierarchy compatible with:
@@ -38,7 +38,7 @@ category:            Control
 build-type:          Simple
 extra-doc-files:     CHANGELOG.md README.md strict-stm/README.md strict-mvar/README.md
 bug-reports:         https://github.com/input-output-hk/io-sim/issues
-tested-with:         GHC == { 8.10, 9.2, 9.4, 9.6, 9.8, 9.10 }
+tested-with:         GHC == { 9.6, 9.8, 9.10, 9.12 }
 
 source-repository head
   type:     git
@@ -87,38 +87,15 @@ library
                        Control.Monad.Class.MonadTime
                        Control.Monad.Class.MonadTimer
                        Control.Monad.Class.MonadTest
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  other-extensions:    CPP
-                       DataKinds
-                       DefaultSignatures
-                       DeriveFunctor
-                       DeriveGeneric
-                       DerivingStrategies
-                       ExistentialQuantification
-                       ExplicitNamespaces
-                       FlexibleContexts
-                       FlexibleInstances
-                       FunctionalDependencies
-                       GADTs
-                       GeneralisedNewtypeDeriving
-                       MultiParamTypeClasses
-                       NamedFieldPuns
-                       QuantifiedConstraints
-                       RankNTypes
-                       ScopedTypeVariables
-                       StandaloneDeriving
-                       TypeFamilies
-                       TypeFamilyDependencies
-                       TypeOperators
-                       UndecidableInstances
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base  >=4.9 && <4.22,
                        array,
-                       async >=2.1,
+                       async >=2.1 && <2.3,
                        bytestring,
                        mtl   >=2.2 && <2.4,
                        primitive >= 0.7 && <0.11,
-                       stm   >=2.5 && <2.5.2 || >=2.5.3 && <2.6,
+                       stm   >=2.5 && <2.5.2 || ^>=2.5.3,
                        time  >=1.9.1 && <1.13
   if impl(ghc >= 9.10)
     build-depends:     ghc-internal
@@ -127,6 +104,7 @@ library
     ghc-options: -fno-ignore-asserts
 
 library strict-stm
+  import:              warnings
   visibility:          public
   hs-source-dirs:      strict-stm
 
@@ -138,40 +116,26 @@ library strict-stm
                        Control.Concurrent.Class.MonadSTM.Strict.TQueue
                        Control.Concurrent.Class.MonadSTM.Strict.TVar
   reexported-modules:  Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  build-depends:       base        >= 4.9 && <4.22,
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
+  build-depends:       base,
                        array,
-                       stm         >= 2.5 && <2.6,
 
                        io-classes:io-classes,
-  ghc-options:         -Wall
-                       -Wno-unticked-promoted-constructors
-                       -Wcompat
-                       -Wincomplete-uni-patterns
-                       -Wincomplete-record-updates
-                       -Wpartial-fields
-                       -Widentities
 
   if flag(asserts)
     ghc-options: -fno-ignore-asserts
 
 library strict-mvar
+  import:              warnings
   visibility:          public
   hs-source-dirs:      strict-mvar/src
 
   exposed-modules:     Control.Concurrent.Class.MonadMVar.Strict
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  build-depends:       base        >= 4.9 && <4.22,
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
+  build-depends:       base,
                        io-classes:io-classes,
-  ghc-options:         -Wall
-                       -Wno-unticked-promoted-constructors
-                       -Wcompat
-                       -Wincomplete-uni-patterns
-                       -Wincomplete-record-updates
-                       -Wpartial-fields
-                       -Widentities
 
 library si-timers
   import:              warnings
@@ -180,22 +144,14 @@ library si-timers
   exposed-modules:     Control.Monad.Class.MonadTime.SI
                        Control.Monad.Class.MonadTimer.SI
   other-modules:       Control.Monad.Class.MonadTimer.NonStandard
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  other-extensions:    BangPatterns,
-                       CPP,
-                       ConstraintKinds,
-                       DefaultSignatures,
-                       DeriveGeneric,
-                       NumericUnderscores,
-                       ScopedTypeVariables,
-                       TypeFamilies
-  build-depends:       base              >=4.9 && <4.22,
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
+  build-depends:       base,
                        deepseq,
                        mtl,
                        nothunks,
                        stm,
-                       time              >=1.9.1 && <1.13,
+                       time,
 
                        io-classes:io-classes
   if flag(asserts)
@@ -214,24 +170,24 @@ library mtl
                    ,  Control.Monad.Class.MonadTime.SI.Trans
                    ,  Control.Monad.Class.MonadTimer.Trans
                    ,  Control.Monad.Class.MonadTimer.SI.Trans
-    build-depends:    base >=4.9 && <4.22,
+    build-depends:    base,
                       array,
                       mtl,
 
                       io-classes:{io-classes,si-timers}
 
     hs-source-dirs:   mtl
-    default-language: Haskell2010
-    default-extensions:  ImportQualifiedPost
+    default-language: GHC2021
+    default-extensions: LambdaCase
 
 library testlib
   import:              warnings
   visibility:          public
   hs-source-dirs:      test
   exposed-modules:     Test.Control.Concurrent.Class.MonadMVar.Strict.WHNF
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
-  build-depends:       base              >=4.9 && <4.22,
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
+  build-depends:       base,
                        nothunks,
                        QuickCheck,
                        io-classes:strict-mvar
@@ -239,26 +195,17 @@ library testlib
      ghc-options:      -fno-ignore-asserts
 
 test-suite test-strict-mvar
+  import:              warnings
   type:                exitcode-stdio-1.0
   hs-source-dirs:      strict-mvar/test
   main-is:             Main.hs
-
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base,
                        QuickCheck,
                        tasty,
                        tasty-quickcheck,
                        io-classes:testlib
-
-  ghc-options:         -Wall
-                       -Wno-unticked-promoted-constructors
-                       -Wcompat
-                       -Wincomplete-uni-patterns
-                       -Wincomplete-record-updates
-                       -Wpartial-fields
-                       -Widentities
-                       -fno-ignore-asserts
 
 -- Since `io-sim` depends on `si-times` (`io-sim` depends on `Time`) some tests of
 -- are in `io-sim:test`: this is a good enough reason to pull `io-sim:test`
@@ -269,8 +216,8 @@ test-suite test-si-timers
   hs-source-dirs:      si-timers/test
   main-is:             Main.hs
   other-modules:       Test.MonadTimer
-  default-language:    Haskell2010
-  default-extensions:  ImportQualifiedPost
+  default-language:    GHC2021
+  default-extensions:  LambdaCase
   build-depends:       base,
 
                        QuickCheck,

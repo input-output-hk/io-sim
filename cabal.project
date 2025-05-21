@@ -12,7 +12,7 @@ package io-classes
 package strict-stm
   flags: +asserts
 
-if impl (ghc >= 9.12)
+if impl (ghc >= 9.10.2)
   allow-newer:
     -- Stuck on `cabal-3.14` issues and recalcitrant maintainers
     -- https://github.com/haskell/aeson/issues/1124

@@ -1,8 +1,3 @@
-{-# LANGUAGE BangPatterns       #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE TypeOperators      #-}
-
 -- | This module corresponds to `Control.Concurrent.STM.TMVar` in "stm" package
 --
 module Control.Concurrent.Class.MonadSTM.Strict.TMVar

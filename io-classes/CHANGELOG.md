@@ -1,13 +1,11 @@
 # Revsion history of io-classes
 
-### next version
-
-* Support ghc-9.12
+### 1.8.0.0
 
 ### Breaking changes
 
-- Provided `MonadTraceMVar`
-- Renamed `InspectMonad` to `InspectMonadSTM`
+* Provided `MonadTraceMVar`
+* Renamed `InspectMonad` to `InspectMonadSTM`
 * Added `threadLabel` to `MonadThread`
 * Added `MonadLabelledMVar` class.
 * Added `labelMVar` to `Control.Concurrent.Class.MonadMVar.Strict`
@@ -21,6 +19,7 @@
 
 * Added monad transformer instances for `MonadInspectSTM` & `MonadTraceSTM`
   type classes.
+* Support ghc-9.12
 
 ### 1.7.0.0
 

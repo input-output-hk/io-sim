@@ -1,6 +1,3 @@
-{-# LANGUAGE InstanceSigs        #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 module Control.Monad.Class.MonadST (MonadST (..)) where
 
 import Control.Monad.Reader

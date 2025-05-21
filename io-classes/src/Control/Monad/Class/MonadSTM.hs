@@ -1,15 +1,11 @@
--- | This module corresponds to "Control.Monad.STM" in "stm" package
---
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DerivingStrategies    #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE GADTs                #-}
 -- undecidable instances needed for 'WrappedSTM' instances of 'MonadThrow' and
 -- 'MonadCatch' type classes.
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+-- | This module corresponds to "Control.Monad.STM" in "stm" package
+--
 module Control.Monad.Class.MonadSTM
   ( MonadSTM (STM, atomically, retry, orElse, check)
   , throwSTM
