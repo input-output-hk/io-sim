@@ -1,4 +1,4 @@
-index-state: hackage.haskell.org 2025-01-14T02:09:49Z
+index-state: hackage.haskell.org 2025-01-15T06:45:23Z
 
 packages: ./io-sim
           ./io-classes
@@ -12,7 +12,7 @@ package io-classes
 package strict-stm
   flags: +asserts
 
-if impl (ghc >= 9.10.2)
+if impl (ghc >= 9.12)
   allow-newer:
     -- Stuck on `cabal-3.14` issues and recalcitrant maintainers
     -- https://github.com/haskell/aeson/issues/1124
