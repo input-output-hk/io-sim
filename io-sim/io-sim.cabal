@@ -62,7 +62,7 @@ library
                        Data.Deque.Strict
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base              >=4.9 && <4.22,
+  build-depends:       base              >=4.16 && <4.22,
                        io-classes:{io-classes,strict-stm,si-timers}
                                         ^>=1.6 || ^>= 1.7 || ^>= 1.8,
                        exceptions        >=0.10,

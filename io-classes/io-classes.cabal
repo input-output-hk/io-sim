@@ -1,6 +1,6 @@
 cabal-version:       3.4
 name:                io-classes
-version:             1.8.0.0
+version:             1.8.0.1
 synopsis:            Type classes for concurrency with STM, ST and timing
 description:
   IO Monad class hierarchy compatible with:
@@ -89,7 +89,7 @@ library
                        Control.Monad.Class.MonadTest
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base  >=4.9 && <4.22,
+  build-depends:       base  >=4.16 && <4.22,
                        array,
                        async >=2.1 && <2.3,
                        bytestring,
@@ -118,6 +118,8 @@ library strict-stm
   reexported-modules:  Control.Concurrent.Class.MonadSTM.TSem as Control.Concurrent.Class.MonadSTM.Strict.TSem
   default-language:    GHC2021
   default-extensions:  LambdaCase
+  if impl(ghc < 9.4)
+    default-extensions: GADTs
   build-depends:       base,
                        array,
 
@@ -134,6 +136,8 @@ library strict-mvar
   exposed-modules:     Control.Concurrent.Class.MonadMVar.Strict
   default-language:    GHC2021
   default-extensions:  LambdaCase
+  if impl(ghc < 9.4)
+    default-extensions: GADTs
   build-depends:       base,
                        io-classes:io-classes,
 
