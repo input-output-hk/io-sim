@@ -1,6 +1,6 @@
 cabal-version:       3.4
 name:                io-sim
-version:             1.8.0.0
+version:             1.8.0.1
 synopsis:            A pure simulator for monadic concurrency with STM.
 description:
   A pure simulator monad with support of concurrency (base & async style), stm,
@@ -62,6 +62,8 @@ library
                        Data.Deque.Strict
   default-language:    GHC2021
   default-extensions:  LambdaCase
+  if impl(ghc < 9.4)
+    default-extensions: GADTs
   build-depends:       base              >=4.16 && <4.22,
                        io-classes:{io-classes,strict-stm,si-timers}
                                         ^>=1.6 || ^>= 1.7 || ^>= 1.8,
@@ -94,6 +96,8 @@ test-suite test
                        Test.Control.Monad.IOSimPOR
   default-language:    GHC2021
   default-extensions:  LambdaCase
+  if impl(ghc < 9.4)
+    default-extensions: GADTs
   build-depends:       base,
                        array,
                        containers,
@@ -116,6 +120,8 @@ benchmark bench
   main-is:             Main.hs
   default-language:    GHC2021
   default-extensions:  LambdaCase
+  if impl(ghc < 9.4)
+    default-extensions: GADTs
   build-depends:       base,
                        criterion ^>= 1.6,
 
