@@ -6,6 +6,10 @@
 
 ### Non-breaking changes
 
+### 1.8.0.1
+
+* Added support for `ghc-9.2`.
+
 ## 1.8.0.0
 
 - Provided `MonadTraceMVar`
