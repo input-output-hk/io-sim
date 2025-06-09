@@ -1,39 +1,51 @@
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE PatternSynonyms     #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE NoFieldSelectors           #-}
+{-# LANGUAGE OverloadedRecordDot        #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 module Test.StateMachine.IOSim.Execute
   ( -- * Executing
     runSequential
+  , runSequentialException
   , runParallel
   , runParallelException
-  , runSequentialPOR
-  , runSequentialPORException
   ) where
 
-import Control.Concurrent.Class.MonadSTM hiding (check)
+import Control.Concurrent.Class.MonadSTM
+import Control.Monad (when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadTest
 import Control.Monad.Class.MonadThrow
+import Control.Monad.Error.Class
 import Control.Monad.IOSim
+import Control.Monad.State.Strict
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Writer.CPS (runWriterT)
+import Control.Monad.Writer.CPS
 import Data.Bifunctor
 import Data.Dynamic (Dynamic, toDyn)
 import Data.Either
-import Data.Foldable (foldl')
+import Data.Either (fromLeft)
+import Data.Foldable (foldl', for_, toList)
 import Data.Function ((&))
 import Data.Maybe
+import Data.Sequence (Seq)
+import Data.Set qualified as Set
 import Test.QuickCheck
 import Test.StateMachine.IOSim.Types
 import Test.StateMachine.Logic
 import Test.StateMachine.Types hiding (StateMachine (..))
 import Test.StateMachine.Types.Rank2 qualified as Rank2
-import Text.Show.Pretty hiding (reify)
+import Text.Show.Pretty (ppShow)
 
 {-------------------------------------------------------------------------------
   Runner helpers
@@ -160,6 +172,88 @@ runIOSimPORAcceptExceptions act prop =
   Running functions
 -------------------------------------------------------------------------------}
 
+runCommandsSequentially ::
+    forall model cmd m resp.
+    ( Monad m
+    , Show (cmd Concrete)
+    , Show (resp Concrete)
+    , Rank2.Traversable cmd
+    , Rank2.Foldable resp
+    ) =>
+    -- | How to run the 'semantics'.
+    (m (resp Concrete) -> QsmM model cmd resp m (resp Concrete)) ->
+    StateMachine model cmd m resp ->
+    Commands cmd resp ->
+    QsmM model cmd resp m ()
+runCommandsSequentially runSemantics sm (Commands scmds) =
+    for_ scmds $ \(Command scmd _ vars) -> do
+      QsmState{env, smodel, counter, cmodel} <- get
+      checkLogic
+        (logic (precondition sm smodel scmd))
+        (PreconditionFailed . show)
+      let ccmd = fromRight (error "impossible") (reify env scmd)
+      logEvent $ Invocation ccmd (Set.fromList vars)
+      cresp <- runSemantics $ semantics sm ccmd
+      logEvent $ Response cresp
+      let cvars = getUsedConcrete cresp
+      when (length vars /= length cvars) $ do
+        let err = mockSemanticsMismatchError
+                    (ppShow ccmd)
+                    (ppShow vars)
+                    (ppShow cresp)
+                    (ppShow cvars)
+        finishWithReason $ MockSemanticsMismatch err
+      checkLogic
+        (logic (postcondition sm cmodel ccmd cresp))
+        (PostconditionFailed . show)
+      checkLogic
+        (logic (fromMaybe (const Top) (invariant sm) cmodel))
+        (InvariantBroken . show)
+      let (sresp, counter') = runGenSym (mock sm smodel scmd) counter
+      put QsmState {
+          env = insertConcretes vars cvars env
+        , smodel = transition sm smodel scmd sresp
+        , counter = counter'
+        , cmodel = transition sm cmodel ccmd cresp
+        }
+
+initialSt :: StateMachine model cmd m resp -> QsmState model
+initialSt sm = QsmState {
+    env = emptyEnvironment
+  , smodel = initModel sm
+  , counter = newCounter
+  , cmodel = initModel sm
+  }
+
+runSemanticsViaCatch ::
+    MonadCatch m =>
+    m (resp Concrete) ->
+    QsmM model cmd resp m (resp Concrete)
+runSemanticsViaCatch sem = lift (try sem) >>= \case
+    Left (ex :: SomeException) -> do
+      let exStr = displayException ex
+      logEvent $ Exception exStr
+      finishWithReason $ ExceptionThrown exStr
+    Right cresp -> pure cresp
+
+runSequentialInternal ::
+    forall model cmd m resp.
+    ( MonadCatch m
+    , Show (cmd Concrete)
+    , Show (resp Concrete)
+    , Rank2.Traversable cmd
+    , Rank2.Foldable resp
+    ) =>
+    (m (resp Concrete) -> QsmM model cmd resp m (resp Concrete)) ->
+    StateMachine model cmd m resp ->
+    Commands cmd resp ->
+    m (History cmd resp, model Concrete, Reason)
+runSequentialInternal runSemantics sm cmds = do
+    (hist, st, reason) <- runQsmM (initialSt sm) (Pid 0) $
+      runCommandsSequentially runSemantics sm cmds
+    pure (hist, st.cmodel, reason)
+
+
 {- | Run a sequence of commands sequentially
 
 Checks for:
@@ -175,518 +269,139 @@ Checks for:
  * mock semantics match
 -}
 runSequential ::
-    forall model cmd init resp.
-    (Show (cmd Concrete), Show (resp Concrete)) =>
-    (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    (forall s. StateMachine model cmd init (IOSim s) resp) ->
+    forall model cmd m resp.
+    ( MonadCatch m
+    , Show (cmd Concrete)
+    , Show (resp Concrete)
+    , Rank2.Traversable cmd
+    , Rank2.Foldable resp
+    ) =>
+    StateMachine model cmd m resp ->
     Commands cmd resp ->
-    Property
-runSequential sm (Commands scmds) =
-    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) scmds
-        & (\(p, _, _, _, _, _) -> p)
-  where
-    act (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
-        let
-            -- Precondition
-            pPre = prec sm smodel scmd
+    m (History cmd resp, model Concrete, Reason)
+runSequential =
+    runSequentialInternal runSemanticsViaCatch
 
-            -- Simulate
-            ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
-            prevCmds' = prevCmds ++ [ccmd]
-            (trace, cresp, prop) = runIOSim $ do
-                sut <- initSut sm
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-                semantics sm sut ccmd
-
-            -- Postcondition and invariant
-            pPost = post sm cmodel ccmd cresp False trace
-            pInv = inv sm cmodel False trace
-
-            -- Mock
-            (pMock, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
-         in
-            ( prevProp .&&. pPre .&&. prop .&&. pMock .&&. pPost .&&. pInv
-            , prevCmds'
-            , insertConcretes vars cvars env
-            , transition sm smodel scmd sresp
-            , counter'
-            , transition sm cmodel ccmd cresp
-            )
-
-{- | Run a sequence of commands sequentially, additionally checking for races.
-
-Checks for:
-
- * precondition
-
- * exceptions
-
- * postcondition
-
- * invariant
-
- * mock semantics match
-
-For all possible races found, the postcondition and invariant must hold.
--}
-runSequentialPOR ::
-    forall model cmd init resp.
-    (Show (cmd Concrete), Show (resp Concrete)) =>
-    (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    (forall s. StateMachine model cmd init (IOSim s) resp) ->
+runSequentialException ::
+    forall model cmd m resp.
+    ( MonadCatch m
+    , Show (cmd Concrete)
+    , Show (resp Concrete)
+    , Rank2.Traversable cmd
+    , Rank2.Foldable resp
+    ) =>
+    StateMachine model cmd m resp ->
     Commands cmd resp ->
-    Property
-runSequentialPOR sm (Commands scmds) =
-    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) scmds
-        & (\(p, _, _, _, _, _) -> p)
+    m (History cmd resp, model Concrete, Reason)
+runSequentialException =
+    runSequentialInternal runSemantics
   where
-    act (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
-        let
-            -- Precondition
-            pPre = prec sm smodel scmd
-
-            -- Simulation
-            ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
-            prevCmds' = prevCmds ++ [ccmd]
-            simAction = do
-                sut <- initSut sm
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-                semantics sm sut ccmd
-            -- Parallel property (for all interleavings)
-            porProp = runIOSimPOR simAction $ \trace pt cresp' ->
-                let
-                    (pMock, _) = mockCheck ccmd cresp' vars
-                    pPost = post sm cmodel ccmd cresp' pt trace
-                    pInv = inv sm cmodel pt trace
-                 in
-                    prevProp .&&. pPre .&&. pMock .&&. pPost .&&. pInv
-
-            -- Advance model
-            (_, cresp, _) = runIOSim simAction
-            (_, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
-         in
-            ( prevProp .&&. porProp
-            , prevCmds'
-            , insertConcretes vars cvars env
-            , transition sm smodel scmd sresp
-            , counter'
-            , transition sm cmodel ccmd cresp
-            )
-
-runSequentialPORException ::
-    forall model cmd init resp.
-    (Show (cmd Concrete), Show (resp Concrete)) =>
-    (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    (forall s. StateMachine model cmd init (IOSim s) resp) ->
-    Commands cmd resp ->
-    Property
-runSequentialPORException sm (Commands scmds) =
-    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) scmds
-        & (\(p, _, _, _, _, _) -> p)
-  where
-    act (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
-        let
-            -- Precondition
-            pPre = prec sm smodel scmd
-
-            -- Simulation
-            ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
-            prevCmds' = prevCmds ++ [ccmd]
-            simAction = do
-                sut <- initSut sm
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-                t1 <- async $ semantics sm sut ccmd
-                canceller <- async (cancel t1)
-                wait canceller
-                wait t1
-            -- Parallel property (for all interleavings)
-            porProp = runIOSimPORAcceptExceptions simAction $ \trace pt -> \case
-              Right cresp' ->
-                let
-                    (pMock, _) = mockCheck ccmd cresp' vars
-                    pPost = post sm cmodel ccmd cresp' pt trace
-                    pInv = inv sm cmodel pt trace
-                 in
-                    prevProp .&&. pPre .&&. pMock .&&. pPost .&&. pInv
-              Left _ -> property True
-
-            -- Advance model
-            (_, cresp, _) = runIOSim simAction
-            (_, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
-         in
-            ( prevProp .&&. porProp
-            , prevCmds'
-            , insertConcretes vars cvars env
-            , transition sm smodel scmd sresp
-            , counter'
-            , transition sm cmodel ccmd cresp
-            )
+    runSemantics :: m (resp Concrete) -> QsmM model cmd resp m (resp Concrete)
+    runSemantics sem = lift (try sem) >>= \case
+      Left (ex :: SomeException) -> do
+        logEvent $ Exception (displayException ex)
+        finishWithReason Ok
+      Right cresp -> pure cresp
 
 {-------------------------------------------------------------------------------
   Parallel
 -------------------------------------------------------------------------------}
 
-data OnePairF f a = One a | PP (f a)
-
--- | Run a ParallelCommands
 runParallel ::
-    forall model cmd init resp.
-    (Show (cmd Concrete), Show (resp Concrete)) =>
-    (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    (forall s. StateMachine model cmd init (IOSim s) resp) ->
-    ParallelCommands cmd resp ->
-    Property
-runParallel sm (ParallelCommands pref suff) =
-    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) (One pref : map PP suff)
-        & (\(p, _, _, _, _, _) -> p)
-  where
-    act st (One (Commands scmds)) = foldl' runSequential' st scmds
-    act (prevProp, prevCmds, env, _smodel, _counter, cmodel) (PP (Pair (Commands p1) (Commands p2))) =
-        let
-            -- Reify commands and create environments
-            --
-            -- The only way to do this is to run the actions in two separate IOSim
-            -- simulations, accumulating the environment and commands.
-            --
-            -- Due to the iterative nature of this test, we can be confident this will
-            -- not fail if previous steps did not fail.
-            reifyCmd (acc, env') (Command scmd _ vars) =
-                let ccmd = fromRight (error "runSequential: impossible") (reify env' scmd)
-                    simAction' = do
-                        sut <- initSut sm
-                        sequence_ $ map (semantics sm sut) (prevCmds ++ map fst acc)
-                        semantics sm sut ccmd
-                    (_, cresp, _) = runIOSim simAction'
-                    (_, cvars) = mockCheck ccmd cresp vars
-                 in (acc ++ [(ccmd, cresp)], insertConcretes vars cvars env')
+    forall model cmd resp m t.
+    ( MonadCatch m
+    , Show (cmd Concrete)
+    , Show (resp Concrete)
+    , Rank2.Traversable cmd
+    , Rank2.Foldable resp
+    , Traversable t
+    ) =>
+    StateMachine model cmd m resp ->
+    ParallelCommandsF t cmd resp ->
+    m (History cmd resp, model Concrete, Reason)
+runParallel sm (ParallelCommands pref suff) = do
+    (hist0, QsmState{env = env0, cmodel = cmodel0}, reason0) <-
+      runQsmM (initialSt sm) (Pid 0) $
+        runCommandsSequentially runSemanticsViaCatch sm pref
+    if reason0 /= Ok
+    then do
+      pure (hist0, cmodel0, reason0)
+    else do
+      pure undefined
 
-            (p1', env1) = foldl' reifyCmd ([], env) p1
-            (p2', env2) = foldl' reifyCmd ([], env) p2
-
-            -- The IOSimPOR parallel action
-            simAction = do
-                -- We create a TQueue to which we will send command + response pairs
-                tq <- atomically $ do
-                    tq <- newTQueue
-                    labelTQueue tq "CONTROL"
-                    pure tq
-                sut <- initSut sm
-                -- Run the sequential prefix
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-
-                let racingAction =
-                        async
-                            . sequence_
-                            . map
-                                ( \ccmd -> do
-                                    cresp <- semantics sm sut ccmd
-                                    atomically $ writeTQueue tq (ccmd, cresp)
-                                )
-                            . map fst
-                -- Run both actions in a race, and wait for both
-                t1 <- racingAction p1'
-                t2 <- racingAction p2'
-
-                wait t1
-                wait t2
-
-                -- Get all command + response pairs
-                atomically $ drainTQueue tq
-
-            -- The simulation
-            porProp = runIOSimPOR simAction $ \trace _ cmds ->
-                let events = traceEvents trace
-                    events' = [first reverse $ splitAt n events | n <- [0 .. length events]]
-                    -- A real interleaving is one in which the thread that sent
-                    -- the message to the TQueue has done some work since it was
-                    -- scheduled, i.e. the TQueue writing action was not
-                    -- artificially delayed
-                    fakeInterleaving =
-                        [ not $ hasDoneWork id2 before
-                        | (before, (_, id2, _, EventTxCommitted w _ _) : _) <- events'
-                        , Just "CONTROL" `elem` map l_label w -- has written to the CONTROL TQueue
-                        ]
-                 in counterexample (ppTrace trace) $
-                        -- If this was a fake interleaving just make it pass
-                        property (or fakeInterleaving)
-                            .||. ( fst $
-                                    foldl'
-                                        ( \(prop, model) (cmd, resp) ->
-                                            let model' = transition sm model cmd resp
-                                                prop' = case logic (postcondition sm model cmd resp) of
-                                                    VFalse ce -> counterexample ("Poscondition impossible! " <> show ce) $ property False
-                                                    _ -> property True
-                                             in (prop .&&. prop', model')
-                                        )
-                                        (property True, cmodel)
-                                        cmds
-                                 )
-         in
-            ( prevProp .&&. porProp
-            , prevCmds ++ map fst p1' ++ map fst p2'
-            , env1 <> env2
-            , undefined
-            , undefined
-            , foldl (\x (y, z) -> transition sm x y z) cmodel $ p1' ++ p2'
-            )
-
-    -- This is almost the same as @runSequential@ but it accumulates the concrete
-    -- commands.
-    runSequential' (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
-        let
-            -- Precondition
-            pPre = prec sm smodel scmd
-
-            -- Simulate
-            ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
-            prevCmds' = prevCmds ++ [ccmd]
-            simAction = do
-                sut <- initSut sm
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-                semantics sm sut ccmd
-            (trace, cresp, prop) = runIOSim simAction
-
-            -- Postcondition
-            pPost = post sm cmodel ccmd cresp False trace
-            pInv = inv sm cmodel False trace
-
-            -- Mock
-            (pMock, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
-         in
-            ( prevProp .&&. pPre .&&. prop .&&. pPost .&&. pInv .&&. pMock
-            , prevCmds'
-            , insertConcretes vars cvars env
-            , transition sm smodel scmd sresp
-            , counter'
-            , transition sm cmodel ccmd cresp
-            )
-
--- | Run a ParallelCommands
-runParallelException ::
-    forall model cmd init resp.
-    (Show (cmd Concrete), Show (resp Concrete)) =>
-    (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    (forall s. StateMachine model cmd init (IOSim s) resp) ->
-    ParallelCommands cmd resp ->
-    Property
-runParallelException sm (ParallelCommands pref suff) =
-    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) (One pref : map PP suff)
-        & (\(p, _, _, _, _, _) -> p)
-  where
-    act st (One (Commands scmds)) = foldl' runSequential' st scmds
-    act (prevProp, prevCmds, env, _smodel, _counter, cmodel) (PP (Pair (Commands p1) (Commands p2))) =
-        let
-            -- Reify commands and create environments
-            --
-            -- The only way to do this is to run the actions in two separate IOSim
-            -- simulations, accumulating the environment and commands.
-            --
-            -- Due to the iterative nature of this test, we can be confident this will
-            -- not fail if previous steps did not fail.
-            reifyCmd (acc, env') (Command scmd _ vars) =
-                let ccmd = fromRight (error "runSequential: impossible") (reify env' scmd)
-                    simAction' = do
-                        sut <- initSut sm
-                        sequence_ $ map (semantics sm sut) (prevCmds ++ map fst acc)
-                        semantics sm sut ccmd
-                    (_, cresp, _) = runIOSim simAction'
-                    (_, cvars) = mockCheck ccmd cresp vars
-                 in (acc ++ [(ccmd, cresp)], insertConcretes vars cvars env')
-
-            (p1', env1) = foldl' reifyCmd ([], env) p1
-            (p2', env2) = foldl' reifyCmd ([], env) p2
-
-            -- The IOSimPOR parallel action
-            simAction = do
-                -- We create a TQueue to which we will send command + response pairs
-                tq <- atomically $ do
-                    tq <- newTQueue
-                    labelTQueue tq "CONTROL"
-                    pure tq
-                sut <- initSut sm
-                -- Run the sequential prefix
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-
-                let racingAction =
-                        async
-                            . sequence_
-                            . map
-                                ( \ccmd -> do
-                                    cresp <- semantics sm sut ccmd
-                                    atomically $ writeTQueue tq (ccmd, cresp)
-                                )
-                            . map fst
-                -- Run both actions in a race, and wait for both
-                t1 <- racingAction p1'
-                t2 <- racingAction p2'
-                t3 <- async (cancel t1)
-                wait t3
-                wait t2
-                wait t1
-
-                -- Get all command + response pairs
-                atomically $ drainTQueue tq
-
-            -- The simulation
-            porProp = runIOSimPORAcceptExceptions simAction $ \trace _ -> \case
-              Left {} -> property True
-              Right cmds ->
-                let events = traceEvents trace
-                    events' = [first reverse $ splitAt n events | n <- [0 .. length events]]
-                    -- A real interleaving is one in which the thread that sent
-                    -- the message to the TQueue has done some work since it was
-                    -- scheduled, i.e. the TQueue writing action was not
-                    -- artificially delayed
-                    fakeInterleaving =
-                        [ not $ hasDoneWork id2 before
-                        | (before, (_, id2, _, EventTxCommitted w _ _) : _) <- events'
-                        , Just "CONTROL" `elem` map l_label w -- has written to the CONTROL TQueue
-                        ]
-                 in counterexample (ppTrace trace) $
-                        -- If this was a fake interleaving just make it pass
-                        property (or fakeInterleaving)
-                            .||. ( fst $
-                                    foldl'
-                                        ( \(prop, model) (cmd, resp) ->
-                                            let model' = transition sm model cmd resp
-                                                prop' = case logic (postcondition sm model cmd resp) of
-                                                    VFalse ce -> counterexample ("Poscondition impossible! " <> show ce) $ property False
-                                                    _ -> property True
-                                             in (prop .&&. prop', model')
-                                        )
-                                        (property True, cmodel)
-                                        cmds
-                                 )
-         in
-            ( prevProp .&&. porProp
-            , prevCmds ++ map fst p1' ++ map fst p2'
-            , env1 <> env2
-            , undefined
-            , undefined
-            , foldl (\x (y, z) -> transition sm x y z) cmodel $ p1' ++ p2'
-            )
-
-    -- This is almost the same as @runSequential@ but it accumulates the concrete
-    -- commands.
-    runSequential' (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
-        let
-            -- Precondition
-            pPre = prec sm smodel scmd
-
-            -- Simulate
-            ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
-            prevCmds' = prevCmds ++ [ccmd]
-            simAction = do
-                sut <- initSut sm
-                sequence_ $ map (\c -> semantics sm sut c) prevCmds
-                semantics sm sut ccmd
-            (trace, cresp, prop) = runIOSim simAction
-
-            -- Postcondition
-            pPost = post sm cmodel ccmd cresp False trace
-            pInv = inv sm cmodel False trace
-
-            -- Mock
-            (pMock, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
-         in
-            ( prevProp .&&. pPre .&&. prop .&&. pPost .&&. pInv .&&. pMock
-            , prevCmds'
-            , insertConcretes vars cvars env
-            , transition sm smodel scmd sresp
-            , counter'
-            , transition sm cmodel ccmd cresp
-            )
-
-hasDoneWork :: (Eq p) => p -> [(a, p, c, SimEventType)] -> Bool
-hasDoneWork idX evs =
-    go False evs
-  where
-    go acc [] = acc
-    go acc ((_, idY, _, ev) : next)
-        | idX /= idY = acc
-        | otherwise =
-            go
-                ( acc || case ev of
-                    EventThrow{}        -> True
-                    EventThrowTo{}      -> True
-                    EventThreadForked{} -> True
-                    EventTxCommitted{}  -> True
-                    EventTxAborted{}    -> True
-                    EventTxBlocked{}    -> True
-                    EventThreadDelay{}  -> True
-                    _                   -> False
-                )
-                next
-
-drainTQueue :: (MonadSTM m) => TQueue m a -> STM m [a]
-drainTQueue tc = do
-    msg <- tryReadTQueue tc
-    case msg of
-        Nothing -> pure []
-        Just v  -> (v :) <$> drainTQueue tc
+runParallelException :: ()
+runParallelException = () -- TODO
 
 {-------------------------------------------------------------------------------
   Helpers
 -------------------------------------------------------------------------------}
 
--- | Check the precondition
-prec ::
-    StateMachine model cmd init m resp ->
-    model Symbolic ->
-    cmd Symbolic ->
-    Property
-prec StateMachine{precondition} smodel scmd =
-    let e ce = counterexample ("Precondition failed: " <> show ce) $ property False
-     in case logic (precondition smodel scmd) of
-            VFalse ce  -> e ce
-            _otherwise -> property True
+data QsmState model = QsmState {
+    env     :: !Environment
+  , smodel  :: !(model Symbolic)
+  , counter :: !Counter
+  , cmodel  :: !(model Concrete)
+  }
 
--- | Check the postcondition
-post ::
-    (Show a) =>
-    StateMachine model cmd init m resp ->
-    model Concrete ->
-    cmd Concrete ->
-    resp Concrete ->
-    Bool ->
-    SimTrace a ->
-    Property
-post StateMachine{postcondition} cmodel ccmd cresp wasRace trace =
-    case logic (postcondition cmodel ccmd cresp) of
-        VFalse ce ->
-            counterexample (ppTrace trace)
-                $ counterexample
-                    ( (if wasRace then ("Race found! " <>) else id)
-                        "Postcondition failed: "
-                        <> show ce
-                    )
-                $ property False
-        _otherwise -> property True
+newtype QsmM model cmd resp m a = QsmM
+  (ExceptT
+     Reason
+     (StateT
+       (QsmState model)
+       (WriterT
+          (Seq (HistoryEvent cmd resp))
+          m
+       )
+     )
+     a
+  )
+  deriving newtype
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadState (QsmState model)
+    )
 
--- | Check the invariant
-inv ::
-    (Show a) =>
-    StateMachine model cmd init m resp ->
-    model Concrete ->
-    Bool ->
-    SimTrace a ->
-    Property
-inv StateMachine{invariant} cmodel wasRace trace =
-    case logic (fromMaybe (const Top) invariant cmodel) of
-        VFalse ce ->
-            counterexample (ppTrace trace)
-                $ counterexample
-                    ( (if wasRace then ("Race found! " <>) else id)
-                        "Invariant broken: "
-                        <> show ce
-                    )
-                $ property False
-        _otherwise -> property True
+instance MonadTrans (QsmM model cmd resp) where
+  lift = QsmM . lift . lift . lift
+
+finishWithReason :: Monad m => Reason -> QsmM model cmd resp m a
+finishWithReason = QsmM . throwError
+
+checkLogic ::
+  Monad m =>
+  Value ->
+  (Counterexample -> Reason) ->
+  QsmM model cmd resp m ()
+checkLogic val toReason = case val of
+  VTrue     -> pure ()
+  VFalse ce -> finishWithReason $ toReason ce
+
+logEvent :: Monad m => HistoryEvent cmd resp -> QsmM model cmd resp m ()
+logEvent = QsmM . tell . pure
+
+runQsmM ::
+  forall model cmd m resp a.
+  Monad m =>
+  QsmState model ->
+  Pid ->
+  QsmM model cmd resp m () ->
+  m (History cmd resp, QsmState model, Reason)
+runQsmM initialSt pid (QsmM action) = do
+  ((ereason, st), evs) <-
+    runWriterT $ runStateT (runExceptT action) initialSt
+  pure (History $ (pid,) <$> toList evs, st, fromLeft Ok ereason)
+
+{-------------------------------------------------------------------------------
+  Vendored, maybe expose upstream?
+-------------------------------------------------------------------------------}
+
+getUsedConcrete :: Rank2.Foldable f => f Concrete -> [Dynamic]
+getUsedConcrete = Rank2.foldMap (\(Concrete x) -> [toDyn x])
+
+logicReason :: Reason -> Logic
+logicReason Ok = Top
+logicReason r  = Annotate (show r) Bot
 
 mockCheck ::
     ( Foldable t

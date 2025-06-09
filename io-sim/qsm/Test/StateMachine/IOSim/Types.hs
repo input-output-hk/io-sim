@@ -8,7 +8,7 @@ import Test.QuickCheck
 import Test.StateMachine.Logic
 import Test.StateMachine.Types hiding (StateMachine (..))
 
-data StateMachine model cmd init m resp = StateMachine
+data StateMachine model cmd m resp = StateMachine
     { initModel :: forall r. model r
     , transition :: forall r. (Show1 r, Ord1 r) => model r -> cmd r -> resp r -> model r
     , precondition :: model Symbolic -> cmd Symbolic -> Logic
@@ -16,7 +16,6 @@ data StateMachine model cmd init m resp = StateMachine
     , invariant :: Maybe (model Concrete -> Logic)
     , generator :: model Symbolic -> Maybe (Gen (cmd Symbolic))
     , shrinker :: model Symbolic -> cmd Symbolic -> [cmd Symbolic]
-    , initSut :: m (init m)
-    , semantics :: init m -> cmd Concrete -> m (resp Concrete)
+    , semantics :: cmd Concrete -> m (resp Concrete)
     , mock :: model Symbolic -> cmd Symbolic -> GenSym (resp Symbolic)
-    }
+    } -- TODO only cleanup missing compared to upstream

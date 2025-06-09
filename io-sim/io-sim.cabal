@@ -97,6 +97,7 @@ library qsm
                        io-sim,
                        QuickCheck,
                        mtl,
+                       transformers,
                        containers,
                        pretty-show,
                        io-classes,
