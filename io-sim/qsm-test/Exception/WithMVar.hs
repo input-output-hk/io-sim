@@ -1,6 +1,6 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveAnyClass           #-}
 {-# LANGUAGE DeriveGeneric            #-}
+{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE PolyKinds                #-}
 {-# LANGUAGE RankNTypes               #-}
 {-# LANGUAGE StandaloneDeriving       #-}
@@ -10,14 +10,15 @@
 
 module Exception.WithMVar where
 
+import Control.Concurrent.Class.MonadMVar
+import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadThrow
+import Control.Monad.IOSim
 import Data.Kind
 import GHC.Generics
 import Test.QuickCheck
 import Test.StateMachine.IOSim
 import Test.StateMachine.Types.Rank2 qualified as Rank2
-import Control.Concurrent.Class.MonadMVar
-import Control.Monad.Class.MonadThrow
-import Control.Monad.Class.MonadSay
 
 {-------------------------------------------------------------------------------
   Cmd and response
@@ -98,7 +99,7 @@ semantics sut Increment = do
 transition :: Model r -> Cmd r -> Resp r -> Model r
 transition (Model m) Increment _ = Model (m + 1)
 
-sm :: StateMachine Model Cmd AtomicCounter Resp
+sm :: StateMachine Model Cmd AtomicCounter (IOSim s) Resp
 sm = StateMachine initModel transition precondition postcondition Nothing
      generator shrinker newSUT semantics mock
 

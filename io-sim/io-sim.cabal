@@ -176,6 +176,7 @@ test-suite qsm-test
   default-extensions:  ImportQualifiedPost
   build-depends:       base,
                        io-sim:qsm,
+                       io-sim,
                        io-classes,
                        QuickCheck,
                        tasty,

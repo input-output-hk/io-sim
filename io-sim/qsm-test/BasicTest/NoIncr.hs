@@ -4,6 +4,7 @@ module BasicTest.NoIncr where
 
 import BasicTest.Template
 import Control.Concurrent.Class.MonadSTM
+import Control.Monad.IOSim
 import Test.QuickCheck
 import Test.StateMachine.IOSim
 
@@ -41,7 +42,7 @@ transition :: Model r -> Cmd r -> Resp r -> Model r
 transition (Model m) Incr _ = Model (m + 1)
 transition m Get _          = m
 
-sm :: StateMachine Model Cmd AtomicCounter Resp
+sm :: StateMachine Model Cmd AtomicCounter (IOSim s) Resp
 sm = StateMachine initModel transition precondition postcondition Nothing
      generator shrinker newSUT semantics mock
 

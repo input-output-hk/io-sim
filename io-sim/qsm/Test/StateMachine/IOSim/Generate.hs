@@ -30,7 +30,7 @@ import Text.Show.Pretty hiding (reify)
 forAllCommands :: Testable prop
                => (Show (cmd Symbolic), Show (resp Symbolic), Show (model Symbolic))
                => (Rank2.Traversable cmd, Rank2.Foldable resp)
-               => StateMachine model cmd sut resp
+               => StateMachine model cmd init m resp
                -> Maybe Int -- ^ Minimum number of commands.
                -> (Commands cmd resp -> prop)     -- ^ Predicate.
                -> Property
@@ -54,15 +54,15 @@ deadlockError model generated counterexamples = error $ concat
 
 generateCommands :: (Rank2.Foldable resp, Show (model Symbolic))
                  => (Show (cmd Symbolic), Show (resp Symbolic))
-                 => StateMachine model cmd sut resp
+                 => StateMachine model cmd init m resp
                  -> Maybe Int -- ^ Minimum number of commands.
                  -> Gen (Commands cmd resp)
 generateCommands sm@StateMachine {..} mminSize =
   evalStateT (generateCommandsState sm newCounter mminSize) initModel
 
-generateCommandsState :: forall model cmd sut resp. Rank2.Foldable resp
+generateCommandsState :: forall model cmd init m resp. Rank2.Foldable resp
                       => (Show (model Symbolic), Show (cmd Symbolic), Show (resp Symbolic))
-                      => StateMachine model cmd sut resp
+                      => StateMachine model cmd init m resp
                       -> Counter
                       -> Maybe Int -- ^ Minimum number of commands.
                       -> StateT (model Symbolic) Gen (Commands cmd resp)
@@ -91,8 +91,8 @@ getUsedVars :: Rank2.Foldable f => f Symbolic -> [Var]
 getUsedVars = Rank2.foldMap (\(Symbolic v) -> [v])
 
 -- | Shrink commands in a pre-condition and scope respecting way.
-shrinkCommands ::  forall model cmd sut resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
-               => StateMachine model cmd sut resp -> Commands cmd resp
+shrinkCommands ::  forall model cmd init m resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
+               => StateMachine model cmd init m resp -> Commands cmd resp
                -> [Commands cmd resp]
 shrinkCommands sm@StateMachine {..} =
     concatMap go . shrinkListS' . unCommands
@@ -168,8 +168,8 @@ data ShouldShrink = MustShrink | DontShrink
 -- If we _did_ already shrink something, then no commands will be shrunk, and
 -- the resulting list will either be empty (if the list of commands was invalid)
 -- or contain a /single/ element with the validated and renumbered commands.
-shrinkAndValidate :: forall model cmd sut resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
-                  => StateMachine model cmd sut resp
+shrinkAndValidate :: forall model cmd init m resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
+                  => StateMachine model cmd init m resp
                   -> ShouldShrink
                   -> ValidateEnv model
                   -> Commands cmd resp
@@ -213,7 +213,7 @@ shrinkAndValidate StateMachine {..} =
 forAllParallelCommands :: Testable prop
                        => (Show (cmd Symbolic), Show (resp Symbolic), Show (model Symbolic))
                        => (Rank2.Traversable cmd, Rank2.Foldable resp)
-                       => StateMachine model cmd sut resp
+                       => StateMachine model cmd init m resp
                        -> Maybe Int
                        -> (ParallelCommands cmd resp -> prop)     -- ^ Predicate.
                        -> Property
@@ -223,7 +223,7 @@ forAllParallelCommands sm mminSize prop =
 forAllNParallelCommands :: Testable prop
                         => (Show (cmd Symbolic), Show (resp Symbolic), Show (model Symbolic))
                         => (Rank2.Traversable cmd, Rank2.Foldable resp)
-                        => StateMachine model cmd sut resp
+                        => StateMachine model cmd init m resp
                         -> Int                                      -- ^ Number of threads
                         -> (NParallelCommands cmd resp -> prop)     -- ^ Predicate.
                         -> Property
@@ -270,10 +270,10 @@ forAllNParallelCommands sm np prop =
 -- > [A, B] ─┤        ├──┤        │
 -- >         └ [D, E] ┘  └ [H, I] ┘
 --
-generateParallelCommands :: forall model cmd sut resp. Rank2.Foldable resp
+generateParallelCommands :: forall model cmd init m resp. Rank2.Foldable resp
                          => Show (model Symbolic)
                          => (Show (cmd Symbolic), Show (resp Symbolic))
-                         => StateMachine model cmd sut resp
+                         => StateMachine model cmd init m resp
                          -> Maybe Int
                          -> Gen (ParallelCommands cmd resp)
 generateParallelCommands sm@StateMachine { initModel } mminSize  = do
@@ -299,7 +299,7 @@ generateParallelCommands sm@StateMachine { initModel } mminSize  = do
 -- for permutation of the list, i.e. it is parallel safe. The other
 -- half is the remainder of the input list.
 spanSafe :: Rank2.Foldable resp
-         => StateMachine model cmd sut resp
+         => StateMachine model cmd init m resp
          -> model Symbolic -> [Command cmd resp] -> [Command cmd resp]
          -> ([Command cmd resp], [Command cmd resp])
 spanSafe _ _     safe []           = (reverse safe, [])
@@ -312,10 +312,10 @@ spanSafe sm model safe (cmd : cmds)
 
 -- Generate Parallel commands. The length of each suffix, indicates how many thread can
 -- concurrently execute the commands safely.
-generateNParallelCommands :: forall model cmd sut resp. Rank2.Foldable resp
+generateNParallelCommands :: forall model cmd init m resp. Rank2.Foldable resp
                           => Show (model Symbolic)
                           => (Show (cmd Symbolic), Show (resp Symbolic))
-                          => StateMachine model cmd sut resp
+                          => StateMachine model cmd init m resp
                           -> Int
                           -> Gen (NParallelCommands cmd resp)
 generateNParallelCommands sm@StateMachine { initModel } np =
@@ -356,7 +356,7 @@ generateNParallelCommands sm@StateMachine { initModel } np =
 -- | A list of commands is parallel safe if the pre-conditions for all commands
 --   hold in all permutations of the list.
 parallelSafe :: Rank2.Foldable resp
-             => StateMachine model cmd sut resp -> model Symbolic
+             => StateMachine model cmd init m resp -> model Symbolic
              -> Commands cmd resp -> Bool
 parallelSafe StateMachine { precondition, transition, mock } model0
   = all (preconditionsHold model0)
@@ -373,7 +373,7 @@ parallelSafe StateMachine { precondition, transition, mock } model0
           length vars == length (getUsedVars $ fst $ runGenSym (mock model cmd) newCounter)
 
 -- | Apply the transition of some commands to a model.
-advanceModel :: StateMachine model cmd sut resp
+advanceModel :: StateMachine model cmd init m resp
              -> model Symbolic      -- ^ The model.
              -> Commands cmd resp   -- ^ The commands.
              -> model Symbolic
@@ -389,9 +389,9 @@ advanceModel StateMachine { transition } model0 =
 -- | Shrink a parallel program in a pre-condition and scope respecting
 --   way.
 shrinkParallelCommands
-  :: forall cmd model sut resp. Rank2.Traversable cmd
+  :: forall model cmd init m resp. Rank2.Traversable cmd
   => Rank2.Foldable resp
-  => StateMachine model cmd sut resp
+  => StateMachine model cmd init m resp
   -> (ParallelCommands cmd resp -> [ParallelCommands cmd resp])
 shrinkParallelCommands sm (ParallelCommands prefix suffixes)
   = concatMap go
@@ -426,9 +426,9 @@ shrinkParallelCommands sm (ParallelCommands prefix suffixes)
 -- | Shrink a parallel program in a pre-condition and scope respecting
 --   way.
 shrinkNParallelCommands
-  :: forall cmd model sut resp. Rank2.Traversable cmd
+  :: forall model cmd init m resp. Rank2.Traversable cmd
   => Rank2.Foldable resp
-  => StateMachine model cmd sut resp
+  => StateMachine model cmd init m resp
   -> (NParallelCommands cmd resp -> [NParallelCommands cmd resp])
 shrinkNParallelCommands sm (ParallelCommands prefix suffixes)
   = concatMap go
@@ -463,8 +463,8 @@ shrinkNParallelCommands sm (ParallelCommands prefix suffixes)
 shrinkCommands' :: Commands cmd resp -> [Shrunk (Commands cmd resp)]
 shrinkCommands' = map (fmap Commands) . shrinkListS' . unCommands
 
-shrinkAndValidateParallel :: forall model cmd sut resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
-                          => StateMachine model cmd sut resp
+shrinkAndValidateParallel :: forall model cmd init m resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
+                          => StateMachine model cmd init m resp
                           -> ShouldShrink
                           -> ParallelCommands cmd resp
                           -> [ParallelCommands cmd resp]
@@ -505,7 +505,7 @@ shrinkAndValidateParallel sm@StateMachine { initModel } = \shouldShrink (Paralle
                                 , ((DontShrink, MustShrink), DontShrink)
                                 , ((DontShrink, DontShrink), MustShrink) ]
 
-combineEnv :: StateMachine model cmd sut resp
+combineEnv :: StateMachine model cmd init m resp
            -> ValidateEnv model
            -> ValidateEnv model
            -> Commands cmd resp
@@ -519,8 +519,8 @@ combineEnv sm envL envR cmds = ValidateEnv {
 withCounterFrom :: ValidateEnv model -> ValidateEnv model -> ValidateEnv model
 withCounterFrom e e' = e { veCounter = veCounter e' }
 
-shrinkAndValidateNParallel :: forall model cmd sut resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
-                           => StateMachine model cmd sut resp
+shrinkAndValidateNParallel :: forall model cmd init m resp. (Rank2.Traversable cmd, Rank2.Foldable resp)
+                           => StateMachine model cmd init m resp
                            -> ShouldShrink
                            -> NParallelCommands cmd resp
                            -> [NParallelCommands cmd resp]

@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -175,14 +175,14 @@ Checks for:
  * mock semantics match
 -}
 runSequential ::
-    forall cmd resp sut model.
+    forall model cmd init resp.
     (Show (cmd Concrete), Show (resp Concrete)) =>
     (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    StateMachine model cmd sut resp ->
+    (forall s. StateMachine model cmd init (IOSim s) resp) ->
     Commands cmd resp ->
     Property
-runSequential sm@StateMachine{..} (Commands scmds) =
-    foldl' act (property True, [], emptyEnvironment, initModel, newCounter, initModel) scmds
+runSequential sm (Commands scmds) =
+    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) scmds
         & (\(p, _, _, _, _, _) -> p)
   where
     act (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
@@ -194,9 +194,9 @@ runSequential sm@StateMachine{..} (Commands scmds) =
             ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
             prevCmds' = prevCmds ++ [ccmd]
             (trace, cresp, prop) = runIOSim $ do
-                sut <- initSut
-                sequence_ $ map (\c -> semantics sut c) prevCmds
-                semantics sut ccmd
+                sut <- initSut sm
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
+                semantics sm sut ccmd
 
             -- Postcondition and invariant
             pPost = post sm cmodel ccmd cresp False trace
@@ -204,14 +204,14 @@ runSequential sm@StateMachine{..} (Commands scmds) =
 
             -- Mock
             (pMock, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock smodel scmd) counter
+            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
          in
             ( prevProp .&&. pPre .&&. prop .&&. pMock .&&. pPost .&&. pInv
             , prevCmds'
             , insertConcretes vars cvars env
-            , transition smodel scmd sresp
+            , transition sm smodel scmd sresp
             , counter'
-            , transition cmodel ccmd cresp
+            , transition sm cmodel ccmd cresp
             )
 
 {- | Run a sequence of commands sequentially, additionally checking for races.
@@ -231,14 +231,14 @@ Checks for:
 For all possible races found, the postcondition and invariant must hold.
 -}
 runSequentialPOR ::
-    forall cmd resp sut model.
+    forall model cmd init resp.
     (Show (cmd Concrete), Show (resp Concrete)) =>
     (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    StateMachine model cmd sut resp ->
+    (forall s. StateMachine model cmd init (IOSim s) resp) ->
     Commands cmd resp ->
     Property
-runSequentialPOR sm@StateMachine{..} (Commands scmds) =
-    foldl' act (property True, [], emptyEnvironment, initModel, newCounter, initModel) scmds
+runSequentialPOR sm (Commands scmds) =
+    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) scmds
         & (\(p, _, _, _, _, _) -> p)
   where
     act (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
@@ -250,9 +250,9 @@ runSequentialPOR sm@StateMachine{..} (Commands scmds) =
             ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
             prevCmds' = prevCmds ++ [ccmd]
             simAction = do
-                sut <- initSut
-                sequence_ $ map (\c -> semantics sut c) prevCmds
-                semantics sut ccmd
+                sut <- initSut sm
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
+                semantics sm sut ccmd
             -- Parallel property (for all interleavings)
             porProp = runIOSimPOR simAction $ \trace pt cresp' ->
                 let
@@ -265,25 +265,25 @@ runSequentialPOR sm@StateMachine{..} (Commands scmds) =
             -- Advance model
             (_, cresp, _) = runIOSim simAction
             (_, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock smodel scmd) counter
+            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
          in
             ( prevProp .&&. porProp
             , prevCmds'
             , insertConcretes vars cvars env
-            , transition smodel scmd sresp
+            , transition sm smodel scmd sresp
             , counter'
-            , transition cmodel ccmd cresp
+            , transition sm cmodel ccmd cresp
             )
 
 runSequentialPORException ::
-    forall cmd resp sut model.
+    forall model cmd init resp.
     (Show (cmd Concrete), Show (resp Concrete)) =>
     (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    StateMachine model cmd sut resp ->
+    (forall s. StateMachine model cmd init (IOSim s) resp) ->
     Commands cmd resp ->
     Property
-runSequentialPORException sm@StateMachine{..} (Commands scmds) =
-    foldl' act (property True, [], emptyEnvironment, initModel, newCounter, initModel) scmds
+runSequentialPORException sm (Commands scmds) =
+    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) scmds
         & (\(p, _, _, _, _, _) -> p)
   where
     act (prevProp, prevCmds, env, smodel, counter, cmodel) (Command scmd _ vars) =
@@ -295,9 +295,9 @@ runSequentialPORException sm@StateMachine{..} (Commands scmds) =
             ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
             prevCmds' = prevCmds ++ [ccmd]
             simAction = do
-                sut <- initSut
-                sequence_ $ map (\c -> semantics sut c) prevCmds
-                t1 <- async $ semantics sut ccmd
+                sut <- initSut sm
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
+                t1 <- async $ semantics sm sut ccmd
                 canceller <- async (cancel t1)
                 wait canceller
                 wait t1
@@ -315,14 +315,14 @@ runSequentialPORException sm@StateMachine{..} (Commands scmds) =
             -- Advance model
             (_, cresp, _) = runIOSim simAction
             (_, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock smodel scmd) counter
+            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
          in
             ( prevProp .&&. porProp
             , prevCmds'
             , insertConcretes vars cvars env
-            , transition smodel scmd sresp
+            , transition sm smodel scmd sresp
             , counter'
-            , transition cmodel ccmd cresp
+            , transition sm cmodel ccmd cresp
             )
 
 {-------------------------------------------------------------------------------
@@ -333,14 +333,14 @@ data OnePairF f a = One a | PP (f a)
 
 -- | Run a ParallelCommands
 runParallel ::
-    forall cmd resp sut model.
+    forall model cmd init resp.
     (Show (cmd Concrete), Show (resp Concrete)) =>
     (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    StateMachine model cmd sut resp ->
+    (forall s. StateMachine model cmd init (IOSim s) resp) ->
     ParallelCommands cmd resp ->
     Property
-runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
-    foldl' act (property True, [], emptyEnvironment, initModel, newCounter, initModel) (One pref : map PP suff)
+runParallel sm (ParallelCommands pref suff) =
+    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) (One pref : map PP suff)
         & (\(p, _, _, _, _, _) -> p)
   where
     act st (One (Commands scmds)) = foldl' runSequential' st scmds
@@ -356,9 +356,9 @@ runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
             reifyCmd (acc, env') (Command scmd _ vars) =
                 let ccmd = fromRight (error "runSequential: impossible") (reify env' scmd)
                     simAction' = do
-                        sut <- initSut
-                        sequence_ $ map (semantics sut) (prevCmds ++ map fst acc)
-                        semantics sut ccmd
+                        sut <- initSut sm
+                        sequence_ $ map (semantics sm sut) (prevCmds ++ map fst acc)
+                        semantics sm sut ccmd
                     (_, cresp, _) = runIOSim simAction'
                     (_, cvars) = mockCheck ccmd cresp vars
                  in (acc ++ [(ccmd, cresp)], insertConcretes vars cvars env')
@@ -373,16 +373,16 @@ runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
                     tq <- newTQueue
                     labelTQueue tq "CONTROL"
                     pure tq
-                sut <- initSut
+                sut <- initSut sm
                 -- Run the sequential prefix
-                sequence_ $ map (\c -> semantics sut c) prevCmds
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
 
                 let racingAction =
                         async
                             . sequence_
                             . map
                                 ( \ccmd -> do
-                                    cresp <- semantics sut ccmd
+                                    cresp <- semantics sm sut ccmd
                                     atomically $ writeTQueue tq (ccmd, cresp)
                                 )
                             . map fst
@@ -415,8 +415,8 @@ runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
                             .||. ( fst $
                                     foldl'
                                         ( \(prop, model) (cmd, resp) ->
-                                            let model' = transition model cmd resp
-                                                prop' = case logic (postcondition model cmd resp) of
+                                            let model' = transition sm model cmd resp
+                                                prop' = case logic (postcondition sm model cmd resp) of
                                                     VFalse ce -> counterexample ("Poscondition impossible! " <> show ce) $ property False
                                                     _ -> property True
                                              in (prop .&&. prop', model')
@@ -430,7 +430,7 @@ runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
             , env1 <> env2
             , undefined
             , undefined
-            , foldl (\x (y, z) -> transition x y z) cmodel $ p1' ++ p2'
+            , foldl (\x (y, z) -> transition sm x y z) cmodel $ p1' ++ p2'
             )
 
     -- This is almost the same as @runSequential@ but it accumulates the concrete
@@ -444,9 +444,9 @@ runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
             ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
             prevCmds' = prevCmds ++ [ccmd]
             simAction = do
-                sut <- initSut
-                sequence_ $ map (\c -> semantics sut c) prevCmds
-                semantics sut ccmd
+                sut <- initSut sm
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
+                semantics sm sut ccmd
             (trace, cresp, prop) = runIOSim simAction
 
             -- Postcondition
@@ -455,26 +455,26 @@ runParallel sm@StateMachine{..} (ParallelCommands pref suff) =
 
             -- Mock
             (pMock, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock smodel scmd) counter
+            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
          in
             ( prevProp .&&. pPre .&&. prop .&&. pPost .&&. pInv .&&. pMock
             , prevCmds'
             , insertConcretes vars cvars env
-            , transition smodel scmd sresp
+            , transition sm smodel scmd sresp
             , counter'
-            , transition cmodel ccmd cresp
+            , transition sm cmodel ccmd cresp
             )
 
 -- | Run a ParallelCommands
 runParallelException ::
-    forall cmd resp sut model.
+    forall model cmd init resp.
     (Show (cmd Concrete), Show (resp Concrete)) =>
     (Rank2.Traversable cmd, Rank2.Foldable resp) =>
-    StateMachine model cmd sut resp ->
+    (forall s. StateMachine model cmd init (IOSim s) resp) ->
     ParallelCommands cmd resp ->
     Property
-runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
-    foldl' act (property True, [], emptyEnvironment, initModel, newCounter, initModel) (One pref : map PP suff)
+runParallelException sm (ParallelCommands pref suff) =
+    foldl' act (property True, [], emptyEnvironment, initModel sm, newCounter, initModel sm) (One pref : map PP suff)
         & (\(p, _, _, _, _, _) -> p)
   where
     act st (One (Commands scmds)) = foldl' runSequential' st scmds
@@ -490,9 +490,9 @@ runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
             reifyCmd (acc, env') (Command scmd _ vars) =
                 let ccmd = fromRight (error "runSequential: impossible") (reify env' scmd)
                     simAction' = do
-                        sut <- initSut
-                        sequence_ $ map (semantics sut) (prevCmds ++ map fst acc)
-                        semantics sut ccmd
+                        sut <- initSut sm
+                        sequence_ $ map (semantics sm sut) (prevCmds ++ map fst acc)
+                        semantics sm sut ccmd
                     (_, cresp, _) = runIOSim simAction'
                     (_, cvars) = mockCheck ccmd cresp vars
                  in (acc ++ [(ccmd, cresp)], insertConcretes vars cvars env')
@@ -507,16 +507,16 @@ runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
                     tq <- newTQueue
                     labelTQueue tq "CONTROL"
                     pure tq
-                sut <- initSut
+                sut <- initSut sm
                 -- Run the sequential prefix
-                sequence_ $ map (\c -> semantics sut c) prevCmds
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
 
                 let racingAction =
                         async
                             . sequence_
                             . map
                                 ( \ccmd -> do
-                                    cresp <- semantics sut ccmd
+                                    cresp <- semantics sm sut ccmd
                                     atomically $ writeTQueue tq (ccmd, cresp)
                                 )
                             . map fst
@@ -552,8 +552,8 @@ runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
                             .||. ( fst $
                                     foldl'
                                         ( \(prop, model) (cmd, resp) ->
-                                            let model' = transition model cmd resp
-                                                prop' = case logic (postcondition model cmd resp) of
+                                            let model' = transition sm model cmd resp
+                                                prop' = case logic (postcondition sm model cmd resp) of
                                                     VFalse ce -> counterexample ("Poscondition impossible! " <> show ce) $ property False
                                                     _ -> property True
                                              in (prop .&&. prop', model')
@@ -567,7 +567,7 @@ runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
             , env1 <> env2
             , undefined
             , undefined
-            , foldl (\x (y, z) -> transition x y z) cmodel $ p1' ++ p2'
+            , foldl (\x (y, z) -> transition sm x y z) cmodel $ p1' ++ p2'
             )
 
     -- This is almost the same as @runSequential@ but it accumulates the concrete
@@ -581,9 +581,9 @@ runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
             ccmd = fromRight (error "runSequential: impossible") (reify env scmd)
             prevCmds' = prevCmds ++ [ccmd]
             simAction = do
-                sut <- initSut
-                sequence_ $ map (\c -> semantics sut c) prevCmds
-                semantics sut ccmd
+                sut <- initSut sm
+                sequence_ $ map (\c -> semantics sm sut c) prevCmds
+                semantics sm sut ccmd
             (trace, cresp, prop) = runIOSim simAction
 
             -- Postcondition
@@ -592,14 +592,14 @@ runParallelException sm@StateMachine{..} (ParallelCommands pref suff) =
 
             -- Mock
             (pMock, cvars) = mockCheck ccmd cresp vars
-            (sresp, counter') = runGenSym (mock smodel scmd) counter
+            (sresp, counter') = runGenSym (mock sm smodel scmd) counter
          in
             ( prevProp .&&. pPre .&&. prop .&&. pPost .&&. pInv .&&. pMock
             , prevCmds'
             , insertConcretes vars cvars env
-            , transition smodel scmd sresp
+            , transition sm smodel scmd sresp
             , counter'
-            , transition cmodel ccmd cresp
+            , transition sm cmodel ccmd cresp
             )
 
 hasDoneWork :: (Eq p) => p -> [(a, p, c, SimEventType)] -> Bool
@@ -636,7 +636,7 @@ drainTQueue tc = do
 
 -- | Check the precondition
 prec ::
-    StateMachine model cmd sut resp ->
+    StateMachine model cmd init m resp ->
     model Symbolic ->
     cmd Symbolic ->
     Property
@@ -649,7 +649,7 @@ prec StateMachine{precondition} smodel scmd =
 -- | Check the postcondition
 post ::
     (Show a) =>
-    StateMachine model cmd sut resp ->
+    StateMachine model cmd init m resp ->
     model Concrete ->
     cmd Concrete ->
     resp Concrete ->
@@ -671,7 +671,7 @@ post StateMachine{postcondition} cmodel ccmd cresp wasRace trace =
 -- | Check the invariant
 inv ::
     (Show a) =>
-    StateMachine model cmd sut resp ->
+    StateMachine model cmd init m resp ->
     model Concrete ->
     Bool ->
     SimTrace a ->
