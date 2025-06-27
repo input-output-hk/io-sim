@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
++* Changed `Time` show instance, which now is designed for pasting
++  counterexamples from terminal to an editor.
+
 ### Non-breaking changes
 
 * Improved performance of `tryReadTBQueueDefault`.
