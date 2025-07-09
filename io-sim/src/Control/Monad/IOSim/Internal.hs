@@ -58,6 +58,7 @@ import Data.Time (UTCTime (..), fromGregorian)
 
 import Control.Exception (NonTermination (..), assert, throw)
 import Control.Monad (join, when)
+import Control.Monad.Primitive (touch)
 import Control.Monad.ST.Lazy
 import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST, unsafeInterleaveST)
 import Data.STRef.Lazy
@@ -259,6 +260,11 @@ schedule !thread@Thread{
             timers' = (PSQ.delete . coerce) tmid timers
         schedule thread' simstate { timers = timers' }
 
+      TouchFrame a k clt' -> do
+        touch a
+        let thread' = thread { threadControl = ThreadControl (k x) clt' }
+        schedule thread' simstate
+
     Throw e -> case unwindControlStack e thread timers of
       -- Found a CatchFrame
       (Right thread'@Thread { threadMasking = maskst' }, timers'') -> do
@@ -315,6 +321,10 @@ schedule !thread@Thread{
     LiftST st k -> do
       x <- strictToLazyST st
       let thread' = thread { threadControl = ThreadControl (k x) ctl }
+      schedule thread' simstate
+
+    KeepAlive a k k' -> do
+      let thread' = thread { threadControl = ThreadControl k (TouchFrame a k' ctl) }
       schedule thread' simstate
 
     GetMonoTime k -> do
@@ -962,6 +972,8 @@ unwindControlStack e thread = \timers ->
       where
         -- Remove the timeout associated with the 'DelayFrame'.
         timers' = (PSQ.delete . coerce) tmid timers
+
+    unwind maskst (TouchFrame _x _k ctl) timers = unwind maskst ctl timers
 
 
     atLeastInterruptibleMask :: MaskingState -> MaskingState

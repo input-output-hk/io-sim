@@ -30,17 +30,17 @@ instance Show (ThreadControl s a) where
   show _ = "..."
 
 data ControlStack s b a where
-  MainFrame  :: ControlStack s a  a
-  ForkFrame  :: ControlStack s () a
-  MaskFrame  :: (b -> SimA s c)         -- subsequent continuation
-             -> MaskingState            -- thread local state to restore
-             -> !(ControlStack s c a)
-             -> ControlStack s b a
-  CatchFrame :: Exception e
-             => (e -> SimA s b)         -- exception continuation
-             -> (b -> SimA s c)         -- subsequent continuation
-             -> !(ControlStack s c a)
-             -> ControlStack s b a
+  MainFrame    :: ControlStack s a  a
+  ForkFrame    :: ControlStack s () a
+  MaskFrame    :: (b -> SimA s c)         -- subsequent continuation
+               -> MaskingState            -- thread local state to restore
+               -> !(ControlStack s c a)
+               -> ControlStack s b a
+  CatchFrame   :: Exception e
+               => (e -> SimA s b)         -- exception continuation
+               -> (b -> SimA s c)         -- subsequent continuation
+               -> !(ControlStack s c a)
+               -> ControlStack s b a
   TimeoutFrame :: TimeoutId
                -> TMVar (IOSim s) IOSimThreadId
                -> (Maybe b -> SimA s c)
@@ -48,8 +48,12 @@ data ControlStack s b a where
                -> ControlStack s b a
   DelayFrame   :: TimeoutId
                -> SimA s c
-               -> ControlStack s c a
+               -> !(ControlStack s c a)
                -> ControlStack s b a
+  TouchFrame   :: x
+               -> (b -> SimA s c)
+               -> !(ControlStack s c a)
+               -> ControlStack s b a 
 
 instance Show (ControlStack s b a) where
   show = show . dash
@@ -61,6 +65,7 @@ instance Show (ControlStack s b a) where
       dash (CatchFrame _ _ cs)        = CatchFrame' (dash cs)
       dash (TimeoutFrame tmid _ _ cs) = TimeoutFrame' tmid (dash cs)
       dash (DelayFrame tmid _ cs)     = DelayFrame' tmid (dash cs)
+      dash (TouchFrame _ _ cs)        = TouchFrame' (dash cs)
 
 data ControlStackDash =
     MainFrame'
@@ -71,6 +76,7 @@ data ControlStackDash =
   | TimeoutFrame' TimeoutId ControlStackDash
   | ThreadDelayFrame' TimeoutId ControlStackDash
   | DelayFrame' TimeoutId ControlStackDash
+  | TouchFrame' ControlStackDash
   deriving Show
 
 data IsLocked = NotLocked | Locked !IOSimThreadId

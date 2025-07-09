@@ -75,6 +75,7 @@ import Control.Concurrent.Class.MonadSTM.Strict.TVar (StrictTVar)
 import Control.Concurrent.Class.MonadSTM.Strict.TVar qualified as StrictTVar
 import Control.Monad.Class.MonadAsync hiding (Async)
 import Control.Monad.Class.MonadAsync qualified as MonadAsync
+import Control.Monad.Class.MonadKeepAlive
 import Control.Monad.Class.MonadEventlog
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadSay
@@ -158,6 +159,7 @@ data SimA s a where
   Output       :: !Dynamic -> SimA s b -> SimA s b
 
   LiftST       :: StrictST.ST s a -> (a -> SimA s b) -> SimA s b
+  KeepAlive    :: a -> SimA s b -> (b -> SimA s c) -> SimA s c
 
   GetMonoTime  :: (SI.Time    -> SimA s b) -> SimA s b
   GetWallTime  :: (UTCTime -> SimA s b) -> SimA s b
@@ -338,6 +340,9 @@ instance MonadThrow (IOSim s) where
 
 instance MonadEvaluate (IOSim s) where
   evaluate a = IOSim $ oneShot $ \k -> Evaluate a k
+
+instance MonadKeepAlive (IOSim s) where
+  keepAlive a io = IOSim $ oneShot $ \k' -> KeepAlive a (runIOSim io) k'
 
 -- | Just like the IO instance, we don't actually check anything here
 instance NoThunks (IOSim s a) where
