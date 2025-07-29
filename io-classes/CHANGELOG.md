@@ -1,5 +1,10 @@
 # Revsion history of io-classes
 
+### next release
+
+* Added module `Control.Monad.Class.MonadUnique` generalising `Data.Unique`.
+* mtl: Added module `Control.Monad.Class.MonadUnique.Trans` providing monad transformer instances for `MonadUnique`.
+
 ### 1.8.0.1
 
 * Added support for `ghc-9.2`.

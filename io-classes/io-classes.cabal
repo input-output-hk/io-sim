@@ -87,6 +87,7 @@ library
                        Control.Monad.Class.MonadTime
                        Control.Monad.Class.MonadTimer
                        Control.Monad.Class.MonadTest
+                       Control.Monad.Class.MonadUnique
   default-language:    GHC2021
   default-extensions:  LambdaCase
   build-depends:       base  >=4.16 && <4.22,
@@ -174,6 +175,7 @@ library mtl
                    ,  Control.Monad.Class.MonadTime.SI.Trans
                    ,  Control.Monad.Class.MonadTimer.Trans
                    ,  Control.Monad.Class.MonadTimer.SI.Trans
+                   ,  Control.Monad.Class.MonadUnique.Trans
     build-depends:    base,
                       array,
                       mtl,
