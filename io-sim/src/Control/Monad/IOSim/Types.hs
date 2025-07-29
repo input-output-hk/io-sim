@@ -93,6 +93,7 @@ import Control.Monad.Class.MonadTime.SI qualified as SI
 import Control.Monad.Class.MonadTimer
 import Control.Monad.Class.MonadTimer.SI (TimeoutState (..))
 import Control.Monad.Class.MonadTimer.SI qualified as SI
+import Control.Monad.Class.MonadUnique
 import Control.Monad.Primitive qualified as Prim
 import Control.Monad.ST.Lazy
 import Control.Monad.ST.Strict qualified as StrictST
@@ -104,6 +105,7 @@ import Control.Monad.Fail qualified as Fail
 import Data.Bifoldable
 import Data.Bifunctor (bimap)
 import Data.Dynamic (Dynamic, toDyn)
+import Data.Hashable (Hashable(hash))
 import Data.List.Trace qualified as Trace
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
@@ -122,6 +124,7 @@ import GHC.Generics (Generic)
 import Quiet (Quiet (..))
 
 import Control.Monad.IOSim.CommonTypes
+import Control.Monad.IOSim.CommonTypes qualified as Sim
 import Control.Monad.IOSim.STM
 import Control.Monad.IOSimPOR.Types
 
@@ -193,6 +196,7 @@ data SimA s a where
   ExploreRaces :: SimA s b -> SimA s b
 
   Fix          :: (x -> IOSim s x) -> (x -> SimA s r) -> SimA s r
+  NewUnique    :: (Sim.Unique s -> SimA s r) -> SimA s r
 
 
 newtype STM s a = STM { unSTM :: forall r. (a -> StmA s r) -> StmA s r }
@@ -626,6 +630,11 @@ instance MonadTraceMVar (IOSim s) where
 instance MonadLabelledMVar (IOSim s) where
   labelMVar = labelMVarDefault
 
+instance MonadUnique (IOSim s) where
+  type Unique (IOSim s) = Sim.Unique s
+  newUnique  = IOSim (oneShot NewUnique)
+  hashUnique = hash
+
 data Async s a = Async !IOSimThreadId (STM s (Either SomeException a))
 
 instance Eq (Async s a) where
@@ -1056,6 +1065,9 @@ data SimEventType
   | EventThreadUnhandled SomeException
   -- ^ thread terminated by an unhandled exception
 
+  | EventUniqueCreated Integer
+  -- ^ created the n-th 'Unique'
+
   --
   -- STM events
   --
@@ -1163,6 +1175,7 @@ ppSimEventType = \case
   EventThreadFinished -> "ThreadFinished"
   EventThreadUnhandled a ->
     "ThreadUnhandled " ++ show a
+  EventUniqueCreated n -> "UniqueCreated " ++ show n
   EventTxCommitted written created mbEff ->
     concat [ "TxCommitted ",
              ppList (ppLabelled show) written, " ",

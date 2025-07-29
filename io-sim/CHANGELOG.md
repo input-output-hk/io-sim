@@ -6,6 +6,8 @@
 
 ### Non-breaking changes
 
+* Added support for unique symbol generation à la `Data.Unique`.
+
 ### 1.8.0.1
 
 * Added support for `ghc-9.2`.

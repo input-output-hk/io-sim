@@ -48,6 +48,7 @@ module Control.Monad.IOSim
   , ThreadLabel
   , IOSimThreadId (..)
   , Labelled (..)
+  , Unique
     -- ** Dynamic Tracing
   , traceM
   , traceSTM

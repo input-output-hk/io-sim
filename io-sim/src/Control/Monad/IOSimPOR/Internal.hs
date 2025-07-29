@@ -200,6 +200,7 @@ data SimState s a = SimState {
        nextTmid         :: !TimeoutId,  -- ^ next unused 'TimeoutId'
        -- | previous steps (which we may race with).
        -- Note this is *lazy*, so that we don't compute races we will not reverse.
+       nextUniq         :: !(Unique s), -- ^ next unused @'Unique' s@
        races            :: Races,
        -- | control the schedule followed, and initial value
        control          :: !ScheduleControl,
@@ -220,6 +221,7 @@ initialState =
       clocks   = Map.singleton (ClockId []) epoch1970,
       nextVid  = 0,
       nextTmid = TimeoutId 0,
+      nextUniq = MkUnique 0,
       races    = noRaces,
       control  = ControlDefault,
       control0 = ControlDefault,
@@ -273,7 +275,7 @@ schedule thread@Thread{
            threads,
            timers,
            clocks,
-           nextVid, nextTmid,
+           nextVid, nextTmid, nextUniq,
            curTime  = time,
            control,
            perStepTimeLimit
@@ -813,6 +815,13 @@ schedule thread@Thread{
     YieldSim k -> do
       let thread' = thread { threadControl = ThreadControl k ctl }
       schedule thread' simstate
+
+    NewUnique k -> do
+      let thread'   = thread{ threadControl = ThreadControl (k nextUniq) ctl }
+          n         = unMkUnique nextUniq
+          simstate' = simstate{ nextUniq = MkUnique (n + 1) }
+      SimPORTrace time tid tstep tlbl (EventUniqueCreated n)
+        <$> schedule thread' simstate'
 
 
 threadInterruptible :: Thread s a -> Bool
