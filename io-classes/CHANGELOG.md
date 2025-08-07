@@ -1,5 +1,13 @@
 # Revsion history of io-classes
 
+### next version
+
+### Breaking changes
+
+### Non-breaking changes
+
+* Improved performance of `tryReadTBQueueDefault`.
+
 ### 1.8.0.1
 
 * Added support for `ghc-9.2`.

@@ -919,12 +919,15 @@ tryReadTBQueueDefault (TBQueue rsize read _wsize write _size) = do
       return (Just x)
     [] -> do
       ys <- readTVar write
-      case reverse ys of
+      case ys of
         [] -> return Nothing
+        _  -> do
+          -- NB. lazy: we want the transaction to be
+          -- short, otherwise it will conflict
+          let ~(z,zs) = case reverse ys of
+                z':zs' -> (z',zs')
+                _      -> error "tryReadTBQueueDefault: impossible"
 
-        -- NB. lazy: we want the transaction to be
-        -- short, otherwise it will conflict
-        (z:zs)  -> do
           writeTVar write []
           writeTVar read zs
           return (Just z)

@@ -6,6 +6,8 @@
 
 ### Non-breaking changes
 
+* Removed a misleading internal comment.
+
 ### 1.8.0.1
 
 * Added support for `ghc-9.2`.
