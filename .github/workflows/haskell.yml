@@ -48,7 +48,7 @@ jobs:
         echo "PATH = $PATH"
         echo "LLVM_CONFIG = $LLVM_CONFIG"
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: "Configure cabal.project.local"
       run: |
