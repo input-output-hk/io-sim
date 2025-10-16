@@ -143,7 +143,8 @@ data SimState s a = SimState {
        -- | list of clocks
        clocks   :: !(Map ClockId UTCTime),
        nextVid  :: !VarId,     -- ^ next unused 'VarId'
-       nextTmid :: !TimeoutId   -- ^ next unused 'TimeoutId'
+       nextTmid :: !TimeoutId, -- ^ next unused 'TimeoutId'
+       nextUniq :: !(Unique s) -- ^ next unused @'Unique' s@
      }
 
 initialState :: SimState s a
@@ -155,7 +156,8 @@ initialState =
       timers   = PSQ.empty,
       clocks   = Map.singleton (ClockId []) epoch1970,
       nextVid  = 0,
-      nextTmid = TimeoutId 0
+      nextTmid = TimeoutId 0,
+      nextUniq = MkUnique 0
     }
   where
     epoch1970 = UTCTime (fromGregorian 1970 1 1) 0
@@ -197,7 +199,7 @@ schedule !thread@Thread{
            threads,
            timers,
            clocks,
-           nextVid, nextTmid,
+           nextVid, nextTmid, nextUniq,
            curTime  = time
          } =
   invariant (Just thread) simstate $
@@ -630,6 +632,13 @@ schedule !thread@Thread{
                   LiftST (lazyToStrictST (writeSTRef r x')) (\() -> k x')
           thread' = thread { threadControl = ThreadControl k' ctl }
       schedule thread' simstate
+
+    NewUnique k -> do
+      let thread'   = thread{ threadControl = ThreadControl (k nextUniq) ctl }
+          n         = unMkUnique nextUniq
+          simstate' = simstate{ nextUniq = MkUnique (n + 1) }
+      SimTrace time tid tlbl (EventUniqueCreated n)
+        <$> schedule thread' simstate'
 
 
 threadInterruptible :: Thread s a -> Bool

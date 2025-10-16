@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia        #-}
+{-# LANGUAGE RoleAnnotations    #-}
 
 -- | Common types shared between `IOSim` and `IOSimPOR`.
 --
@@ -28,6 +29,7 @@ module Control.Monad.IOSim.CommonTypes
   , BlockedReason (..)
   , Labelled (..)
   , ppLabelled
+  , Unique (..)
     -- * Utils
   , ppList
   ) where
@@ -201,6 +203,16 @@ data Labelled a = Labelled {
 ppLabelled :: (a -> String) -> Labelled a -> String
 ppLabelled pp Labelled { l_labelled = a, l_label = Nothing  } = pp a
 ppLabelled pp Labelled { l_labelled = a, l_label = Just lbl } = concat ["Labelled ", pp a, " ", lbl]
+
+-- | Abstract unique symbols à la "Data.Unique".
+newtype Unique s = MkUnique{ unMkUnique :: Integer }
+  deriving stock   (Eq, Ord)
+  deriving newtype NFData
+type role Unique nominal
+
+instance Hashable (Unique s) where
+  hash = fromInteger . unMkUnique
+  hashWithSalt = defaultHashWithSalt
 
 --
 -- Utils
