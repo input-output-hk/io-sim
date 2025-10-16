@@ -105,7 +105,7 @@ import Control.Monad.Fail qualified as Fail
 import Data.Bifoldable
 import Data.Bifunctor (bimap)
 import Data.Dynamic (Dynamic, toDyn)
-import Data.Hashable (Hashable(hash))
+import Data.Hashable (Hashable (hash))
 import Data.List.Trace qualified as Trace
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)

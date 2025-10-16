@@ -1,21 +1,21 @@
-{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DefaultSignatures      #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 -- | A generalisation of the
 -- <https://hackage.haskell.org/package/base/docs/Data-Unique.html Data.Unique>
 -- API to both 'IO' and <https://hackage.haskell.org/package/io-sim IOSim>.
 --
-module Control.Monad.Class.MonadUnique (
-  MonadUnique (..),
-  UniqueFor (..),
-) where
+module Control.Monad.Class.MonadUnique
+  ( MonadUnique (..)
+  , UniqueFor (..)
+  ) where
 
 -- base
 import Data.Kind (Type)
 import Data.Unique qualified as IO
 
 -- transformers
-import Control.Monad.Reader (MonadTrans(..), ReaderT(..), lift)
+import Control.Monad.Reader (MonadTrans (..), ReaderT (..), lift)
 
 
 class (Monad m, Eq (Unique m), Ord (Unique m)) => MonadUnique m where
