@@ -1,11 +1,16 @@
 # Revsion history of io-classes
 
-### next release
+## next release
 
+### Breaking changes
+
+### Non-breaking changes
+
+* Improved performance of `tryReadTBQueueDefault`.
 * Added module `Control.Monad.Class.MonadUnique` generalising `Data.Unique`.
 * mtl: Added module `Control.Monad.Class.MonadUnique.Trans` providing monad transformer instances for `MonadUnique`.
 
-### 1.8.0.1
+## 1.8.0.1
 
 * Added support for `ghc-9.2`.
 
@@ -30,13 +35,13 @@
   type classes.
 * Support ghc-9.12
 
-### 1.7.0.0
+## 1.7.0.0
 
 ### Breaking changes
 
 * Renamed `io-classes:io-classes-mtl` as `io-classes:mtl`.
 
-### 1.6.0.0
+## 1.6.0.0
 
 ### Breaking changes
 
