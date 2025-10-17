@@ -26,22 +26,26 @@ import Control.Monad.Class.MonadTime qualified as MonadTime
 
 import NoThunks.Class (NoThunks (..))
 
+import Data.Fixed (Pico, showFixed)
 import Data.Time.Clock (DiffTime)
 import Data.Time.Clock qualified as Time
 import Data.Word (Word64)
 import GHC.Generics (Generic (..))
 
 
--- | A point in time in a monotonic clock.
+-- | A point in time in a monotonic clock counted in seconds.
 --
 -- The epoch for this clock is arbitrary and does not correspond to any wall
 -- clock or calendar, and is /not guaranteed/ to be the same epoch across
 -- program runs. It is represented as the 'DiffTime' from this arbitrary epoch.
 --
 newtype Time = Time DiffTime
-  deriving stock    (Eq, Ord, Show, Generic)
+  deriving stock    (Eq, Ord, Generic)
   deriving newtype  NFData
   deriving anyclass NoThunks
+
+instance Show Time where
+  show (Time t) = "Time " ++ showFixed True (realToFrac t :: Pico)
 
 -- | The time duration between two points in time (positive or negative).
 diffTime :: Time -> Time -> DiffTime
