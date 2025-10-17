@@ -63,7 +63,7 @@ common warnings
 
 library
   import:              warnings
-  hs-source-dirs:      src
+  hs-source-dirs:      io-classes
 
   -- At this experiment/prototype stage everything is exposed.
   -- This has to be tidied up once the design becomes clear.
