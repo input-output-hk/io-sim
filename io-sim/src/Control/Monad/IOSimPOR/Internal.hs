@@ -198,9 +198,9 @@ data SimState s a = SimState {
        clocks           :: !(Map ClockId UTCTime),
        nextVid          :: !VarId,     -- ^ next unused 'TVarId'
        nextTmid         :: !TimeoutId,  -- ^ next unused 'TimeoutId'
+       nextUniq         :: !(Unique s), -- ^ next unused @'Unique' s@
        -- | previous steps (which we may race with).
        -- Note this is *lazy*, so that we don't compute races we will not reverse.
-       nextUniq         :: !(Unique s), -- ^ next unused @'Unique' s@
        races            :: Races,
        -- | control the schedule followed, and initial value
        control          :: !ScheduleControl,
