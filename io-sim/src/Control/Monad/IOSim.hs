@@ -99,7 +99,7 @@ import Data.Typeable (Typeable)
 
 import Data.List.Trace (Trace (..))
 
-import Control.Exception (throw)
+import Control.Exception (SomeAsyncException (..), throw)
 
 import Control.Monad.ST.Lazy
 
@@ -422,7 +422,16 @@ traceResult strict = unsafePerformIO . eval
   where
     eval :: SimTrace a -> IO (Either Failure a)
     eval a = do
-      r <- try (evaluate a)
+      -- NOTE: It's fine to let asynchronous exceptions pass through. The only
+      -- way simulation could raise them is by using `throw` in pure code, while
+      -- `throwIO` in the simulation will be captured as `FailureException`.  So
+      -- we can safely assume asynchronous exceptions are coming from the
+      -- environment running the simulation, e.g. `QuickCheck`, as in the case
+      -- of `within` or `discardAfter` operators.
+      r <- tryJust (\e -> case fromException @SomeAsyncException e of
+                            Just _  -> Nothing
+                            Nothing -> Just e)
+                   (evaluate a)
       case r of
         Left e  -> return (Left (FailureEvaluation e))
         Right _ -> go a

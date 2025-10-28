@@ -8,6 +8,10 @@
 
 * Added support for unique symbol generation à la `Data.Unique`.
 * Removed a misleading internal comment.
+* Fixed error handling in `traceResult` so one can combine it (or ather APIs
+  which are based on it: `runSim`, `runSimOrThrow`, or `runSimStrictShutdown`)
+  with `within` or `discardAfter` from `QuickCheck`.  See the test suite how to
+  use `discardAfter` with `IOSim`.
 
 ## 1.8.0.1
 
