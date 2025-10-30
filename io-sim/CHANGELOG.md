@@ -12,6 +12,8 @@
   which are based on it: `runSim`, `runSimOrThrow`, or `runSimStrictShutdown`)
   with `within` or `discardAfter` from `QuickCheck`.  See the test suite how to
   use `discardAfter` with `IOSim`.
+* Round `si-timers` API (`MonadDelay`, `MonadTimer`) to microsecond to match
+  `IO` behaviour.
 
 ## 1.8.0.1
 
