@@ -8,6 +8,8 @@
 
 * Added support for unique symbol generation à la `Data.Unique`.
 * Removed a misleading internal comment.
+* Round `si-timers` API (`MonadDelay`, `MonadTimer`) to microsecond to match
+  `IO` behaviour.
 
 ## 1.8.0.1
 
