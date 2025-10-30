@@ -4,14 +4,15 @@
 
 ### Breaking changes
 
-+* Changed `Time` show instance, which now is designed for pasting
-+  counterexamples from terminal to an editor.
+* Changed `Time` show instance, which now is designed for pasting
+*  counterexamples from terminal to an editor.
 
 ### Non-breaking changes
 
 * Improved performance of `tryReadTBQueueDefault`.
 * Added module `Control.Monad.Class.MonadUnique` generalising `Data.Unique`.
 * mtl: Added module `Control.Monad.Class.MonadUnique.Trans` providing monad transformer instances for `MonadUnique`.
+* Added `roundDiffTimeToMicroseconds` utility function to `si-timers` package (in the `MonadTimer.SI` module).
 
 ## 1.8.0.1
 
