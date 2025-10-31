@@ -1,6 +1,9 @@
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
+-- `-fno-full-laziness` is needed for `discardAfter` to work correctly, see
+-- `unit_discardAfter` below.
+{-# OPTIONS_GHC -fno-full-laziness #-}
 
 module Test.Control.Monad.IOSim
   ( tests
@@ -43,6 +46,7 @@ import Test.Control.Monad.STM
 import Test.Control.Monad.Utils
 
 import Test.QuickCheck
+import Test.QuickCheck.Property as QC
 import Test.Tasty hiding (after)
 import Test.Tasty.QuickCheck
 
@@ -66,6 +70,10 @@ tests =
     , testProperty "threadDelay and STM"    unit_threadDelay_and_stm
     , testProperty "{register,thread}Delay" unit_registerDelay_threadDelay
     , testProperty "throwTo and STM"        unit_throwTo_and_stm
+    ]
+  , testGroup "QuickCheck"
+    [ testProperty "timeout: discardAfter"  unit_discardAfter
+    , testProperty "timeout: within"        unit_within
     ]
   , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
   , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
@@ -1071,6 +1079,46 @@ prop_stacked_timeouts timeout0 timeout1 actionDuration =
 
               | otherwise -- i.e. timeout0 >= timeout1
               = Just Nothing
+
+
+-- | Check that `discardAfter` works as expected.
+--
+-- NOTE: using `discardAfter` with `IOSim` is more tricky than for `IO`
+-- properties, since `IOSim` is a pure computation.  One need to wrap the
+-- simulation in a lambda and use `-fno-full-laziness` to avoid GHC from
+-- moving the thunk outside of the lambda, and evaluating it just once.
+--
+unit_discardAfter :: Property
+unit_discardAfter = mapTotalResult f
+                  . discardAfter 10
+                  $ \() -> runSimOrThrow $ True <$ (forever (threadDelay 10))
+  where
+    -- if `discard` kills the computation with the `Timeout` exception,
+    -- `theException` is `Nothing`, but if `traceResult` wraps it, then it is
+    -- a `Just`. We mark each test a success if `theException` is `Nothing`,
+    -- otherwise the test would fail with too many discarded cases, but if we re
+    -- introduce the bug in `traceResult` then it fails, since then
+    -- `theException` is a `Just`.
+    f :: QC.Result -> QC.Result
+    f r@MkResult { QC.theException = Nothing }
+        = r { ok = Just True }
+    f r = r
+
+
+-- | Check that `within` works as expected.
+--
+unit_within :: Property
+unit_within = mapTotalResult f
+            . within 10
+            $ runSimOrThrow $ True <$ (forever (threadDelay 10))
+  where
+    -- if `within` kills the computation with the `Timeout` exception,
+    -- `theException` is `Nothing`, but if `traceResult` wraps it, then it is
+    -- a `Just`.
+    f :: QC.Result -> QC.Result
+    f r@MkResult { QC.theException = Nothing }
+        = r { expect = False }
+    f r = r
 
 
 unit_timeouts_and_async_exceptions_1 :: Property
