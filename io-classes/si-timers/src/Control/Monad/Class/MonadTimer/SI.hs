@@ -5,6 +5,7 @@ module Control.Monad.Class.MonadTimer.SI
     -- * Auxiliary functions
   , diffTimeToMicrosecondsAsInt
   , microsecondsAsIntToDiffTime
+  , roundDiffTimeToMicroseconds
     -- * Re-exports
   , DiffTime
   , MonadFork
@@ -54,9 +55,24 @@ diffTimeToMicrosecondsAsInt d =
 microsecondsAsIntToDiffTime :: Int -> DiffTime
 microsecondsAsIntToDiffTime = (/ 1_000_000) . fromIntegral
 
+-- | Round to microseconds.
+--
+-- For negative diff times it rounds towards negative infinity, which is
+-- desirable for `MonadTimer` API.
+--
+roundDiffTimeToMicroseconds :: DiffTime -> DiffTime
+roundDiffTimeToMicroseconds d = fromIntegral usec / 1_000_000
+  where
+    -- microseconds
+    usec :: Integer
+    usec = diffTimeToPicoseconds d `div` 1_000_000
+
+
 class ( MonadTimer.MonadDelay m
       , MonadMonotonicTime m
       ) => MonadDelay m where
+  -- | All instances SHOULD round delays down to the nearest microsecond so the
+  -- behaviour matches the `IO` instance.
   threadDelay :: DiffTime -> m ()
 
 -- | Thread delay. This implementation will not over- or underflow.
@@ -67,6 +83,9 @@ class ( MonadTimer.MonadDelay m
 --
 -- For delays smaller than `minBound :: Int` seconds, `minBound :: Int` will be
 -- used instead.
+--
+-- NOTE: since `MonadTimer.threadDelay` uses microsecond precision (as does
+-- GHC), so does this instance.
 --
 instance MonadDelay IO where
   threadDelay :: forall m.
@@ -103,6 +122,11 @@ instance MonadDelay IO where
 instance MonadDelay m => MonadDelay (ReaderT r m) where
   threadDelay = lift . threadDelay
 
+-- | `MonadTimer` API based on SI units (seconds).
+--
+-- NOTE: all instances SHOULD round delays down to the nearest microsecond so
+-- the behaviour matches the `IO` instance.
+--
 class ( MonadTimer.MonadTimer m
       , MonadMonotonicTime m
       ) => MonadTimer m where

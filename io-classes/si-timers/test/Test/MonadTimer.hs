@@ -17,6 +17,8 @@ tests =
         prop_diffTimeToMicrosecondsAsIntLeftInverse
     , testProperty "diffTimeToMicroseconds right inverse"
         prop_diffTimeToMicrosecondsAsIntRightInverse
+    , testProperty "roundToMicroseconds"
+        prop_roundDiffTimeToMicroseconds
     ]
 
 newtype IntDistr = IntDistr Int
@@ -88,3 +90,21 @@ prop_diffTimeToMicrosecondsAsIntRightInverse (DiffTimeDistr a) =
          -> "large"
          | otherwise
          -> "average"
+
+
+prop_roundDiffTimeToMicroseconds :: DiffTimeDistr -> Property
+prop_roundDiffTimeToMicroseconds (DiffTimeDistr d) =
+    -- rounded is less or equal to d
+    --
+    -- NOTE: this guarantees that if `d < 0` then `d' < 0` which is
+    -- important for `MonadTimer (IOSim s)` instance.
+    d' <= d
+    .&&.
+    -- difference is less than 1 microsecond
+    abs (d - d') < 0.000_001
+    .&&.
+    -- rounded has no fractional microseconds
+    case properFraction (d' * 1_000_000) of
+      (_ :: Integer, f) -> f === 0
+  where
+    d' = roundDiffTimeToMicroseconds d
