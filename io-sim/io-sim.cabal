@@ -74,7 +74,7 @@ library
                        nothunks,
                        primitive         >=0.7 && <0.11,
                        psqueues          >=0.2 && <0.3,
-                       time              >=1.9.1 && <1.13,
+                       time              >=1.9.1 && <1.16,
                        quiet,
                        QuickCheck,
                        parallel
