@@ -3,6 +3,9 @@ name: Haskell CI
 on:
   pull_request:
   merge_group:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -72,7 +75,6 @@ jobs:
         path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.setup-haskell.outputs.cabal-store }}
         key: cache-dependencies-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
         restore-keys: cache-dependencies-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
-        enableCrossOsArchive: true
 
     - uses: actions/cache@v4
       name: "Cache `dist-newstyle`"
@@ -82,7 +84,6 @@ jobs:
           !dist-newstyle/**/.git
         key: cache-dist-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ steps.record-deps.outputs.weeknum }}
         restore-keys: cache-dist-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
-        enableCrossOsArchive: true
 
     - name: Build dependencies
       run: |
@@ -93,7 +94,6 @@ jobs:
       with:
         path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.setup-haskell.outputs.cabal-store }}
         key: ${{ steps.restore-cabal-store.outputs.cache-primary-key }}
-        enableCrossOsArchive: true
 
     - name: Build projects [build]
       run: cabal build all
