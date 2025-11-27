@@ -6,6 +6,12 @@
 
 ### Non-breaking changes
 
+## 1.9.0.0
+
+The version is bumped to `1.9` in sync with `io-classes-1.9`.
+
+### Non-breaking changes
+
 * Added support for unique symbol generation à la `Data.Unique`.
 * Removed a misleading internal comment.
 * Fixed error handling in `traceResult` so one can combine it (or ather APIs
