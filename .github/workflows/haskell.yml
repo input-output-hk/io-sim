@@ -67,6 +67,7 @@ jobs:
 
     - uses: actions/cache/restore@v4
       name: "Restore cabal store"
+      id: restore-cabal-store
       with:
         path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.setup-haskell.outputs.cabal-store }}
         key: cache-dependencies-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
@@ -91,7 +92,7 @@ jobs:
       name: "Save cabal store"
       with:
         path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.setup-haskell.outputs.cabal-store }}
-        key: cache-dependencies-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+        key: ${{ steps.restore-cabal-store.outputs.cache-primary-key }}
         enableCrossOsArchive: true
 
     - name: Build projects [build]
