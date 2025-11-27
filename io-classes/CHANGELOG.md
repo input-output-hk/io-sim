@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+### Non-breaking changes
+
+## 1.9.0.0
+
+### Breaking changes
+
 * Changed `Time` show instance, which now is designed for pasting
 *  counterexamples from terminal to an editor.
 
