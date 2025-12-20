@@ -608,15 +608,14 @@ instance MonadInspectMVar (IOSim s) where
         MVarFull x _  -> pure (Just x)
 
 instance MonadTraceMVar (IOSim s) where
-  traceMVarIO :: forall proxy a.
-                 proxy
-              -> MVar (IOSim s) a
+  traceMVarIO :: forall a.
+                 MVar (IOSim s) a
               -> (    Maybe (Maybe a)
                   ->         Maybe a
                   -> ST s TraceValue
                  )
               -> IOSim s ()
-  traceMVarIO _ (MVar mvar) f = traceTVarIO mvar f'
+  traceMVarIO (MVar mvar) f = traceTVarIO mvar f'
     where
       f' :: Maybe (MVarState m a)
          ->        MVarState m a
@@ -990,7 +989,6 @@ ppTrace_ tr = Trace.ppTrace
                   (Max 0, Max 0, Max 0)
               )
       $ tr
-
 
 
 -- | Trace each event using 'Debug.trace'; this is useful when a trace ends with

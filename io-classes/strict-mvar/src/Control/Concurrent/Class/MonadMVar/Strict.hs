@@ -23,11 +23,15 @@ module Control.Concurrent.Class.MonadMVar.Strict
   , modifyMVarMasked
   , tryReadMVar
   , labelMVar
+  , traceMVarIO
     -- * Re-exports
   , MonadMVar
+  , MonadTraceMVar
+  , MonadInspectMVar
+  , TraceValue (..)
   ) where
 
-import Control.Concurrent.Class.MonadMVar (MonadLabelledMVar, MonadMVar)
+import Control.Concurrent.Class.MonadMVar (MonadInspectMVar, MonadLabelledMVar, MonadMVar, MonadTraceMVar, TraceValue (..))
 import Control.Concurrent.Class.MonadMVar qualified as Lazy
 
 --
@@ -125,3 +129,10 @@ modifyMVarMasked v io = Lazy.modifyMVarMasked (mvar v) io'
 
 tryReadMVar :: MonadMVar m => StrictMVar m a -> m (Maybe a)
 tryReadMVar v = Lazy.tryReadMVar (mvar v)
+
+
+traceMVarIO :: MonadTraceMVar m
+            => StrictMVar m a
+            -> (Maybe (Maybe a) -> Maybe a -> Lazy.InspectMVarMonad m TraceValue)
+            -> m ()
+traceMVarIO m f = Lazy.traceMVarIO (mvar m) f

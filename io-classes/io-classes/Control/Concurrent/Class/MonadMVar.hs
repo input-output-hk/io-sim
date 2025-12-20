@@ -7,6 +7,8 @@ module Control.Concurrent.Class.MonadMVar
   , MonadInspectMVar (..)
   , MonadTraceMVar (..)
   , MonadLabelledMVar (..)
+    -- * re-exports
+  , TraceValue (..)
   ) where
 
 import Control.Concurrent.MVar qualified as IO
@@ -15,7 +17,7 @@ import Control.Monad.Class.MonadThrow
 import Control.Monad.Reader (ReaderT (..))
 import Control.Monad.Trans (lift)
 
-import Control.Concurrent.Class.MonadSTM (TraceValue)
+import Control.Concurrent.Class.MonadSTM (TraceValue (..))
 import Data.Kind (Type)
 
 
@@ -206,13 +208,13 @@ instance MonadInspectMVar IO where
   inspectMVar _ = tryReadMVar
 
 class MonadTraceMVar m where
-  traceMVarIO :: proxy
+  traceMVarIO :: MVar m a
               -> MVar m a
               -> (Maybe (Maybe a) -> Maybe a -> InspectMVarMonad m TraceValue)
               -> m ()
 
 instance MonadTraceMVar IO where
-  traceMVarIO = \_ _ _ -> pure ()
+  traceMVarIO = \_ _ -> pure ()
 
 -- | Labelled `MVar`s
 --
