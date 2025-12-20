@@ -24,6 +24,16 @@ module Control.Concurrent.Class.MonadMVar.Strict
   , tryReadMVar
   , labelMVar
   , traceMVarIO
+    -- * StrictChan
+  , StrictChan
+  , LazyChan
+  , castStrictChan
+  , newChan
+  , readChan
+  , writeChan
+  , dupChan
+  , getChanContents
+  , writeList2Chan
     -- * Re-exports
   , MonadMVar
   , MonadTraceMVar
@@ -136,3 +146,32 @@ traceMVarIO :: MonadTraceMVar m
             -> (Maybe (Maybe a) -> Maybe a -> Lazy.InspectMVarMonad m TraceValue)
             -> m ()
 traceMVarIO m f = Lazy.traceMVarIO (mvar m) f
+
+
+type LazyChan m = Lazy.Chan m
+
+newtype StrictChan m a = StrictChan {
+    chan :: LazyChan m a
+  }
+
+castStrictChan :: LazyChan m ~ LazyChan n
+               => StrictChan m a -> StrictChan n a
+castStrictChan v = StrictChan (chan v)
+
+newChan :: MonadMVar m => m (StrictChan m a)
+newChan = StrictChan <$> Lazy.newChan
+
+readChan :: MonadMVar m => StrictChan m a -> m a
+readChan = Lazy.readChan . chan
+
+writeChan :: MonadMVar m => StrictChan m a -> a -> m ()
+writeChan v !a = Lazy.writeChan (chan v) a
+
+dupChan :: MonadMVar m => StrictChan m a -> m (StrictChan m a)
+dupChan v = StrictChan <$> Lazy.dupChan (chan v)
+
+getChanContents :: MonadMVar m => StrictChan m a -> m [a]
+getChanContents v = Lazy.getChanContents (chan v)
+
+writeList2Chan :: MonadMVar m => StrictChan m a -> [a] -> m ()
+writeList2Chan v as = Lazy.writeList2Chan (chan v) as

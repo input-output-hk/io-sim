@@ -81,8 +81,8 @@ import Control.Monad.Class.MonadSay
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadSTM.Internal (MonadInspectSTM (..),
            MonadLabelledSTM (..), MonadSTM, MonadTraceSTM (..), TArrayDefault,
-           TChanDefault (..), TMVarDefault (..), TSemDefault (..), TraceValue,
-           atomically, retry)
+           TChanDefault (..), TMVarDefault (..), TSemDefault (..), atomically,
+           retry)
 import Control.Monad.Class.MonadSTM.Internal qualified as MonadSTM
 import Control.Monad.Class.MonadTest
 import Control.Monad.Class.MonadThrow as MonadThrow hiding (getMaskingState)

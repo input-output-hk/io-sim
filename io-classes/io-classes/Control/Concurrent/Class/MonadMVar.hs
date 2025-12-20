@@ -11,6 +11,7 @@ module Control.Concurrent.Class.MonadMVar
   , TraceValue (..)
   ) where
 
+import Control.Concurrent.Chan qualified as IO
 import Control.Concurrent.MVar qualified as IO
 import Control.Monad.Class.MonadThrow
 
@@ -26,7 +27,13 @@ class Monad m => MonadMVar m where
               takeMVar, tryTakeMVar,
               putMVar,  tryPutMVar,
               readMVar, tryReadMVar,
-              isEmptyMVar #-}
+              isEmptyMVar,
+              newChan,
+              writeChan,
+              readChan,
+              dupChan,
+              getChanContents,
+              writeList2Chan #-}
 
   type MVar m :: Type -> Type
 
@@ -134,6 +141,19 @@ class Monad m => MonadMVar m where
       return b
   {-# INLINE modifyMVarMasked #-}
 
+  --
+  -- Chan
+  --
+
+  type Chan m :: Type -> Type
+
+  newChan         :: m (Chan m a)
+  writeChan       :: Chan m a -> a -> m ()
+  readChan        :: Chan m a -> m a
+  dupChan         :: Chan m a -> m (Chan m a)
+  getChanContents :: Chan m a -> m [a]
+  writeList2Chan  :: Chan m a -> [a] -> m ()
+  
 --
 -- IO instance
 --
@@ -157,11 +177,23 @@ instance MonadMVar IO where
     modifyMVarMasked_ = IO.modifyMVarMasked_
     modifyMVarMasked  = IO.modifyMVarMasked
 
+    type Chan IO      = IO.Chan
+    newChan           = IO.newChan
+    writeChan         = IO.writeChan
+    readChan          = IO.readChan
+    dupChan           = IO.dupChan
+    getChanContents   = IO.getChanContents
+    writeList2Chan    = IO.writeList2Chan
+
 --
 -- ReaderT instance
 --
 
-newtype WrappedMVar r (m :: Type -> Type) a = WrappedMVar { unwrapMVar :: MVar m a }
+type    WrappedMVar :: Type -> (Type -> Type) -> Type -> Type
+newtype WrappedMVar r m a = WrappedMVar { unwrapMVar :: MVar m a }
+
+type    WrappedChan :: Type -> (Type -> Type) -> Type -> Type
+newtype WrappedChan r m a = WrappedChan { unwrapChan :: Chan m a }
 
 instance ( MonadMask m
          , MonadMVar m
@@ -190,6 +222,14 @@ instance ( MonadMask m
     modifyMVarMasked (WrappedMVar v) f = ReaderT $ \r ->
       modifyMVarMasked v (\a -> runReaderT (f a) r)
 
+    type Chan (ReaderT r m) = WrappedChan r m
+    newChan         = WrappedChan <$> lift newChan
+    readChan        = lift . readChan . unwrapChan
+    writeChan       = lift .: (writeChan . unwrapChan)
+    dupChan         = fmap WrappedChan . lift . dupChan . unwrapChan
+    getChanContents = lift . getChanContents . unwrapChan
+    writeList2Chan  = lift .: (writeList2Chan . unwrapChan)
+
 --
 -- MonadInspectMVar
 --
@@ -209,12 +249,16 @@ instance MonadInspectMVar IO where
 
 class MonadTraceMVar m where
   traceMVarIO :: MVar m a
-              -> MVar m a
               -> (Maybe (Maybe a) -> Maybe a -> InspectMVarMonad m TraceValue)
+              -> m ()
+
+  traceChanIO :: Chan m a
+              -> (Maybe [a] -> [a] -> InspectMVarMonad m TraceValue)
               -> m ()
 
 instance MonadTraceMVar IO where
   traceMVarIO = \_ _ -> pure ()
+  traceChanIO = \_ _ -> pure ()
 
 -- | Labelled `MVar`s
 --
