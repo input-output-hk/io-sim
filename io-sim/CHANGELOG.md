@@ -1,10 +1,12 @@
 # Revision history of io-sim
 
-## next release
-
-### Breaking changes
+## 1.9.1.0
 
 ### Non-breaking changes
+
+* Reverted rounding of `si-timers` API to microsecond to match `IO` behaviour.
+  It may cause surprising issues downstream when time is not advancing as
+  expected because of rounding to `0`.
 
 ## 1.9.0.0
 

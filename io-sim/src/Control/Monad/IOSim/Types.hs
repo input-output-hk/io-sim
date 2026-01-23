@@ -725,8 +725,7 @@ instance MonadDelay (IOSim s) where
 
 instance SI.MonadDelay (IOSim s) where
   threadDelay d =
-    IOSim $ oneShot $ \k -> ThreadDelay (SI.roundDiffTimeToMicroseconds d)
-                                        (k ())
+    IOSim $ oneShot $ \k -> ThreadDelay d (k ())
 
 data Timeout s = Timeout !(TVar s TimeoutState) !TimeoutId
                -- ^ a timeout
@@ -766,15 +765,11 @@ instance SI.MonadTimer (IOSim s) where
   timeout d action
     | d <  0 = Just <$> action
     | d == 0 = return Nothing
-    | otherwise = IOSim $ oneShot $ \k ->
-                          StartTimeout (SI.roundDiffTimeToMicroseconds d)
-                                       (runIOSim action)
-                                       k
+    | otherwise = IOSim $ oneShot $ \k -> StartTimeout d (runIOSim action) k
 
-  registerDelay d = IOSim $ oneShot $ \k ->
-    RegisterDelay (SI.roundDiffTimeToMicroseconds d) k
+  registerDelay d = IOSim $ oneShot $ \k -> RegisterDelay d k
   registerDelayCancellable d = do
-    t <- newTimeout (SI.roundDiffTimeToMicroseconds d)
+    t <- newTimeout d
     return (readTimeout t, cancelTimeout t)
 
 newtype TimeoutException = TimeoutException TimeoutId deriving Eq
