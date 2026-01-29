@@ -1,5 +1,13 @@
 # Revision history of io-sim
 
+## next release
+
+### Breaking changes
+
+* Added `flushEventLog` to `MonadEventLog` instance.
+
+### Non-breaking changes
+
 ## 1.9.1.0
 
 ### Non-breaking changes

@@ -790,8 +790,9 @@ newtype EventlogEvent = EventlogEvent String
 newtype EventlogMarker = EventlogMarker String
 
 instance MonadEventlog (IOSim s) where
-  traceEventIO = traceM . EventlogEvent
+  traceEventIO  = traceM . EventlogEvent
   traceMarkerIO = traceM . EventlogMarker
+  flushEventLog = pure ()
 
 -- | 'Trace' is a recursive data type, it is the trace of a 'IOSim'
 -- computation.  The trace will contain information about thread scheduling,

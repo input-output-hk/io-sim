@@ -4,6 +4,8 @@
 
 ### Breaking changes
 
+* Added `flushEventLog` to `MonadEventLog` class.
+
 ### Non-breaking changes
 
 ## 1.9.0.0
