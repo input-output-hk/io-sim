@@ -5,6 +5,7 @@
 ### Breaking changes
 
 * Added `flushEventLog` to `MonadEventLog` class.
+* Added `Monad` constraint to `MonadEventlog` class.
 
 ### Non-breaking changes
 

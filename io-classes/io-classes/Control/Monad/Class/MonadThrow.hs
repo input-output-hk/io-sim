@@ -210,7 +210,7 @@ class MonadMask m => MonadMaskingState m
 
 -- | Monads which can 'evaluate'.
 --
-class MonadEvaluate m where
+class Monad m => MonadEvaluate m where
     evaluate :: a -> m a
 
 --
