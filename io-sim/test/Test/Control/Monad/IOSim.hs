@@ -425,7 +425,7 @@ unit_catch_0, unit_catch_1, unit_catch_2, unit_catch_3, unit_catch_4,
   :: Property
 
 -- unhandled top level exception
-unit_catch_0 =
+unit_catch_0 = once $
       runSimTraceSay example === ["before"]
  .&&. case traceResult True (runSimTrace example) of
         Left (FailureException e) -> property (maybe False (==DivideByZero) $ fromException e)
@@ -439,7 +439,7 @@ unit_catch_0 =
     say "after"
 
 -- normal execution of a catch frame
-unit_catch_1 =
+unit_catch_1 = once $
     runSimTraceSay
       (do catch (say "inner") (\(_e :: IOError) -> say "handler")
           say "after"
@@ -449,7 +449,7 @@ unit_catch_1 =
 
 
 -- catching an exception thrown in a catch frame
-unit_catch_2 =
+unit_catch_2 = once $
     runSimTraceSay
       (do catch (do say "inner1"
                     _ <- throwIO DivideByZero
@@ -462,7 +462,7 @@ unit_catch_2 =
 
 
 -- not catching an exception of the wrong type
-unit_catch_3 =
+unit_catch_3 = once $
     runSimTraceSay
       (do catch (do say "inner"
                     throwIO DivideByZero)
@@ -474,7 +474,7 @@ unit_catch_3 =
 
 
 -- catching an exception in an outer handler
-unit_catch_4 =
+unit_catch_4 = once $
     runSimTraceSay
       (do catch (catch (do say "inner"
                            throwIO DivideByZero)
@@ -487,7 +487,7 @@ unit_catch_4 =
 
 
 -- catching an exception in the inner handler
-unit_catch_5 =
+unit_catch_5 = once $
     runSimTraceSay
       (do catch (catch (do say "inner"
                            throwIO DivideByZero)
@@ -500,7 +500,7 @@ unit_catch_5 =
 
 
 -- catching an exception in the inner handler, rethrowing and catching in outer
-unit_catch_6 =
+unit_catch_6 = once $
     runSimTraceSay
       (do catch (catch (do say "inner"
                            throwIO DivideByZero)
@@ -516,14 +516,14 @@ unit_catch_6 =
 
 -- evaluate should catch pure errors
 unit_evaluate_0 :: Property
-unit_evaluate_0 =
+unit_evaluate_0 = once $
     -- This property also fails if the @error@ is not caught by the sim monad
     -- and instead reaches the QuickCheck driver.
     property $ isLeft $ runSim $ evaluate (error "boom" :: ())
 
 
 -- The sim terminates when the main thread terminates
-unit_fork_1 =
+unit_fork_1 = once $
       runSimTraceSay example === ["parent"]
  .&&. case traceResult True (runSimTrace example) of
         Left FailureSloppyShutdown{} -> property True
@@ -536,7 +536,7 @@ unit_fork_1 =
 
 -- Try works and we can pass exceptions back from threads.
 -- And terminating with an exception is reported properly.
-unit_fork_2 =
+unit_fork_2 = once $
       runSimTraceSay example === ["parent", "user error (oh noes!)"]
  .&&. case traceResult True (runSimTrace example) of
         Left (FailureException e)
@@ -568,7 +568,7 @@ unit_async_1, unit_async_2, unit_async_3, unit_async_4, unit_async_5,
   :: Property
 
 
-unit_async_1 =
+unit_async_1 = once $
     runSimTraceSay
       (do mtid <- myThreadId
           say ("main " ++ show mtid)
@@ -581,7 +581,7 @@ unit_async_1 =
    ["main ThreadId []", "parent ThreadId [1]", "child ThreadId [1]"]
 
 
-unit_async_2 =
+unit_async_2 = once $
     runSimTraceSay
       (do tid <- myThreadId
           say "before"
@@ -592,7 +592,7 @@ unit_async_2 =
    ["before"]
 
 
-unit_async_3 =
+unit_async_3 = once $
     runSimTraceSay
       (do tid <- myThreadId
           catch (do say "before"
@@ -603,7 +603,7 @@ unit_async_3 =
    ["before", "handler"]
 
 
-unit_async_4 =
+unit_async_4 = once $
     runSimTraceSay
       (do tid <- forkIO $ say "child"
           threadDelay 1
@@ -614,7 +614,7 @@ unit_async_4 =
    ["child", "parent done"]
 
 
-unit_async_5 =
+unit_async_5 = once $
     runSimTraceSay
       (do tid <- forkIO $ do
                    say "child"
@@ -629,7 +629,7 @@ unit_async_5 =
    ["child", "handler", "child done", "parent done"]
 
 
-unit_async_6 =
+unit_async_6 = once $
     runSimTraceSay
       (do tid <- forkIO $ mask_ $
                    do
@@ -649,7 +649,7 @@ unit_async_6 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_7 =
+unit_async_7 = once $
     runSimTraceSay
       (do tid <- forkIO $
                    mask $ \restore -> do
@@ -669,7 +669,7 @@ unit_async_7 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_8 =
+unit_async_8 = once $
     runSimTraceSay
       (do tid <- forkIO $ do
                    catch (do mask_ $ do
@@ -689,7 +689,7 @@ unit_async_8 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_9 =
+unit_async_9 = once $
     runSimTraceSay
       (do tid <- forkIO $
                    mask_ $ do
@@ -705,7 +705,7 @@ unit_async_9 =
    ["child", "parent done"]
 
 
-unit_async_10 =
+unit_async_10 = once $
     runSimTraceSay
       (do tid1 <- forkIO $ do
                     mask_ $ do
@@ -733,7 +733,7 @@ unit_async_10 =
    ["child 1", "child 2", "child 1 running", "parent done"]
 
 
-unit_async_11 =
+unit_async_11 = once $
     runSimTraceSay
       (do tid1 <- forkIO $ do
                     mask_ $ do
@@ -765,7 +765,7 @@ unit_async_11 =
    ["child 1", "child 2", "child 1 running", "parent done"]
 
 
-unit_async_12 =
+unit_async_12 = once $
     runSimTraceSay
       (do tid <- forkIO $ do
                    uninterruptibleMask_ $ do
@@ -786,7 +786,7 @@ unit_async_12 =
    ["child", "child masked", "child done", "parent done"]
 
 
-unit_async_13 =
+unit_async_13 = once $
     case runSim
            (uninterruptibleMask_ $ do
               tid <- forkIO $ atomically retry
@@ -795,7 +795,7 @@ unit_async_13 =
           _                       -> property False
 
 
-unit_async_14 =
+unit_async_14 = once $
     runSimTraceSay
       (do tid <- forkIO $ do
                    uninterruptibleMask_ $ do
@@ -816,7 +816,7 @@ unit_async_14 =
    ["child", "child masked", "child done", "parent done"]
 
 
-unit_async_15 =
+unit_async_15 = once $
     runSimTraceSay
       (do tid <- forkIO $
                    uninterruptibleMask $ \restore -> do
@@ -836,7 +836,7 @@ unit_async_15 =
    ["child", "child masked", "handler", "child done", "parent done"]
 
 
-unit_async_16 =
+unit_async_16 = once $
     runSimTraceSay
       (do tid <- forkIO $ do
                    catch (do uninterruptibleMask_ $ do
@@ -1089,7 +1089,8 @@ prop_stacked_timeouts timeout0 timeout1 actionDuration =
 -- moving the thunk outside of the lambda, and evaluating it just once.
 --
 unit_discardAfter :: Property
-unit_discardAfter = mapTotalResult f
+unit_discardAfter = once
+                  . mapTotalResult f
                   . discardAfter 10
                   $ \() -> runSimOrThrow $ True <$ (forever (threadDelay 10))
   where
@@ -1108,7 +1109,8 @@ unit_discardAfter = mapTotalResult f
 -- | Check that `within` works as expected.
 --
 unit_within :: Property
-unit_within = mapTotalResult f
+unit_within = once
+            . mapTotalResult f
             . within 10
             $ runSimOrThrow $ True <$ (forever (threadDelay 10))
   where
@@ -1122,7 +1124,7 @@ unit_within = mapTotalResult f
 
 
 unit_timeouts_and_async_exceptions_1 :: Property
-unit_timeouts_and_async_exceptions_1 =
+unit_timeouts_and_async_exceptions_1 = once $
     let trace = runSimTrace experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
@@ -1143,7 +1145,7 @@ unit_timeouts_and_async_exceptions_1 =
 
 
 unit_timeouts_and_async_exceptions_2 :: Property
-unit_timeouts_and_async_exceptions_2 =
+unit_timeouts_and_async_exceptions_2 = once $
     let trace = runSimTrace experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
@@ -1164,7 +1166,7 @@ unit_timeouts_and_async_exceptions_2 =
 
 
 unit_timeouts_and_async_exceptions_3 :: Property
-unit_timeouts_and_async_exceptions_3 =
+unit_timeouts_and_async_exceptions_3 = once $
     let trace = runSimTrace experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
@@ -1188,7 +1190,7 @@ unit_timeouts_and_async_exceptions_3 =
 -- transaction.
 --
 unit_threadDelay_and_stm :: Property
-unit_threadDelay_and_stm =
+unit_threadDelay_and_stm = once $
     let trace = runSimTrace experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
@@ -1216,7 +1218,7 @@ unit_threadDelay_and_stm =
       return (t1 `diffTime` t0 === delay)
 
 unit_registerDelay_threadDelay :: Property
-unit_registerDelay_threadDelay =
+unit_registerDelay_threadDelay = once $
     let trace = runSimTrace experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
@@ -1248,7 +1250,7 @@ unit_registerDelay_threadDelay =
 -- transaction.
 --
 unit_throwTo_and_stm :: Property
-unit_throwTo_and_stm =
+unit_throwTo_and_stm = once $
     let trace = runSimTrace experiment in
         counterexample (ppTrace_ trace)
       . either (\e -> counterexample (show e) False) id
@@ -1282,63 +1284,63 @@ unit_throwTo_and_stm =
 --
 
 unit_set_masking_state_IO :: MaskingState -> Property
-unit_set_masking_state_IO =
+unit_set_masking_state_IO = once .
     ioProperty . prop_set_masking_state
 
 unit_set_masking_state_ST :: MaskingState -> Property
-unit_set_masking_state_ST ms =
+unit_set_masking_state_ST ms = once $
     runSimOrThrow (prop_set_masking_state ms)
 
 unit_unmask_IO :: MaskingState -> MaskingState -> Property
-unit_unmask_IO ms ms' = ioProperty $ prop_unmask ms ms'
+unit_unmask_IO ms ms' = once $ ioProperty $ prop_unmask ms ms'
 
 unit_unmask_ST :: MaskingState -> MaskingState -> Property
-unit_unmask_ST ms ms' = runSimOrThrow $ prop_unmask ms ms'
+unit_unmask_ST ms ms' = once $ runSimOrThrow $ prop_unmask ms ms'
 
 unit_fork_masking_state_IO :: MaskingState -> Property
-unit_fork_masking_state_IO =
+unit_fork_masking_state_IO = once .
     ioProperty . prop_fork_masking_state
 
 unit_fork_masking_state_ST :: MaskingState -> Property
-unit_fork_masking_state_ST ms =
+unit_fork_masking_state_ST ms = once $
     runSimOrThrow (prop_fork_masking_state ms)
 
 unit_fork_unmask_IO :: MaskingState -> MaskingState -> Property
-unit_fork_unmask_IO ms ms' = ioProperty $ prop_fork_unmask ms ms'
+unit_fork_unmask_IO ms ms' = once $ ioProperty $ prop_fork_unmask ms ms'
 
 unit_fork_unmask_ST :: MaskingState -> MaskingState -> Property
-unit_fork_unmask_ST ms ms' = runSimOrThrow $ prop_fork_unmask ms ms'
+unit_fork_unmask_ST ms ms' = once $ runSimOrThrow $ prop_fork_unmask ms ms'
 
 unit_catch_throwIO_masking_state_IO :: MaskingState -> Property
-unit_catch_throwIO_masking_state_IO ms =
+unit_catch_throwIO_masking_state_IO ms = once $
     ioProperty $ prop_catch_throwIO_masking_state ms
 
 unit_catch_throwIO_masking_state_ST :: MaskingState -> Property
-unit_catch_throwIO_masking_state_ST ms =
+unit_catch_throwIO_masking_state_ST ms = once $
     runSimOrThrow (prop_catch_throwIO_masking_state ms)
 
 unit_catch_throwTo_masking_state_IO :: MaskingState -> Property
-unit_catch_throwTo_masking_state_IO =
+unit_catch_throwTo_masking_state_IO = once .
     ioProperty . prop_catch_throwTo_masking_state
 
 unit_catch_throwTo_masking_state_ST :: MaskingState -> Property
-unit_catch_throwTo_masking_state_ST ms =
+unit_catch_throwTo_masking_state_ST ms = once $
     runSimOrThrow $ prop_catch_throwTo_masking_state ms
 
 unit_catch_throwTo_masking_state_async_IO :: MaskingState -> Property
-unit_catch_throwTo_masking_state_async_IO =
+unit_catch_throwTo_masking_state_async_IO = once .
     ioProperty . prop_catch_throwTo_masking_state_async
 
 unit_catch_throwTo_masking_state_async_ST :: MaskingState -> Property
-unit_catch_throwTo_masking_state_async_ST ms =
+unit_catch_throwTo_masking_state_async_ST ms = once $
     runSimOrThrow (prop_catch_throwTo_masking_state_async ms)
 
 unit_catch_throwTo_masking_state_async_mayblock_IO :: MaskingState -> Property
-unit_catch_throwTo_masking_state_async_mayblock_IO =
+unit_catch_throwTo_masking_state_async_mayblock_IO = once .
     ioProperty . prop_catch_throwTo_masking_state_async_mayblock
 
 unit_catch_throwTo_masking_state_async_mayblock_ST :: MaskingState -> Property
-unit_catch_throwTo_masking_state_async_mayblock_ST ms =
+unit_catch_throwTo_masking_state_async_mayblock_ST ms = once $
     runSimOrThrow (prop_catch_throwTo_masking_state_async_mayblock ms)
 
 --
