@@ -1,7 +1,8 @@
-{-# LANGUAGE CPP             #-}
-{-# LANGUAGE DerivingVia     #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DerivingVia         #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 -- Needed for `SimEvent` type.
 {-# OPTIONS_GHC -Wno-partial-fields    #-}
@@ -65,7 +66,7 @@ module Control.Monad.IOSim.Types
   ) where
 
 import Control.Applicative
-import Control.Exception (ErrorCall (..))
+import Control.Exception (ErrorCall (..), SomeAsyncException)
 import Control.Exception qualified as IO
 import Control.Monad
 import Control.Monad.Fix (MonadFix (..))
@@ -129,8 +130,9 @@ import Control.Monad.IOSim.STM
 import Control.Monad.IOSimPOR.Types
 
 
+import Control.DeepSeq (force)
 import Data.List (intercalate)
-import GHC.IO (mkUserError)
+import GHC.IO (mkUserError, unsafePerformIO)
 import System.IO.Error qualified as IO.Error (userError)
 
 {-# ANN module "HLint: ignore Use readTVarIO" #-}
@@ -1175,6 +1177,17 @@ data SimEventType
   -- a simulation.  Useful for debugging IOSimPOR.
   deriving Show
 
+unsafeEvaluateString :: String -> String -> String
+unsafeEvaluateString name a = unsafePerformIO $
+  catchJust
+    (\e -> case fromException @SomeAsyncException e of
+              Just{}  -> Nothing
+              Nothing -> Just e
+    )
+    (evaluate (force a))
+    (\(e :: SomeException) -> return ("- error evaluating " ++ name ++ ": " ++ show e))
+
+
 ppSimEventType :: SimEventType -> String
 ppSimEventType = \case
   EventSay a -> "Say " ++ a
@@ -1182,10 +1195,10 @@ ppSimEventType = \case
   EventLog a -> "Dynamic " ++ show a
   EventLogEvaluationError err -> "DynamicEvaluationError " ++ show err
   EventMask a -> "Mask " ++ show a
-  EventThrow a -> "Throw " ++ show a
+  EventThrow err -> "Throw " ++ unsafeEvaluateString "exception" (show err)
   EventThrowTo err tid ->
     concat [ "ThrowTo (",
-              show err, ") ",
+              unsafeEvaluateString "exception" (show err), ") ",
               ppIOSimThreadId tid ]
   EventThrowToBlocked -> "ThrowToBlocked"
   EventThrowToWakeup -> "ThrowToWakeup"
