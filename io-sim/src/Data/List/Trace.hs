@@ -7,6 +7,7 @@ module Data.List.Trace
   , fromList
   , head
   , tail
+  , last
   , filter
   , length
   , take
@@ -15,7 +16,7 @@ module Data.List.Trace
   , dropWhile
   ) where
 
-import Prelude hiding (drop, dropWhile, filter, head, length, tail, take,
+import Prelude hiding (drop, dropWhile, filter, head, last, length, tail, take,
            takeWhile)
 
 import Control.Applicative (Alternative (..))
@@ -45,6 +46,10 @@ head _          = error "Trace.head: empty"
 tail :: Trace a b -> Trace a b
 tail (Cons _ o) = o
 tail Nil {}     = error "Trace.tail: empty"
+
+last :: Trace a b -> a
+last (Cons _ k) = last k
+last (Nil a)    = a
 
 filter :: (b -> Bool) -> Trace a b -> Trace a b
 filter _fn o@Nil {}   = o
