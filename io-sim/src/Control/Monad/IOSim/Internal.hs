@@ -300,11 +300,15 @@ schedule !thread@Thread{
         Left e -> do
           -- schedule this thread to immediately raise the exception
           let thread' = thread { threadControl = ThreadControl (Throw e) ctl }
-          schedule thread' simstate
+          trace <- schedule thread' simstate
+          return $ SimTrace time tid tlbl (EventEvaluationError e)
+                 $ trace
         Right whnf -> do
           -- continue with the resulting WHNF
           let thread' = thread { threadControl = ThreadControl (k whnf) ctl }
-          schedule thread' simstate
+          trace <- schedule thread' simstate
+          return $ SimTrace time tid tlbl EventEvaluationSuccess
+                 $ trace
 
     Say msg k -> do
       mbNF <- unsafeIOToST $ tryJust (\e -> case fromException @SomeAsyncException e of

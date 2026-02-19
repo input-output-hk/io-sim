@@ -1078,6 +1078,8 @@ data SimEventType
   | EventThrowToUnmasked (Labelled IOSimThreadId)
   -- ^ a target thread of `throwTo` unmasked its exceptions, this is paired
   -- with `EventThrowToWakeup` for threads which were blocked on `throwTo`
+  | EventEvaluationError SomeException
+  | EventEvaluationSuccess
 
   | EventThreadForked    IOSimThreadId
   -- ^ forked a thread
@@ -1202,6 +1204,8 @@ ppSimEventType = \case
               ppIOSimThreadId tid ]
   EventThrowToBlocked -> "ThrowToBlocked"
   EventThrowToWakeup -> "ThrowToWakeup"
+  EventEvaluationError err -> "EvaluationError " ++ show err
+  EventEvaluationSuccess -> "EvaluationSuccess"
   EventThrowToUnmasked a ->
     "ThrowToUnmasked " ++ ppLabelled ppIOSimThreadId a
   EventThreadForked a ->
