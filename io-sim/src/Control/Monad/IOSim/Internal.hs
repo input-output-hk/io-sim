@@ -295,7 +295,10 @@ schedule !thread@Thread{
       schedule thread' simstate
 
     Evaluate expr k -> do
-      mbWHNF <- unsafeIOToST $ try $ evaluate expr
+      mbWHNF <- unsafeIOToST $ tryJust (\e -> case fromException @SomeAsyncException e of
+                                          Nothing -> Just e
+                                          Just {} -> Nothing)
+                             $ evaluate expr
       case mbWHNF of
         Left e -> do
           -- schedule this thread to immediately raise the exception
