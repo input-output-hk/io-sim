@@ -4,9 +4,26 @@
 
 ### Breaking changes
 
+* Added `EventEvaluationError`, `EvenatEvaluationSuccess`
+* Added `EventSayEvaluationError`, `EventLogEvaluationError`
 * Added `flushEventLog` to `MonadEventLog` instance.
 
 ### Non-breaking changes
+
+* `ppSimEventType` (used by `Control.Monad.IOSim.ppTrace` and
+  `Control.Monad.IOSim.ppTrace_`): does not fail if `EventThrow` or
+  `EventThrowTo` contain a pure exception.  This supports laziness of `throwIO`
+  and `throwTo`.
+* `say`, `traceM` and `traceSTM` evaluate their arguments (first one to _NF_
+  the other two to _WHNF_).  They throw an exception (within the simulator) if
+  evaluation fails.  For `say` this makes it behave like `putStrLn` does.
+  Previously all would throw a pure exception which would terminate the
+  simulator prematurelly.  If you want to verify that these calls do not fail,
+  you can check that the trace does not contain `EventSayEvaluationError` or
+  `EventLogEvaluationError`.
+* Added `Data.List.Trace.last`
+* Although `IOSim` and `IOSimPOR` are pure we use `evaluate` in a few places,
+  non of them now catches asynchrounous exceptions.
 
 ## 1.9.1.0
 
