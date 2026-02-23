@@ -4,7 +4,7 @@
 
 ### Breaking changes
 
-* Added `EventEvaluationError`, `EvenatEvaluationSuccess`
+* Added `EventEvaluationError`, `EventEvaluationSuccess`
 * Added `EventSayEvaluationError`, `EventLogEvaluationError`
 * Added `flushEventLog` to `MonadEventLog` instance.
 
@@ -18,12 +18,12 @@
   the other two to _WHNF_).  They throw an exception (within the simulator) if
   evaluation fails.  For `say` this makes it behave like `putStrLn` does.
   Previously all would throw a pure exception which would terminate the
-  simulator prematurelly.  If you want to verify that these calls do not fail,
-  you can check that the trace does not contain `EventSayEvaluationError` or
+  simulator prematurely.  If you want to verify that these calls do not fail,
+  you can check for absence of `EventSayEvaluationError` or
   `EventLogEvaluationError`.
 * Added `Data.List.Trace.last`
 * Although `IOSim` and `IOSimPOR` are pure we use `evaluate` in a few places,
-  non of them now catches asynchrounous exceptions.
+  non of them now catch asynchrounous exceptions.
 
 ## 1.9.1.0
 
