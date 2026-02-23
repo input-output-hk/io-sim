@@ -1,6 +1,6 @@
 # Revision history of io-sim
 
-## next release
+## 1.10.0.0
 
 ### Breaking changes
 
