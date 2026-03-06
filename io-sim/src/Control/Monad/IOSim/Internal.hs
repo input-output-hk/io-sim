@@ -826,26 +826,29 @@ unblockThreads !onlySTM !wakeup !simstate@SimState {runqueue, threads} =
                    threads
                    unblocked
 
--- | This function receives a list of TimerTimeout values that represent threads
--- for which the timeout expired and kills the running thread if needed.
+-- | This function receives a list of TimerTimeout values that represent
+-- threads for which the timeout expired and kills the running thread if
+-- needed.
 --
--- This function is responsible for the second part of the race condition issue
--- and relates to the 'schedule's 'TimeoutFrame' locking explanation (here is
--- where the assassin threads are launched. So, as explained previously, at this
--- point in code, the timeout expired so we need to interrupt the running
--- thread. If the running thread finished at the same time the timeout expired
--- we have a race condition. To deal with this race condition what we do is
--- look at the lock value. If it is 'Locked' this means that the running thread
--- already finished (or won the race) so we can safely do nothing. Otherwise, if
--- the lock value is 'NotLocked' we need to acquire the lock and launch an
--- assassin thread that is going to interrupt the running one. Note that we
--- should run this interrupting thread in an unmasked state since it might
--- receive a 'ThreadKilled' exception.
+-- This function is responsible for the second part of the race condition
+-- issue and relates to the 'schedule's 'TimeoutFrame' locking explanation
+-- (here is where the assassin threads are launched. So, as explained
+-- previously, at this point in code, the timeout expired so we need to
+-- interrupt the running thread. If the running thread finished at the same
+-- time the timeout expired we have a race condition. To deal with this race
+-- condition what we do is look at the lock value. If it is 'Locked' this
+-- means that the running thread already finished (or won the race) so we
+-- can safely do nothing. Otherwise, if the lock value is 'NotLocked' we
+-- need to acquire the lock and launch an assassin thread that is going to
+-- interrupt the running one. Note that we should run this interrupting
+-- thread in an unmasked state since it might receive a 'ThreadKilled'
+-- exception.
 --
-forkTimeoutInterruptThreads :: forall s a.
-                               [(IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)]
-                            -> SimState s a
-                            -> ST s (SimState s a)
+forkTimeoutInterruptThreads
+  :: forall s a.
+     [(IOSimThreadId, TimeoutId, TMVar (IOSim s) IOSimThreadId)]
+  -> SimState s a
+  -> ST s (SimState s a)
 forkTimeoutInterruptThreads timeoutExpired simState =
   foldlM (\st@SimState{ runqueue, threads }
            (t, TMVar lock)
@@ -861,8 +864,8 @@ forkTimeoutInterruptThreads timeoutExpired simState =
           throwToThread
 
   where
-    -- we launch a thread responsible for throwing an AsyncCancelled exception
-    -- to the thread which timeout expired
+    -- we launch a thread responsible for throwing an AsyncCancelled
+    -- exception to the thread which timeout expired
     throwToThread :: [(Thread s a, TMVar (IOSim s) IOSimThreadId)]
 
     (simState', throwToThread) = List.mapAccumR fn simState timeoutExpired
@@ -896,11 +899,12 @@ forkTimeoutInterruptThreads timeoutExpired simState =
                 )
              )
 
--- | Iterate through the control stack to find an enclosing exception handler
--- of the right type, or unwind all the way to the top level for the thread.
+-- | Iterate through the control stack to find an enclosing exception
+-- handler of the right type, or unwind all the way to the top level for the
+-- thread.
 --
--- Also return if it's the main thread or a forked thread since we handle the
--- cases differently.
+-- Also return if it's the main thread or a forked thread since we handle
+-- the cases differently.
 --
 -- Also remove timeouts associated to frames we unwind.
 --
