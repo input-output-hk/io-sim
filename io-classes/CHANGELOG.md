@@ -1,5 +1,13 @@
 # Revsion history of io-classes
 
+## next
+
+### Breaking changes
+
+### Non-breaking changes
+
+* Support `ghc-9.14`
+
 ## 1.10.0.0
 
 ### Breaking changes

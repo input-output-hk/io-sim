@@ -64,7 +64,7 @@ library
   default-extensions:  LambdaCase
   if impl(ghc < 9.4)
     default-extensions: GADTs
-  build-depends:       base              >=4.16 && <4.22,
+  build-depends:       base              >=4.16 && <4.23,
                        io-classes:{io-classes,strict-stm,si-timers}
                                         ^>=1.9 || ^>=1.10,
                        exceptions        >=0.10,
