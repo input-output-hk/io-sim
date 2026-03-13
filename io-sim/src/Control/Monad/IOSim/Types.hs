@@ -846,7 +846,6 @@ data SimEvent
   deriving Generic
   deriving Show via Quiet SimEvent
 
-
 -- | Pretty print a 'SimEvent'.
 --
 ppSimEvent :: Int -- ^ width of the time

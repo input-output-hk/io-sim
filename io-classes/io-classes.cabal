@@ -90,7 +90,7 @@ library
                        Control.Monad.Class.MonadUnique
   default-language:    GHC2021
   default-extensions:  LambdaCase
-  build-depends:       base  >=4.16 && <4.22,
+  build-depends:       base  >=4.16 && <4.23,
                        array,
                        async >=2.1 && <2.3,
                        bytestring,
