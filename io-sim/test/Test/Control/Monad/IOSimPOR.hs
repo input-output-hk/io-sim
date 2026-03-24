@@ -45,6 +45,7 @@ import Test.Control.Monad.Utils
 
 import Data.List.Trace qualified as Trace
 import Test.QuickCheck
+import Test.QuickCheck.Monadic (assert, run)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
 
@@ -122,6 +123,11 @@ tests =
 
       , testProperty "catch: throwTo async blocking (IOSim)"
       $ forall_masking_states unit_catch_throwTo_masking_state_async_mayblock_ST
+      ]
+    , testGroup "PropertyM callbacks"
+      [ testProperty "happy path"      unit_monadicIOSimPOR_0
+      , testProperty "failing assert"  unit_monadicIOSimPOR_1
+      , testProperty "exception"       unit_monadicIOSimPOR_2
       ]
     , testProperty "evaluate unit test" unit_evaluate_0
     , testGroup "forkIO unit tests"
@@ -756,6 +762,30 @@ unit_catch_6 =
                       say "after"
                    ) $ \_ trace ->
     selectTraceSay trace === ["inner", "handler1", "handler2", "after"]
+
+unit_monadicIOSimPOR_0, unit_monadicIOSimPOR_1, unit_monadicIOSimPOR_2
+  :: Property
+
+-- | Basic success case: a PropertyM test can be executed through IOSimPOR.
+unit_monadicIOSimPOR_0 =
+  monadicIOSimPOR_ $ do
+    x <- run (pure (1 :: Int))
+    assert (x == 1)
+
+-- | Failing assertions inside PropertyM are reported as property failures.
+unit_monadicIOSimPOR_1 =
+  expectFailure $
+    monadicIOSimPOR_ $ do
+      x <- run (pure (1 :: Int))
+      assert (x == 2)
+
+-- | Exceptions thrown by the simulation are turned into failing properties via
+-- `traceResult False`, matching the manual workaround from issue #229.
+unit_monadicIOSimPOR_2 =
+  expectFailure $
+    monadicIOSimPOR_ $ do
+      _ <- run $ evaluate (error "boom" :: ())
+      assert True
 
 -- evaluate should catch pure errors
 unit_evaluate_0 :: Property
