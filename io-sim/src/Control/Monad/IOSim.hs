@@ -18,6 +18,9 @@ module Control.Monad.IOSim
   , monadicIOSim
   , runIOSimGen
     -- ** Explore races using /IOSimPOR/
+  , monadicIOSimPOR_
+  , monadicIOSimPOR
+  , runIOSimPORGen
     -- $iosimpor
   , exploreSimTrace
   , controlSimTrace
@@ -801,3 +804,77 @@ runIOSimGen f sim = do
     Capture eval <- capture
     let trace = runSimTrace (eval sim)
     return (f trace)
+
+-- | Like <runSTGen
+-- https://hackage.haskell.org/package/QuickCheck-2.14.3/docs/Test-QuickCheck-Monadic.html#v:runSTGen>,
+-- but evaluates generated simulations using 'exploreSimTrace'.
+--
+-- The callback receives the previously passing trace (if any) and the current
+-- trace being checked.
+--
+-- @since 1.10.0.0
+--
+runIOSimPORGen :: Testable test
+               => (ExplorationOptions -> ExplorationOptions)
+               -> (Maybe (SimTrace a) -> SimTrace a -> test)
+               -> (forall s. Gen (IOSim s a))
+               -> Gen Property
+runIOSimPORGen optsf k sim = do
+  Capture eval <- capture
+  pure $ exploreSimTrace optsf (eval sim) k
+
+-- | A /IOSimPOR/ variant of 'monadicIOSim_', which:
+--
+-- * explores alternative schedules using 'exploreSimTrace';
+-- * allows to run in monad stacks build on top of `IOSim`;
+-- * gives more control how to attach debugging information to failed
+--   tests.
+--
+-- Note, to use this combinator your monad needs to be defined as:
+--
+-- > newtype M s a = M { runM :: ReaderT State (IOSim s) a }
+--
+-- It's important that `M s` is a monad.  For such a monad you'll need to
+-- provide a natural transformation:
+-- @
+--   -- the state could also be created as an `IOSim` computation.
+--   nat :: forall s a. State -> M s a -> 'IOSim' s a
+--   nat state m = runStateT (runM m) state
+-- @
+--
+-- @since 1.10.0.0
+--
+monadicIOSimPOR :: (Testable a, forall s. Monad (m s))
+                => (ExplorationOptions -> ExplorationOptions)
+                -> (Maybe (SimTrace Property) -> SimTrace Property -> Property)
+                -> (forall s a. m s a -> IOSim s a)
+                -> (forall s. PropertyM (m s) a)
+                -> Property
+monadicIOSimPOR optsf f tr sim =
+  property (runIOSimPORGen optsf f (tr <$> monadic' sim))
+
+-- | Like <monadicST
+-- https://hackage.haskell.org/package/QuickCheck-2.14.3/docs/Test-QuickCheck-Monadic.html#v:monadicST>,
+-- but using /IOSimPOR/ schedule exploration.
+--
+-- Note: it calls `traceResult` in non-strict mode, e.g. leaked threads do not
+-- cause failures.
+--
+-- > testProperty "example" $
+-- >   monadicIOSimPOR_ $ do
+-- >     x <- run (pure (1 :: Int))
+-- >     assert (x == 1)
+--
+-- @since 1.10.0.0
+--
+monadicIOSimPOR_ :: Testable a
+                 => (forall s. PropertyM (IOSim s) a)
+                 -> Property
+monadicIOSimPOR_ sim =
+   monadicIOSimPOR
+      id
+      (\_ tr -> case traceResult False tr of
+          Left e  -> counterexample (show e) False
+          Right p -> p)
+      id
+      sim

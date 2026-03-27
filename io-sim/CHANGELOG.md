@@ -24,6 +24,8 @@
 * Added `Data.List.Trace.last`
 * Although `IOSim` and `IOSimPOR` are pure we use `evaluate` in a few places,
   non of them now catch asynchrounous exceptions.
+* Added `IOSimPOR` QuickCheck monadic combinators:
+  `monadicIOSimPOR`, `monadicIOSimPOR_` and `runIOSimPORGen`.
 
 ## 1.9.1.0
 
