@@ -6,6 +6,10 @@
 
 ### Non-breaking changes
 
+## 1.10.1.0
+
+### Non-breaking changes
+
 * Support `ghc-9.14`
 
 ## 1.10.0.0

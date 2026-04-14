@@ -70,9 +70,9 @@ tests =
     -- , testProperty "propPermutations" propPermutations
     ]
   , testGroup "IO simulator properties"
-    [ testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
+    [ testProperty "read/write graph (IOSim)" (withNumTests 1000 prop_stm_graph_sim)
     , testGroup "timeouts"
-      [ testProperty "IOSim"                  (withMaxSuccess 1000 prop_timers_ST)
+      [ testProperty "IOSim"                  (withNumTests 1000 prop_timers_ST)
       , testProperty "IOSim: no deadlock"     prop_timeout_no_deadlock_Sim
       , testProperty "timeout"                prop_timeout
       , testProperty "timeouts"               prop_timeouts
@@ -86,8 +86,8 @@ tests =
         ]
       ]
     , testProperty "infinite simulation"      prop_explore_endless_simulation
-    , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
-    , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
+    , testProperty "threadId order (IOSim)"   (withNumTests 1000 prop_threadId_order_order_Sim)
+    , testProperty "forkIO order (IOSim)"     (withNumTests 1000 prop_fork_order_ST)
     , testGroup "throw/catch unit tests"
       [ testProperty "0" unit_catch_0
       , testProperty "1" unit_catch_1

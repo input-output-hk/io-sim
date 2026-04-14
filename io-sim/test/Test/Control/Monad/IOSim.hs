@@ -56,9 +56,9 @@ tests :: TestTree
 tests =
   testGroup "IOSim"
   [ testProperty "read/write graph (IO)"    prop_stm_graph_io
-  , testProperty "read/write graph (IOSim)" (withMaxSuccess 1000 prop_stm_graph_sim)
+  , testProperty "read/write graph (IOSim)" (withNumTests 1000 prop_stm_graph_sim)
   , testGroup "timeouts"
-    [ testProperty "IOSim"                  (withMaxSuccess 1000 prop_timers_ST)
+    [ testProperty "IOSim"                  (withNumTests 1000 prop_timers_ST)
     -- fails since we just use `threadDelay` to schedule timers in `IO`.
     , testProperty "IO"                     (expectFailure prop_timers_IO)
     , testProperty "IOSim: no deadlock"     prop_timeout_no_deadlock_Sim
@@ -83,8 +83,8 @@ tests =
     [ testProperty "timeout: discardAfter"  unit_discardAfter
     , testProperty "timeout: within"        unit_within
     ]
-  , testProperty "threadId order (IOSim)"   (withMaxSuccess 1000 prop_threadId_order_order_Sim)
-  , testProperty "forkIO order (IOSim)"     (withMaxSuccess 1000 prop_fork_order_ST)
+  , testProperty "threadId order (IOSim)"   (withNumTests 1000 prop_threadId_order_order_Sim)
+  , testProperty "forkIO order (IOSim)"     (withNumTests 1000 prop_fork_order_ST)
   , testProperty "order (IO)"               (expectFailure prop_fork_order_IO)
   , testProperty "STM wakeup order"         prop_wakeup_order_ST
   , testGroup "throw/catch unit tests"

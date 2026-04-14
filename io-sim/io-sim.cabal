@@ -1,6 +1,6 @@
 cabal-version:       3.4
 name:                io-sim
-version:             1.10.0.0
+version:             1.10.1.0
 synopsis:            A pure simulator for monadic concurrency with STM.
 description:
   A pure simulator monad with support of concurrency (base & async style), stm,
@@ -19,7 +19,7 @@ category:            Testing
 build-type:          Simple
 extra-doc-files:     CHANGELOG.md README.md
 bug-reports:         https://github.com/input-output-hk/io-sim/issues
-tested-with:         GHC == { 9.6, 9.8, 9.10, 9.12 }
+tested-with:         GHC == { 9.6, 9.8, 9.10, 9.12, 9.14 }
 
 flag asserts
   description: Enable assertions
@@ -112,6 +112,8 @@ test-suite test
                        -rtsopts
   if impl(ghc >= 9.8)
     ghc-options:       -Wno-x-partial
+  if impl(ghc >= 9.14)
+    ghc-options:       -Wno-incomplete-record-selectors
 
 benchmark bench
   import:              warnings

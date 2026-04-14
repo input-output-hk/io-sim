@@ -1,5 +1,16 @@
 # Revision history of io-sim
 
+## 1.10.1.0
+
+### Non-breaking changes
+
+* Added `IOSimPOR` `QuickCheck` combinators:
+  * `monadicIOSimPOR_`
+  * `monadicIOSimPOR`
+  * `runIOSimPORGen`
+* Support ghc-9.14
+* Support QuickCheck-2.18.0.0
+
 ## 1.10.0.0
 
 ### Breaking changes
@@ -23,7 +34,7 @@
   `EventLogEvaluationError`.
 * Added `Data.List.Trace.last`
 * Although `IOSim` and `IOSimPOR` are pure we use `evaluate` in a few places,
-  non of them now catch asynchrounous exceptions.
+  none of them now catch asynchronous exceptions.
 * Added `IOSimPOR` QuickCheck monadic combinators:
   `monadicIOSimPOR`, `monadicIOSimPOR_` and `runIOSimPORGen`.
 

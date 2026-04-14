@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Test.Control.Monad.Utils where
 
 import Data.Array
@@ -17,6 +18,11 @@ import Control.Monad.IOSim
 import Test.Control.Monad.STM
 
 import Test.QuickCheck
+
+#if !MIN_VERSION_QuickCheck(2,18,0)
+withNumTests :: Testable prop => Int -> prop -> Property
+withNumTests = withMaxSuccess
+#endif
 
 --
 -- Read/Write graph
@@ -489,7 +495,7 @@ forall_masking_states :: (MaskingState -> Property)
                       -> Property
 forall_masking_states prop =
     -- make sure that the property is executed once!
-    withMaxSuccess 1 $
+    withNumTests 1 $
     foldr (\ms p -> counterexample (show ms) (prop ms) .&&. p)
           (property True)
           [Unmasked, MaskedInterruptible, MaskedUninterruptible]
