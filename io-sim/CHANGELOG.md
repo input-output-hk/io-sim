@@ -34,7 +34,7 @@
   `EventLogEvaluationError`.
 * Added `Data.List.Trace.last`
 * Although `IOSim` and `IOSimPOR` are pure we use `evaluate` in a few places,
-  non of them now catch asynchrounous exceptions.
+  none of them now catch asynchronous exceptions.
 * Added `IOSimPOR` QuickCheck monadic combinators:
   `monadicIOSimPOR`, `monadicIOSimPOR_` and `runIOSimPORGen`.
 
