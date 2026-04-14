@@ -11,3 +11,19 @@ package io-classes
 
 package strict-stm
   flags: +asserts
+
+if impl(ghc >= 9.14)
+  allow-newer: microstache:base
+             , microstache:containers
+             , binary-orphans:base
+             , aeson:template-haskell
+             , aeson:bytestring
+             , aeson:containers
+             , indexed-traversable:base
+             , indexed-traversable:containers
+             , indexed-traversable-instances:base
+             , uuid-types:template-haskell
+             , these:base
+             , semialign:base
+             , semialign:containers
+             , criterion:aeson

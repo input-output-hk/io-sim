@@ -19,7 +19,7 @@ category:            Testing
 build-type:          Simple
 extra-doc-files:     CHANGELOG.md README.md
 bug-reports:         https://github.com/input-output-hk/io-sim/issues
-tested-with:         GHC == { 9.6, 9.8, 9.10, 9.12 }
+tested-with:         GHC == { 9.6, 9.8, 9.10, 9.12, 9.14 }
 
 flag asserts
   description: Enable assertions
