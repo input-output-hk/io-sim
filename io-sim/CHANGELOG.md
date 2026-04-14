@@ -1,5 +1,16 @@
 # Revision history of io-sim
 
+## 1.10.1.0
+
+### Non-breaking changes
+
+* Added `IOSimPOR` `QuickCheck` combinators:
+  * `monadicIOSimPOR_`
+  * `monadicIOSimPOR`
+  * `runIOSimPORGen`
+* Support ghc-9.14
+* Support QuickCheck-2.18.0.0
+
 ## 1.10.0.0
 
 ### Breaking changes
