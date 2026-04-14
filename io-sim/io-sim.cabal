@@ -112,6 +112,8 @@ test-suite test
                        -rtsopts
   if impl(ghc >= 9.8)
     ghc-options:       -Wno-x-partial
+  if impl(ghc >= 9.14)
+    ghc-options:       -Wno-incomplete-record-selectors
 
 benchmark bench
   import:              warnings
