@@ -4,6 +4,8 @@
 
 ### Breaking changes
 
+- Removed the deprecated `withLiftST` (deprecated since `io-classes-1.5.0.0`).
+
 ### Non-breaking changes
 
 ## 1.10.1.0
