@@ -37,21 +37,12 @@ class PrimMonad m => MonadST m where
   -- | @since 1.4.1.0
   stToIO :: ST (PrimState m) a -> m a
 
-  -- | Deprecated. Use 'stToIO' instead.
-  withLiftST :: (forall s. (forall a. ST s a -> m a) -> b) -> b
-  withLiftST = \k -> k stToIO
-
-{-# DEPRECATED withLiftST "Use the simpler 'stToIO' instead." #-}
-
 instance MonadST IO where
   stToIO = stToPrim
 
 instance MonadST (ST s) where
   stToIO = stToPrim
-  withLiftST = \f -> f id
 
 instance (MonadST m, PrimMonad m) => MonadST (ReaderT r m) where
   stToIO :: ST (PrimState m) a -> ReaderT r m a
   stToIO f = lift (stToPrim f)
-
-  withLiftST f = withLiftST $ \g -> f (lift . g)
